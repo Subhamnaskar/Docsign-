@@ -1,0 +1,98 @@
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { prisma } from '../db.js';
+import { API_KEY_PREFIX, requireAuth } from '../lib/auth.js';
+import { randomToken, sha256Hex } from '../lib/crypto.js';
+import { notFound } from '../lib/errors.js';
+import { parse } from '../lib/validate.js';
+import { listAdapters } from '../adapters/registry.js';
+import { signPayload, WEBHOOK_EVENTS } from '../webhooks/dispatcher.js';
+
+export async function developerRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', requireAuth);
+
+  app.get('/api-keys', async (req) => {
+    const keys = await prisma.apiKey.findMany({
+      where: { orgId: req.auth.orgId, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    return keys.map(({ keyHash: _, ...k }) => k);
+  });
+
+  /** The full key is returned once, at creation. */
+  app.post('/api-keys', async (req, reply) => {
+    const { name } = parse(z.object({ name: z.string().trim().min(1).max(80) }), req.body);
+    const key = `${API_KEY_PREFIX}${randomToken(24)}`;
+    const created = await prisma.apiKey.create({
+      data: { orgId: req.auth.orgId, name, prefix: key.slice(0, 12), keyHash: sha256Hex(key) },
+    });
+    reply.code(201);
+    return { id: created.id, name: created.name, prefix: created.prefix, createdAt: created.createdAt, key };
+  });
+
+  app.delete('/api-keys/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const res = await prisma.apiKey.updateMany({
+      where: { id, orgId: req.auth.orgId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (res.count === 0) throw notFound('API key');
+    reply.code(204);
+  });
+
+  app.get('/webhooks', async (req) => {
+    const endpoints = await prisma.webhookEndpoint.findMany({
+      where: { orgId: req.auth.orgId },
+      orderBy: { createdAt: 'desc' },
+      include: { deliveries: { orderBy: { createdAt: 'desc' }, take: 10 } },
+    });
+    return { events: WEBHOOK_EVENTS, endpoints };
+  });
+
+  app.post('/webhooks', async (req, reply) => {
+    const body = parse(
+      z.object({
+        url: z.string().url().refine((u) => /^https?:\/\//.test(u), 'Use an http(s) URL'),
+        events: z.array(z.enum(WEBHOOK_EVENTS)).default([]),
+      }),
+      req.body,
+    );
+    const endpoint = await prisma.webhookEndpoint.create({
+      data: { orgId: req.auth.orgId, url: body.url, events: body.events, secret: `whsec_${randomToken(24)}` },
+    });
+    reply.code(201);
+    return endpoint;
+  });
+
+  app.delete('/webhooks/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const res = await prisma.webhookEndpoint.deleteMany({ where: { id, orgId: req.auth.orgId } });
+    if (res.count === 0) throw notFound('Webhook endpoint');
+    reply.code(204);
+  });
+
+  /** Sends a synchronous test event so users can check their receiver. */
+  app.post('/webhooks/:id/test', async (req) => {
+    const { id } = req.params as { id: string };
+    const endpoint = await prisma.webhookEndpoint.findFirst({ where: { id, orgId: req.auth.orgId } });
+    if (!endpoint) throw notFound('Webhook endpoint');
+    const body = JSON.stringify({ id: 'test', event: 'ping', createdAt: new Date().toISOString(), data: {} });
+    try {
+      const res = await fetch(endpoint.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-DocSign-Event': 'ping',
+          'X-DocSign-Signature': signPayload(endpoint.secret, body),
+        },
+        body,
+        signal: AbortSignal.timeout(10_000),
+      });
+      return { ok: res.ok, status: res.status };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+
+  app.get('/adapters', async () => listAdapters());
+}

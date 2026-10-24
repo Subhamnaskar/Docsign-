@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id           String            @id @default(cuid())
+  name         String
+  // Default jurisdiction applied to new envelopes (US, UK, EU, IN ...)
+  jurisdiction String            @default("US")
+  // Regional cell that owns this tenant's data
+  dataRegion   String
+  createdAt    DateTime          @default(now())
+  users        User[]
+  envelopes    Envelope[]
+  apiKeys      ApiKey[]
+  webhooks     WebhookEndpoint[]
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         UserRole   @default(MEMBER)
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sessions     Session[]
+  envelopes    Envelope[]
+  createdAt    DateTime   @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model ApiKey {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name       String
+  // First characters of the key, shown in the UI so users can tell keys apart
+  prefix     String
+  keyHash    String       @unique
+  createdAt  DateTime     @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Agreements
+// ---------------------------------------------------------------------------
+
+enum EnvelopeStatus {
+  DRAFT
+  SENT
+  COMPLETED
+  DECLINED
+  VOIDED
+  EXPIRED
+}
+
+enum RoutingMode {
+  SEQUENTIAL
+  PARALLEL
+}
+
+model Envelope {
+  id             String         @id @default(cuid())
+  orgId          String
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  title          String
+  message        String?
+  status         EnvelopeStatus @default(DRAFT)
+  routing        RoutingMode    @default(SEQUENTIAL)
+  jurisdiction   String
+  documentType   String         @default("general")
+  // Snapshot of the resolved compliance profile at send time
+  policy         Json?
+  reminderDays   Int            @default(2)
+  expiresAt      DateTime?
+  sentAt         DateTime?
+  completedAt    DateTime?
+  // Claim marker so only one worker seals a fully signed envelope; stale claims are retried
+  finalizingAt   DateTime?
+  voidReason     String?
+  certificateKey String?
+  certificateSha256 String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  documents      Document[]
+  recipients     Recipient[]
+  fields         Field[]
+  auditEvents    AuditEvent[]
+
+  @@index([orgId, status])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  envelopeId  String
+  envelope    Envelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  name        String
+  order       Int      @default(0)
+  // Original (converted) PDF
+  storageKey  String
+  sha256      String
+  pageCount   Int
+  // [{ width, height }] in PDF points, used by the field editor
+  pages       Json
+  // Completed, sealed PDF
+  finalKey    String?
+  finalSha256 String?
+  createdAt   DateTime @default(now())
+  fields      Field[]
+
+  @@index([finalSha256])
+}
+
+enum RecipientRole {
+  SIGNER
+  CC
+}
+
+enum RecipientStatus {
+  CREATED
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+}
+
+model Recipient {
+  id                 String          @id @default(cuid())
+  envelopeId         String
+  envelope           Envelope        @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  name               String
+  email              String
+  role               RecipientRole   @default(SIGNER)
+  routingOrder       Int             @default(1)
+  status             RecipientStatus @default(CREATED)
+  // One-time passcode for signer authentication (hashed)
+  otpHash            String?
+  otpExpiresAt       DateTime?
+  otpAttempts        Int             @default(0)
+  // Set after OTP verification; ties the signing session to one browser
+  signerSessionHash  String?
+  verifiedAt         DateTime?
+  viewedAt           DateTime?
+  signedAt           DateTime?
+  declinedAt         DateTime?
+  declineReason      String?
+  lastNotifiedAt     DateTime?
+  signedIp           String?
+  signedUserAgent    String?
+  fields             Field[]
+
+  @@index([envelopeId])
+}
+
+enum FieldType {
+  SIGNATURE
+  INITIALS
+  DATE_SIGNED
+  NAME
+  EMAIL
+  TEXT
+  CHECKBOX
+}
+
+model Field {
+  id          String    @id @default(cuid())
+  envelopeId  String
+  envelope    Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  documentId  String
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  type        FieldType
+  // 0-based page index; position and size are fractions (0..1) of the page,
+  // measured from the top-left corner.
+  page        Int
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  required    Boolean   @default(true)
+  label       String?
+  // Filled in by the signer. Signatures/initials are PNG data URLs.
+  value       String?
+
+  @@index([envelopeId])
+}
+
+// ---------------------------------------------------------------------------
+// Evidence
+// ---------------------------------------------------------------------------
+
+// Append-only, hash-chained log. hash = SHA-256(prevHash || canonical(event)).
+model AuditEvent {
+  id         String   @id @default(cuid())
+  envelopeId String
+  envelope   Envelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  seq        Int
+  type       String
+  actor      Json
+  data       Json
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime
+  prevHash   String
+  hash       String
+
+  @@unique([envelopeId, seq])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations
+// ---------------------------------------------------------------------------
+
+model WebhookEndpoint {
+  id         String            @id @default(cuid())
+  orgId      String
+  org        Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  url        String
+  secret     String
+  // Empty = all events
+  events     String[]
+  active     Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  deliveries WebhookDelivery[]
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+// Transactional outbox: rows are written in the same transaction as the
+// state change, then delivered by the worker with retries.
+model WebhookDelivery {
+  id            String          @id @default(cuid())
+  endpointId    String
+  endpoint      WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event         String
+  payload       Json
+  status        DeliveryStatus  @default(PENDING)
+  attempts      Int             @default(0)
+  nextAttemptAt DateTime        @default(now())
+  lastError     String?
+  responseCode  Int?
+  deliveredAt   DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([status, nextAttemptAt])
+}

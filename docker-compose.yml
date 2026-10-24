@@ -1,0 +1,50 @@
+# Local infrastructure for one "regional cell" (see docs/ARCHITECTURE.md).
+name: docsign
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: docsign
+      POSTGRES_PASSWORD: docsign
+      POSTGRES_DB: docsign
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docsign"]
+      interval: 5s
+      retries: 10
+
+  # S3-compatible object storage (RustFS). Completed documents are written with
+  # Object Lock retention (write-once), mirroring S3 Object Lock in production.
+  # Console: http://localhost:9001
+  objectstore:
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_ACCESS_KEY: docsign
+      RUSTFS_SECRET_KEY: docsign-secret
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - objectdata:/data
+
+  # Catches all outgoing email. Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  # Converts DOCX/XLSX/PPTX/ODT/RTF/TXT uploads to PDF.
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3100:3000"
+
+volumes:
+  pgdata:
+  objectdata:

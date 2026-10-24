@@ -1,0 +1,255 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { AppShell, useMe } from '@/components/AppShell';
+import { Alert, Button, Card, cx, Input, Label, Select } from '@/components/ui';
+import { api } from '@/lib/api';
+import { formatDate, relativeTime } from '@/lib/format';
+import type { Option } from '@/lib/types';
+
+interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+interface WebhookEndpoint {
+  id: string;
+  url: string;
+  secret: string;
+  events: string[];
+  active: boolean;
+  createdAt: string;
+  deliveries: { id: string; event: string; status: string; attempts: number; responseCode: number | null; lastError: string | null; createdAt: string }[];
+}
+
+function Organization() {
+  const me = useMe();
+  const [jurisdictions, setJurisdictions] = useState<Option[]>([]);
+  const [name, setName] = useState(me?.organization.name ?? '');
+  const [jurisdiction, setJurisdiction] = useState(me?.organization.jurisdiction ?? 'US');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api<{ jurisdictions: Option[] }>('/policy/options').then((o) => setJurisdictions(o.jurisdictions));
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    await api('/organization', { method: 'PATCH', json: { name, jurisdiction } });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold">Organization</h2>
+      <form onSubmit={save} className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="org-name">Name</Label>
+          <Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} required />
+        </div>
+        <div>
+          <Label htmlFor="org-j">Default jurisdiction</Label>
+          <Select id="org-j" value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)}>
+            {jurisdictions.map((j) => (
+              <option key={j.code} value={j.code}>
+                {j.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex items-center gap-3 sm:col-span-2">
+          <Button type="submit">Save</Button>
+          {saved && <span className="text-sm text-green-700">Saved</span>}
+          <span className="ml-auto text-xs text-gray-400">
+            Data region: <span className="font-medium uppercase">{me?.organization.dataRegion}</span>
+          </span>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+function ApiKeys() {
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [name, setName] = useState('');
+  const [created, setCreated] = useState<string | null>(null);
+  const load = useCallback(() => api<ApiKey[]>('/api-keys').then(setKeys), []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await api<{ key: string }>('/api-keys', { method: 'POST', json: { name } });
+    setCreated(res.key);
+    setName('');
+    load();
+  }
+
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold">API keys</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        Use <code className="rounded bg-gray-100 px-1">Authorization: Bearer &lt;key&gt;</code> with any endpoint under <code className="rounded bg-gray-100 px-1">/api/v1</code>.
+      </p>
+      {created && (
+        <div className="mt-4">
+          <Alert tone="success" title="Copy your key now. It won't be shown again.">
+            <code className="mt-1 block break-all font-mono text-xs">{created}</code>
+          </Alert>
+        </div>
+      )}
+      <form onSubmit={create} className="mt-4 flex gap-2">
+        <Input placeholder="Key name, e.g. CRM integration" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Button type="submit">Create key</Button>
+      </form>
+      {keys.length > 0 && (
+        <ul className="mt-4 divide-y divide-gray-100 text-sm">
+          {keys.map((k) => (
+            <li key={k.id} className="flex items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{k.name}</div>
+                <div className="font-mono text-xs text-gray-400">
+                  {k.prefix}… · created {formatDate(k.createdAt, false)} · {k.lastUsedAt ? `used ${relativeTime(k.lastUsedAt)}` : 'never used'}
+                </div>
+              </div>
+              <button
+                className="text-sm text-gray-400 hover:text-red-600"
+                onClick={async () => {
+                  if (!confirm(`Revoke "${k.name}"? Apps using it will stop working.`)) return;
+                  await api(`/api-keys/${k.id}`, { method: 'DELETE' });
+                  load();
+                }}
+              >
+                Revoke
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function Webhooks() {
+  const [data, setData] = useState<{ events: string[]; endpoints: WebhookEndpoint[] } | null>(null);
+  const [url, setUrl] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, string>>({});
+  const load = useCallback(() => api<typeof data>('/webhooks').then(setData), []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api('/webhooks', { method: 'POST', json: { url, events: selected } });
+      setUrl('');
+      setSelected([]);
+      load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold">Webhooks</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        Events are signed with HMAC-SHA256 in the <code className="rounded bg-gray-100 px-1">X-DocSign-Signature</code> header (
+        <code className="rounded bg-gray-100 px-1">t=…,v1=…</code> over <code className="rounded bg-gray-100 px-1">t.body</code>) and retried with backoff.
+      </p>
+      {error && (
+        <div className="mt-3">
+          <Alert>{error}</Alert>
+        </div>
+      )}
+      <form onSubmit={create} className="mt-4 space-y-3">
+        <div className="flex gap-2">
+          <Input type="url" placeholder="https://example.com/webhooks/docsign" value={url} onChange={(e) => setUrl(e.target.value)} required />
+          <Button type="submit">Add endpoint</Button>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {data?.events.map((ev) => (
+            <button
+              type="button"
+              key={ev}
+              onClick={() => setSelected((s) => (s.includes(ev) ? s.filter((x) => x !== ev) : [...s, ev]))}
+              className={cx('rounded-full px-2.5 py-1 font-mono text-xs', selected.includes(ev) ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
+            >
+              {ev}
+            </button>
+          ))}
+          <span className="self-center text-xs text-gray-400">{selected.length ? '' : 'No selection = all events'}</span>
+        </div>
+      </form>
+      <ul className="mt-4 space-y-3">
+        {data?.endpoints.map((ep) => (
+          <li key={ep.id} className="rounded-lg border border-gray-200 p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="min-w-0 flex-1 truncate font-medium">{ep.url}</span>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  const r = await api<{ ok: boolean; status?: number; error?: string }>(`/webhooks/${ep.id}/test`, { method: 'POST' });
+                  setTestResult((t) => ({ ...t, [ep.id]: r.ok ? `OK (${r.status})` : `Failed: ${r.error ?? r.status}` }));
+                }}
+              >
+                Send test
+              </Button>
+              <button
+                className="text-gray-400 hover:text-red-600"
+                onClick={async () => {
+                  if (!confirm('Delete this endpoint?')) return;
+                  await api(`/webhooks/${ep.id}`, { method: 'DELETE' });
+                  load();
+                }}
+              >
+                Delete
+              </button>
+            </div>
+            {testResult[ep.id] && <div className="mt-1 text-xs text-gray-500">Test: {testResult[ep.id]}</div>}
+            <div className="mt-1 font-mono text-xs text-gray-400">
+              secret {ep.secret} · {ep.events.length ? ep.events.join(', ') : 'all events'}
+            </div>
+            {ep.deliveries.length > 0 && (
+              <ul className="mt-2 space-y-0.5 text-xs">
+                {ep.deliveries.map((d) => (
+                  <li key={d.id} className="flex gap-2">
+                    <span className={cx('font-medium', d.status === 'DELIVERED' ? 'text-green-700' : d.status === 'FAILED' ? 'text-red-700' : 'text-amber-700')}>{d.status}</span>
+                    <span className="font-mono">{d.event}</span>
+                    <span className="text-gray-400">
+                      {relativeTime(d.createdAt)} · {d.attempts} attempt{d.attempts === 1 ? '' : 's'}
+                      {d.lastError && ` · ${d.lastError}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <AppShell>
+      <h1 className="text-2xl font-semibold">Settings</h1>
+      <div className="mt-6 space-y-6">
+        <Organization />
+        <ApiKeys />
+        <Webhooks />
+      </div>
+    </AppShell>
+  );
+}

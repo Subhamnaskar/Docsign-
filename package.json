@@ -1,0 +1,26 @@
+{
+  "name": "docsign",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Global e-signature platform: Phase 1 core (see docs/ARCHITECTURE.md)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "db:migrate": "npm run db:migrate -w @docsign/api",
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm run dev -w @docsign/api\" \"npm run dev -w @docsign/web\"",
+    "typecheck": "npm run typecheck -w @docsign/api && npm run typecheck -w @docsign/web",
+    "build": "npm run build -w @docsign/api && npm run build -w @docsign/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true
+  }
+}

@@ -1,0 +1,91 @@
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { Actor } from '../audit/audit.js';
+import { config } from '../config.js';
+import { prisma } from '../db.js';
+import { hmacSha256Hex, randomToken, safeEqualHex, sha256Hex } from './crypto.js';
+import { unauthorized } from './errors.js';
+
+export const SESSION_COOKIE = 'ds_session';
+export const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
+export const API_KEY_PREFIX = 'dsk_';
+
+export interface AuthContext {
+  orgId: string;
+  userId: string | null;
+  actor: Actor;
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    auth: AuthContext;
+  }
+}
+
+export async function createSession(reply: FastifyReply, userId: string) {
+  const token = randomToken();
+  await prisma.session.create({
+    data: { userId, tokenHash: sha256Hex(token), expiresAt: new Date(Date.now() + SESSION_TTL_MS) },
+  });
+  reply.setCookie(SESSION_COOKIE, token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: config.isProduction,
+    maxAge: SESSION_TTL_MS / 1000,
+  });
+}
+
+/** Authenticates a sender by session cookie or `Authorization: Bearer dsk_...` API key. */
+export async function requireAuth(request: FastifyRequest): Promise<void> {
+  const header = request.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    const key = header.slice(7).trim();
+    if (!key.startsWith(API_KEY_PREFIX)) throw unauthorized('Invalid API key');
+    const apiKey = await prisma.apiKey.findUnique({ where: { keyHash: sha256Hex(key) } });
+    if (!apiKey || apiKey.revokedAt) throw unauthorized('Invalid API key');
+    // Best-effort usage tracking; not worth failing the request over
+    prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+    // API calls act on behalf of the org's owner for attribution of created envelopes
+    const owner = await prisma.user.findFirst({ where: { orgId: apiKey.orgId, role: 'OWNER' } });
+    request.auth = {
+      orgId: apiKey.orgId,
+      userId: owner?.id ?? null,
+      actor: { kind: 'api_key', id: apiKey.id, name: apiKey.name },
+    };
+    return;
+  }
+
+  const token = request.cookies[SESSION_COOKIE];
+  if (!token) throw unauthorized();
+  const session = await prisma.session.findUnique({
+    where: { tokenHash: sha256Hex(token) },
+    include: { user: true },
+  });
+  if (!session || session.expiresAt < new Date()) throw unauthorized('Session expired');
+  const { user } = session;
+  request.auth = {
+    orgId: user.orgId,
+    userId: user.id,
+    actor: { kind: 'user', id: user.id, name: user.name, email: user.email },
+  };
+}
+
+/** Signing links carry `<recipientId>.<hmac>`; nothing secret is stored server-side. */
+export function signingToken(recipientId: string): string {
+  return `${recipientId}.${hmacSha256Hex(config.appSecret, `sign:${recipientId}`).slice(0, 48)}`;
+}
+
+export function parseSigningToken(token: string): string | null {
+  const [id, mac] = token.split('.');
+  if (!id || !mac || !/^[0-9a-f]{48}$/.test(mac)) return null;
+  const expected = hmacSha256Hex(config.appSecret, `sign:${id}`).slice(0, 48);
+  return safeEqualHex(mac, expected) ? id : null;
+}
+
+export function signingUrl(recipientId: string): string {
+  return `${config.appUrl}/sign/${signingToken(recipientId)}`;
+}
+
+export function clientInfo(request: FastifyRequest) {
+  return { ip: request.ip, userAgent: request.headers['user-agent']?.slice(0, 300) ?? null };
+}
