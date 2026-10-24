@@ -152,8 +152,9 @@ export interface AuditEvent {
 
 export interface Me {
   user: { id: string; name: string; email: string; role: string } | null;
-  organization: { id: string; name: string; jurisdiction: string; dataRegion: string; brandColor: string | null; embedOrigins: string[] };
+  organization: { id: string; name: string; jurisdiction: string; dataRegion: string; brandColor: string | null; embedOrigins: string[]; aiEnabled?: boolean };
   cell: string;
+  features?: { ai: boolean; aadhaarEsign: string };
 }
 
 export interface Estamp {

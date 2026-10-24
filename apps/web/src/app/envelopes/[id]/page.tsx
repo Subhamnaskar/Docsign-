@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { AppShell } from '@/components/AppShell';
+import { AppShell, useMe } from '@/components/AppShell';
+import { AiAskPanel } from '@/components/AiPanels';
 import { CompliancePanel } from '@/components/CompliancePanel';
 import { SaveTemplateModal } from '@/components/SaveTemplateModal';
 import { Alert, Button, Card, cx, Input, Label, Modal, PageLoader, StatusBadge, Textarea } from '@/components/ui';
@@ -65,6 +66,7 @@ function RecipientRow({ r, sequential, onCorrect, onHost }: { r: Recipient; sequ
 }
 
 function Detail() {
+  const me = useMe();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const params = useSearchParams();
@@ -284,6 +286,7 @@ function Detail() {
         </div>
         <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <CompliancePanel policy={env.policy} />
+          {me?.features?.ai && me.organization.aiEnabled && <AiAskPanel envelopeId={env.id} />}
           {env.estampResult && (
             <Card className="p-4 text-sm">
               <h3 className="font-semibold">e-Stamp</h3>

@@ -36,6 +36,7 @@ function Organization() {
   const [jurisdiction, setJurisdiction] = useState(me?.organization.jurisdiction ?? 'US');
   const [saved, setSaved] = useState(false);
   const [origins, setOrigins] = useState((me?.organization.embedOrigins ?? []).join('\n'));
+  const [aiEnabled, setAiEnabled] = useState(Boolean(me?.organization.aiEnabled));
   const [orgError, setOrgError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ function Organization() {
     try {
       await api('/organization', {
         method: 'PATCH',
-        json: { name, jurisdiction, embedOrigins: origins.split('\n').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean) },
+        json: { name, jurisdiction, aiEnabled, embedOrigins: origins.split('\n').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean) },
       });
     } catch (err) {
       setOrgError((err as Error).message);
@@ -76,6 +77,14 @@ function Organization() {
             ))}
           </Select>
         </div>
+        {me?.features?.ai && (
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" className="mt-0.5" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
+            <span>
+              Turn on AI features <span className="text-gray-500">(signer summaries, contract review, field detection, Q&amp;A). Document content is sent to Anthropic&apos;s Claude API for processing.</span>
+            </span>
+          </label>
+        )}
         <div className="sm:col-span-2">
           <Label htmlFor="org-origins" hint="(one per line)">
             Allowed embed origins

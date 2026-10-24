@@ -208,6 +208,7 @@ export async function signingRoutes(app: FastifyInstance) {
         returnUrl: r.embedded ? r.embedReturnUrl : null,
       },
       branding: await getBranding(env.orgId),
+      aiAvailable: config.ai.enabled && Boolean((await prisma.organization.findUnique({ where: { id: env.orgId }, select: { aiEnabled: true } }))?.aiEnabled),
       compliance: {
         jurisdiction: policy.jurisdictionName,
         laws: policy.laws,

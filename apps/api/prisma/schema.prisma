@@ -34,6 +34,8 @@ model Organization {
   ssoDefaultRole     UserRole          @default(MEMBER)
   // SCIM provisioning bearer token (hashed)
   scimTokenHash      String?           @unique
+  // AI features send document content to the model provider; admins opt in
+  aiEnabled          Boolean           @default(false)
   createdAt          DateTime          @default(now())
   users              User[]
   envelopes          Envelope[]
@@ -541,4 +543,16 @@ model EsignTransaction {
   completedAt DateTime?
 
   @@index([recipientId])
+}
+
+// Cached AI outputs (summaries, reviews), keyed by content hash and options
+model AiResult {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  kind       String
+  envelopeId String
+  data       Json
+  createdAt  DateTime @default(now())
+
+  @@index([envelopeId])
 }

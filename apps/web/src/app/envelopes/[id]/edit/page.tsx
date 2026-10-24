@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppShell, useMe } from '@/components/AppShell';
 import { CompliancePanel } from '@/components/CompliancePanel';
-import { FieldEditor } from '@/components/FieldEditor';
+import { AiReviewPanel } from '@/components/AiPanels';
+import { FieldEditor, newFieldId } from '@/components/FieldEditor';
 import { SaveTemplateModal } from '@/components/SaveTemplateModal';
 import { Alert, Button, Card, cx, Input, Label, PageLoader, Select, Spinner, Textarea } from '@/components/ui';
 import { api, ApiError, upload } from '@/lib/api';
@@ -462,6 +463,8 @@ function RecipientsStep({
 }
 
 function ReviewStep({ env }: { env: Envelope }) {
+  const me = useMe();
+  const ai = Boolean(me?.features?.ai && me.organization.aiEnabled);
   const signers = env.recipients.filter((r) => r.role === 'SIGNER');
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -515,8 +518,9 @@ function ReviewStep({ env }: { env: Envelope }) {
           </p>
         )}
       </Card>
-      <div className="lg:sticky lg:top-20 lg:self-start">
+      <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
         <CompliancePanel policy={env.policy} />
+        {ai && <AiReviewPanel envelopeId={env.id} />}
       </div>
     </div>
   );
@@ -533,6 +537,26 @@ function Builder() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ message: string; problems: string[] } | null>(null);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detected, setDetected] = useState<string | null>(null);
+
+  async function detectFields() {
+    setDetecting(true);
+    setError(null);
+    try {
+      const res = await api<{ method: 'ai' | 'rules'; fields: Omit<Field, 'id' | 'required'>[] }>(`/envelopes/${id}/ai/detect-fields`, { method: 'POST' });
+      // Skip suggestions that overlap a field already placed
+      const overlaps = (a: Omit<Field, 'id' | 'required'>, b: Field) =>
+        a.documentId === b.documentId && a.page === b.page && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      const fresh = res.fields.filter((f) => !fields.some((g) => overlaps(f, g)));
+      setFields((current) => [...current, ...fresh.map((f) => ({ ...f, id: newFieldId(), required: f.type !== 'TEXT', options: [], formula: null, condition: null }))]);
+      setDetected(fresh.length ? `Added ${fresh.length} suggested field${fresh.length === 1 ? '' : 's'} (${res.method === 'ai' ? 'AI' : 'layout rules'}). Review them before sending.` : 'No new fields found.');
+    } catch (err) {
+      setError({ message: (err as Error).message, problems: [] });
+    } finally {
+      setDetecting(false);
+    }
+  }
 
   const adopt = useCallback((e: Envelope) => {
     setEnv(e);
@@ -693,7 +717,17 @@ function Builder() {
           }}
         />
       )}
-      {step === 2 && <FieldEditor envelopeId={env.id} documents={env.documents} recipients={env.recipients} fields={fields} onChange={setFields} />}
+      {step === 2 && (
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <Button variant="secondary" size="sm" loading={detecting} onClick={detectFields}>
+              ✨ Detect fields
+            </Button>
+            {detected && <span className="text-sm text-gray-500">{detected}</span>}
+          </div>
+          <FieldEditor envelopeId={env.id} documents={env.documents} recipients={env.recipients} fields={fields} onChange={setFields} />
+        </>
+      )}
       {step === 3 && <ReviewStep env={env} />}
 
       {templateOpen && <SaveTemplateModal env={env} open onClose={() => setTemplateOpen(false)} />}

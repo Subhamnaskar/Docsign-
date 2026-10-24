@@ -22,6 +22,9 @@ export default defineConfig({
       APP_SECRET: 'test-secret-test-secret-test-secret',
       KEYS_DIR: '.keys-test',
       CLAMAV_HOST: process.env.CLAMAV_HOST ?? '',
+      // AI tests use a fake client (setAiClientForTests); no requests leave the machine
+      AI_ENABLED: 'true',
+      ANTHROPIC_API_KEY: '',
     },
   },
 });

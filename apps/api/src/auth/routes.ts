@@ -85,8 +85,10 @@ export async function authRoutes(app: FastifyInstance) {
         dataRegion: org.dataRegion,
         brandColor: org.brandColor,
         embedOrigins: org.embedOrigins,
+        aiEnabled: org.aiEnabled,
       },
       cell: config.cellRegion,
+      features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode },
     };
   });
 
@@ -96,12 +98,21 @@ export async function authRoutes(app: FastifyInstance) {
         name: z.string().trim().min(1).max(120).optional(),
         jurisdiction: z.string().refine((c) => c in JURISDICTIONS, 'Unknown jurisdiction').optional(),
         brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #4f46e5').nullable().optional(),
+        aiEnabled: z.boolean().optional(),
         embedOrigins: z.array(z.string().url().refine((u) => /^https?:\/\/[^/]+$/.test(u), 'Use an origin like https://app.example.com')).max(20).optional(),
       }),
       req.body,
     );
     const org = await prisma.organization.update({ where: { id: req.auth.orgId }, data: body });
     await logActivity(req, 'organization.updated', body);
-    return { id: org.id, name: org.name, jurisdiction: org.jurisdiction, dataRegion: org.dataRegion, brandColor: org.brandColor, embedOrigins: org.embedOrigins };
+    return {
+      id: org.id,
+      name: org.name,
+      jurisdiction: org.jurisdiction,
+      dataRegion: org.dataRegion,
+      brandColor: org.brandColor,
+      embedOrigins: org.embedOrigins,
+      aiEnabled: org.aiEnabled,
+    };
   });
 }

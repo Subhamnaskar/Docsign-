@@ -59,6 +59,15 @@ export const config = {
     /** Directory of trusted root/intermediate PEMs for DSC certificates (e.g. CCA India). Empty = chain not checked. */
     dscTrustDir: process.env.DSC_TRUST_DIR ?? '',
   },
+  ai: {
+    /**
+     * AI features call the Claude API. Enabled when ANTHROPIC_API_KEY is set (or
+     * AI_ENABLED=true with another Anthropic credential source); organisations
+     * must still opt in under Settings.
+     */
+    enabled: process.env.AI_ENABLED === 'true' || Boolean(process.env.ANTHROPIC_API_KEY),
+    model: env('AI_MODEL', 'claude-opus-5-5'),
+  },
   estamp: {
     /** sandbox (specimen certificates, not valid) | off */
     provider: env('ESTAMP_PROVIDER', 'sandbox'),

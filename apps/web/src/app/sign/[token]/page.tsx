@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SignerSummary } from '@/components/AiPanels';
 import { PdfPages } from '@/components/PdfPages';
 import { SignaturePad } from '@/components/SignaturePad';
 import { Alert, Button, Card, cx, Input, Logo, Modal, PageLoader, Textarea } from '@/components/ui';
@@ -32,6 +33,7 @@ interface SigningSession {
     esignSandbox: boolean;
   };
   branding: { name: string; color: string | null; logoUrl: string | null };
+  aiAvailable: boolean;
   compliance: { jurisdiction: string; laws: string[]; signatureLevel: string; consentText: string };
   documents: { id: string; name: string; pageCount: number; pages: PageInfo[] }[];
   fields: Field[];
@@ -454,6 +456,11 @@ function SignDocument({
         )}
       </div>
 
+      {session.aiAvailable && (
+        <div className="mb-4">
+          <SignerSummary token={token} locale={session.recipient.locale} label={tr('summarize')} />
+        </div>
+      )}
       {approving && <p className="mb-4 text-sm text-gray-600">{tr('approveIntro')}</p>}
       {method === 'AADHAAR_ESIGN' && (
         <div className="mb-4">

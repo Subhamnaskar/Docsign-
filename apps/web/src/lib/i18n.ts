@@ -98,6 +98,7 @@ const en = {
   dscIntro: 'Insert your DSC token and keep your DSC signing utility running.',
   dscNoUtility: 'We could not reach a DSC signing utility on this computer. Start it and try again.',
   dscSigning: 'Waiting for your DSC token…',
+  summarize: 'Summarise this document',
 };
 
 export type SignerKey = keyof typeof en;
