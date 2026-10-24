@@ -88,8 +88,8 @@ export default function CompliancePage() {
           </table>
         </div>
         <p className="mt-4 text-sm text-gray-500">
-          Signatures today are simple electronic signatures (SES) with a platform seal. Advanced and qualified signatures are on the roadmap through
-          licensed trust partners. This page is general information, not legal advice; check requirements for your specific documents.
+          Signatures are simple electronic signatures (SES) with a platform seal by default. In India, Aadhaar eSign and DSC tokens provide
+          advanced signatures through licensed partners; qualified signatures (eIDAS) are on the roadmap. This page is general information, not legal advice; check requirements for your specific documents.
         </p>
       </Section>
 
@@ -137,6 +137,10 @@ export default function CompliancePage() {
             <Check>Organisations are strictly isolated from each other</Check>
             <Check>API keys are stored hashed and can be revoked at any time; webhooks are HMAC-signed</Check>
             <Check>Passwords are hashed with bcrypt; sessions are HTTP-only cookies</Check>
+            <Check>Single sign-on with OIDC, optional enforcement per domain, and SCIM de-provisioning</Check>
+            <Check>Roles limit who sees which agreements; admin actions are kept in an activity log</Check>
+            <Check>Embedding is limited to the websites each organisation allows</Check>
+            <Check>AI features are off until an organisation&apos;s admin turns them on</Check>
           </ul>
         </div>
       </Section>

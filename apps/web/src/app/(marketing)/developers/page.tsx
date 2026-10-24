@@ -95,7 +95,8 @@ curl -X POST ${BASE}/envelopes/$ENVELOPE/send \\
         <p className="mt-6 text-sm text-gray-500">
           Field positions are fractions (0–1) of the page, measured from the top-left corner. <code>page</code> is zero-based. Field types:{' '}
           <code>SIGNATURE</code>, <code>INITIALS</code>, <code>DATE_SIGNED</code>, <code>NAME</code>, <code>EMAIL</code>, <code>TEXT</code>,{' '}
-          <code>CHECKBOX</code>.
+          <code>CHECKBOX</code>, <code>NUMBER</code>, <code>DROPDOWN</code>, <code>RADIO</code>, <code>FORMULA</code>, <code>ATTACHMENT</code>,{' '}
+          <code>PAYMENT</code> (with <code>amount</code> in minor units and <code>currency</code>).
         </p>
       </Section>
 
@@ -124,6 +125,14 @@ curl -X POST ${BASE}/envelopes/$ENVELOPE/send \\
           <Endpoint method="GET" path="/templates">List templates with their roles.</Endpoint>
           <Endpoint method="POST" path="/templates/:id/envelopes">Create an envelope from a template: <code>recipients</code> (one per role), <code>send</code>.</Endpoint>
           <Endpoint method="POST" path="/templates/:id/bulk-send">Up to 100 <code>rows</code>, each creating and sending one envelope. Returns per-row results.</Endpoint>
+        </div>
+
+        <h3 id="embedded" className="mt-10 scroll-mt-24 text-sm font-semibold uppercase tracking-wide text-gray-500">Embedded signing & integrations</h3>
+        <div className="mt-3 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white">
+          <Endpoint method="POST" path="/envelopes/:id/recipients/:rid/embedded-session">One-time URL to load in an <code>&lt;iframe&gt;</code> on a site your organisation allows.</Endpoint>
+          <Endpoint method="POST" path="/envelopes/:id/recipients/:rid/correct">Change a recipient&apos;s name or email after sending. The old link stops working.</Endpoint>
+          <Endpoint method="POST" path="/hooks">Subscribe a URL to one event (Zapier-style REST hook): <code>target_url</code>, <code>event</code>.</Endpoint>
+          <Endpoint method="POST" path="/mcp">MCP server (Streamable HTTP) for AI assistants: list and look up agreements, send from templates, remind, void.</Endpoint>
         </div>
 
         <h3 className="mt-10 text-sm font-semibold uppercase tracking-wide text-gray-500">Compliance & verification</h3>

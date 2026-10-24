@@ -3,7 +3,7 @@ import { Check, CtaBand, PageHero, Section, SectionHeading } from '@/components/
 
 export const metadata: Metadata = {
   title: 'Product',
-  description: 'Prepare, send, sign and verify agreements, with templates, bulk send, signer languages and a full audit trail.',
+  description: 'Prepare, send, sign and verify agreements, with templates, web forms, payments, Aadhaar eSign, signer languages and a full audit trail.',
 };
 
 const GROUPS = [
@@ -12,8 +12,10 @@ const GROUPS = [
     intro: 'Get documents ready in minutes.',
     items: [
       'Upload PDF, Word, Excel, PowerPoint, ODT, RTF or text files; they are converted to PDF automatically',
-      'Drag-and-drop fields: signature, initials, date signed, name, email, text and checkbox',
-      'Multiple documents per agreement',
+      'Drag-and-drop fields: signature, initials, date, name, email, text, number, checkbox, dropdown, radio, attachment and payment',
+      'Calculated fields and fields that show or hide based on earlier answers',
+      'Optional AI field detection and contract review (off until an admin turns it on)',
+      'Multiple documents per agreement, or import from a share link',
       'Signing order, or everyone at once',
       'Reminders, expiry dates and a personal message',
     ],
@@ -22,11 +24,13 @@ const GROUPS = [
     title: 'Sign',
     intro: 'A signing experience people finish.',
     items: [
-      'Personal signing link by email, with a one-time code for identity',
+      'Personal signing link by email, verified with an email, SMS or WhatsApp code, or an access code',
+      'In-person signing on your device, and signing embedded in your own website',
+      'Collect a payment as part of signing',
       'Draw, type or upload a signature, adopted once and reused',
       'Guided "next field" navigation on desktop and mobile',
       'Ten languages, including right-to-left Arabic',
-      'Decline with a reason; senders are notified straight away',
+      'Decline with a reason, or hand off to the right person; senders are notified straight away',
     ],
   },
   {
@@ -36,8 +40,9 @@ const GROUPS = [
       'Save any agreement as a template with named roles',
       'Create agreements from templates in the app or over the API',
       'Bulk send from a CSV: one agreement per row, with a per-row error report',
-      'Duplicate past agreements',
-      'Dashboard with status, search and progress at a glance',
+      'Public web forms that turn a filled-in form into a signed agreement',
+      'Folders, bulk download, CSV export and a reports dashboard',
+      'Teams with roles, single sign-on (OIDC) and SCIM user provisioning',
     ],
   },
   {
@@ -73,6 +78,18 @@ export default function ProductPage() {
           </div>
         </Section>
       ))}
+      <Section>
+        <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr]">
+          <SectionHeading eyebrow="India" title="Aadhaar eSign, DSC and e-stamping" intro="Built for lending, HR and property documents in India." />
+          <ul className="space-y-4 text-gray-700">
+            <Check>Aadhaar eSign 2.1 with OTP, through a licensed eSign service provider</Check>
+            <Check>DSC USB tokens for directors and authorised signatories</Check>
+            <Check>e-Stamp certificate attached as the first page when stamp duty applies</Check>
+            <Check>Each signature is added without invalidating the ones before it</Check>
+          </ul>
+        </div>
+        <p className="mt-6 text-sm text-gray-500">Production Aadhaar eSign and e-stamping are switched on per customer once the licensed partner integration is live.</p>
+      </Section>
       <Section tone="dark">
         <SectionHeading
           dark
@@ -82,12 +99,12 @@ export default function ProductPage() {
         />
         <ul className="mt-10 grid gap-4 text-gray-300 sm:grid-cols-2">
           {[
-            'Advanced and qualified signatures (eIDAS) through trust service providers',
-            'Aadhaar eSign and e-stamping for India',
+            'Qualified signatures (eIDAS) through trust service providers',
+            'Licensed Aadhaar eSign and e-stamp partners in production',
             'ID document and selfie checks, national eIDs',
-            'Single sign-on and user provisioning',
             'Salesforce, Microsoft 365 and Google Workspace integrations',
-            'Contract repository with AI summaries and renewal tracking',
+            'Contract repository with renewal tracking',
+            'Native mobile apps',
           ].map((r) => (
             <Check dark key={r}>
               {r}

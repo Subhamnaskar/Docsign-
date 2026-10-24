@@ -74,7 +74,7 @@ export default function PricingPage() {
           </Link>
         </div>
         <p className="mt-4 text-sm text-gray-500">
-          Premium trust services (qualified signatures, Aadhaar eSign, ID verification, notarisation) will be billed per transaction when available.
+          Premium trust services (Aadhaar eSign, DSC, e-stamping, SMS codes, and later qualified signatures and ID verification) are billed per transaction.
         </p>
       </Section>
 

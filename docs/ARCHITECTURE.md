@@ -16,29 +16,45 @@ This repository implements **Phase 1 (Core, months 0–6)** of the blueprint and
 ## Signing pipeline (blueprint §8.1)
 
 1. **Fingerprint**: uploads are hashed (SHA-256) at ingestion; the hash goes in the audit log.
-2. **Policy**: `resolvePolicy()` picks the level (SES today) and provider (`platform-seal`).
+2. **Policy**: `resolvePolicy()` picks the level and provider: SES with the `platform-seal`, or AES through `aadhaar-esign` / `dsc` where the jurisdiction pack requires it (India loan agreements, for example).
 3. **Sign**: `CadesSigner` builds CAdES signed attributes (content-type, message-digest, signing-certificate-v2). Only the encoded attributes go to the `KeyProvider`, never the document.
 4. **Timestamp**: an RFC 3161 token over the signature value is embedded as an unsigned attribute (PAdES-B-T).
 5. **Store**: the sealed PDF is written to S3 with Object Lock retention for the policy's retention period.
 6. **Evidence**: the hash-chained audit log, plus a certificate of completion that is itself sealed.
 
+### AES (incremental) envelopes
+
+When any signer signs with Aadhaar eSign or a DSC, the envelope switches to incremental mode (`src/trust/incremental.ts`):
+
+- At send, the PDF is normalised once (and the e-stamp page prepended when the policy needs stamp duty). That file is the base every signature builds on.
+- Each signer's field values are appended as locked stamp annotations in a new incremental update, which PDF readers accept as a permitted change after earlier signatures.
+- An AES signer's signature goes into its own signature field: the server computes the ByteRange digest, the ESP (or the DSC token) returns a CMS signature, and it is embedded without rewriting earlier bytes.
+- The final platform seal is one more incremental signature, so every earlier signature still validates.
+
 ## Phase roadmap from here
 
-| Phase | Adds | Seams already in place |
+| Phase | Status in this repository | Still to do |
 |---|---|---|
-| 2. Trust | AES/QES via QTSP partners (CSC API), Aadhaar eSign ESP adapter, ID verification, mobile apps, Salesforce/M365/Google | `registerSignatureProvider` / `registerIdentityProvider`; policy rules already require AES for EU/IN loan agreements and block until an adapter exists |
-| 3. Enterprise | Workflow builder (Temporal), CLM repository, AI extraction, BYOK, dedicated cells, SOC 2 | `KeyProvider` interface for BYOK/HSM; outbox → Kafka |
-| 4. Regulated | RON, e-stamping, FedRAMP cell, on-prem, ICP-Brasil, national eIDs | Jurisdiction packs + adapters; cell config |
-| 5. Full suite | Negotiation/redlining, marketplace, advanced AI, EUDI Wallet, China stack | — |
+| 2. Trust | Aadhaar eSign 2.1 (sandbox ESP + production adapter), DSC tokens, SMS/WhatsApp/access-code identity, incremental signing | QES via QTSP partners (CSC API), ID document verification, native mobile apps, Salesforce/M365/Google integrations, LTV (B-LT/B-LTA) |
+| 3. Enterprise | Roles, OIDC SSO, SCIM, branding, activity log, reports, AI (Claude API), web forms, conditional and calculated fields, REST hooks, MCP server | Workflow builder (Temporal), CLM repository, BYOK, dedicated cells, SOC 2 audit (see [compliance/soc2-readiness.md](compliance/soc2-readiness.md)) |
+| 4. Regulated | e-stamp interface with a sandbox provider, payments at signing | RON, real e-stamp vendor, FedRAMP cell, on-prem, ICP-Brasil, national eIDs |
+| 5. Full suite | — | Negotiation/redlining, marketplace, EUDI Wallet (see below), China stack |
 
-## Phase 1 status
+## EU Digital Identity Wallet
 
-Done since the first cut: automated tests + CI, standalone worker (`WORKER_MODE=off` + `npm run worker`), ClamAV upload scanning, templates and bulk send, 10 signer languages.
+The EUDI Wallet cannot be integrated yet. Member states must offer wallets from late 2026, but production wallets, the relying-party registration process and the remote QES flow through the wallet are still being rolled out country by country. When they are available, the wallet plugs in as:
 
-Still open:
+- an **identity provider** (OpenID4VP presentation of PID attributes) registered with `registerIdentityProvider`, giving HIGH identity assurance for EU signers;
+- a **signature provider** for QES, either through the wallet's own signing or a QTSP over the CSC API, registered with `registerSignatureProvider` and selected by the EU jurisdiction pack.
 
-- **HSM/KMS key provider**: `LocalKeyProvider` keeps a dev key on disk. Production needs a cloud KMS or HSM implementation of `KeyProvider` and a publicly trusted (AATL/EUTL) seal certificate. Needs a cloud account and a CA to complete.
-- **LTV**: seals are B-T. B-LT/B-LTA (embedded revocation data, re-timestamping) come with the Phase 2 trust work.
-- **SSO/SCIM**: email + password sessions only. Needs an identity provider (Google/Microsoft/Okta) to configure and test against.
-- **Sender UI language**: the sender app is English; signers get their language.
+Neither needs changes to the envelope engine.
+
+## Still open
+
+- **HSM/KMS key provider**: `LocalKeyProvider` keeps a dev key on disk. Production needs a cloud KMS or HSM implementation of `KeyProvider` and a publicly trusted (AATL/EUTL) seal certificate.
+- **LTV**: seals are B-T. B-LT/B-LTA (embedded revocation data, re-timestamping) are not done.
+- **Real-provider testing**: ESP, Twilio/MSG91, Stripe/Razorpay and OIDC adapters are written to the providers' published APIs but only tested against sandboxes and stubs.
+- **e-Stamp vendor**: only the interface and a specimen provider exist.
+- **Sender UI language**: the sender app is English; signers get their language. Translations need native-speaker review.
 - **Bulk send scale**: batches run synchronously, capped at 100 rows. Move to a queued job for larger batches.
+- **Legal pages**: the website's legal pages are outlines.

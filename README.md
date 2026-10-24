@@ -8,17 +8,37 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 
 | Area | Implemented |
 |---|---|
-| Documents | PDF upload, Office/ODT/RTF/TXT → PDF conversion (Gotenberg), ClamAV malware scanning, SHA-256 fingerprint, multi-document envelopes |
-| Templates | Save any agreement as a template with named roles (e.g. "Employee"), create agreements from it, bulk send from CSV (100 rows per batch) |
+| Documents | PDF upload, Office/ODT/RTF/TXT → PDF conversion (Gotenberg), import from a public share link (SSRF-safe), ClamAV malware scanning, SHA-256 fingerprint, multi-document envelopes |
+| Templates & forms | Templates with named roles, create-from-template, bulk send from CSV (100 rows per batch), public web forms (`/f/<slug>`) that create and route an agreement when someone fills them in |
 | Languages | Per-recipient language for emails and the signing page: English, Hindi, Spanish, French, German, Portuguese, Italian, Dutch, Arabic (RTL), Japanese |
-| Workflow | Sequential or parallel routing, signers + CC, automatic reminders, expiry, void, decline, duplicate |
-| Field editor | Signature, initials, date signed, name, email, text, checkbox; click to place, drag to move/resize |
-| Signer experience | Email link → email OTP → e-sign consent → guided signing (draw / type / upload signature) |
-| Compliance engine | Jurisdiction packs for US, UK, EU and India; resolves signature level, identity strength, retention, data region and consent text; blocks documents that cannot legally be e-signed (wills, certain property deeds, etc.) |
-| Trust | PAdES (ETSI.CAdES.detached) platform seal over the whole completed PDF with RFC 3161 timestamp (PAdES-B-T); key behind a `KeyProvider` interface (HSM-ready) |
+| Workflow | Sequential or parallel routing, signers + CC, reminders, expiry, void, decline, duplicate, correct a recipient after sending (old link stops working), signer-initiated reassign, folders, bulk ZIP download, CSV export |
+| Field editor | Signature, initials, date signed, name, email, text, number, checkbox, dropdown, radio, formula (calculated), attachment upload, payment; required/optional, conditional show/hide, AI field detection |
+| Signer experience | Email link → identity check (email, SMS or WhatsApp code, or an access code) → e-sign consent → guided signing (draw / type / upload), mobile-friendly, in-person (host) signing, embedded signing in your own site |
+| India | Aadhaar eSign 2.1 (ESP XML protocol, built-in sandbox ESP), DSC USB-token signing via a local utility, sandbox e-stamp certificates; signatures are applied as incremental PDF updates so each one stays valid |
+| Payments | Collect a fee as part of signing: built-in sandbox checkout, Stripe Checkout and Razorpay Payment Links adapters |
+| Compliance engine | Jurisdiction packs for US, UK, EU and India; resolves signature level, identity strength, retention, data region and consent text; blocks documents that cannot legally be e-signed |
+| Trust | PAdES (ETSI.CAdES.detached) seal with RFC 3161 timestamp (PAdES-B-T); key behind a `KeyProvider` interface (HSM-ready) |
 | Evidence | Append-only SHA-256 hash-chained audit log, certificate of completion (also sealed), write-once storage via S3 Object Lock |
 | Verification portal | Public `/verify`: fingerprint lookup, CMS signature check, timestamp check, tamper detection, audit chain status |
-| API & webhooks | REST API (`/api/v1`) used by the web app itself, API keys, HMAC-signed webhooks with retries (transactional outbox) |
+| Teams & admin | Owner / admin / member roles (members see only their own agreements), invitations, OIDC single sign-on with optional enforcement, SCIM 2.0 user provisioning, branding (logo, colour, email footer), organisation activity log, reports dashboard |
+| AI (opt-in) | On the Claude API: document summaries for signers, contract review for senders, field detection, Q&A over an agreement. Off until an admin turns it on for the organisation |
+| API & integrations | REST API (`/api/v1`), API keys, HMAC-signed webhooks with retries, REST hooks (Zapier style), MCP server at `/api/v1/mcp` so AI assistants can look up, send (from templates), remind and void agreements |
+
+## Sandbox vs production providers
+
+Everything that depends on an outside contract ships with a working sandbox so the whole flow runs locally. The production adapters follow each provider's published API but have **not been tested against the real services**; test each one with your own credentials before going live.
+
+| Capability | Sandbox (default) | Production adapter | What you need |
+|---|---|---|---|
+| SMS / WhatsApp codes | Messages land in Mailpit (`sms-<number>@sms.local`) | Twilio, MSG91 | Twilio account or MSG91 key + DLT-approved template |
+| Aadhaar eSign | Built-in test ESP: any 12-digit number, OTP `123456`. **Not legally valid** | eSign 2.1 XML to a licensed ESP | ESP contract (eMudhra, NSDL, C-DAC…), ASP ID, ESP certificate |
+| DSC tokens | — | Local signing utility protocol (`docs/dsc-utility.md`) | The desktop utility, CCA root certificates in `DSC_TRUST_DIR` |
+| e-Stamp | Specimen certificate page. **Not valid** | — (interface only) | SHCIL or state e-stamp vendor agreement |
+| Payments | Built-in test checkout at `/api/v1/dev/pay/...` | Stripe Checkout, Razorpay Payment Links | Stripe or Razorpay keys and webhook secret |
+| Single sign-on | — | Any OIDC provider (Okta, Entra ID, Google) | An app registration at your identity provider |
+| AI | Off | Claude API | `ANTHROPIC_API_KEY`, and an admin opts the organisation in |
+
+The sandbox ESP and payment pages (`/api/v1/dev/*`) are only served while `ESIGN_MODE=sandbox` and `PAYMENT_PROVIDER=sandbox` respectively.
 
 ## Website
 
@@ -58,7 +78,7 @@ npm test                                   # API suite against a separate docsig
 CLAMAV_HOST=localhost npm test             # also runs the malware-scanning tests
 ```
 
-The suite covers the policy engine, crypto, PAdES sealing and tamper detection, audit-chain tampering, the full signing flow, tenant isolation, forged links, OTP lockout, API keys, templates and bulk send. CI (`.github/workflows/ci.yml`) runs typechecks, the API tests and the web build on every push and pull request.
+The suite covers the policy engine, crypto, PAdES sealing, incremental signing and tamper detection, audit-chain tampering, the full signing flow, tenant isolation and roles, forged links, OTP lockout, API keys, templates, bulk send, fields and formulas, SMS/access-code identity, Aadhaar eSign against the sandbox ESP, SSO and SCIM, AI endpoints (with a stubbed model), payments and webhook signature checks. CI (`.github/workflows/ci.yml`) runs typechecks, the API tests and the web build on every push and pull request.
 
 ## Running more than one API instance
 
@@ -89,6 +109,10 @@ From a template (`roleId`s come from `GET /api/v1/templates/<id>`):
 curl -s -H "Authorization: Bearer $KEY" -H 'content-type: application/json'   -d '{"send":true,"recipients":[{"roleId":"<role>","name":"Sam","email":"sam@example.com","locale":"es"}]}'   localhost:4000/api/v1/templates/<id>/envelopes
 ```
 
+Embedded signing: `POST /api/v1/envelopes/<id>/recipients/<rid>/embedded-session` returns a one-time URL to put in an `<iframe>`. Add your site's origin to the allowed embedding origins under **Settings → Organization** first.
+
+MCP: point an MCP client at `<APP_URL>/api/v1/mcp` with `Authorization: Bearer <API key>`.
+
 Webhook payloads carry `X-DocSign-Signature: t=<unix>,v1=<hex>`, where `v1 = HMAC_SHA256(secret, "<t>.<raw body>")`.
 
 ## Repository layout
@@ -106,6 +130,15 @@ apps/api      Fastify + Prisma (PostgreSQL) — domain services, policy engine, 
   src/webhooks    Outbox + delivery with retries
   src/templates   Templates, create-from-template, bulk send
   src/i18n        Signer email translations
+  src/esign       Aadhaar eSign (ASP request/ESP response XML, sandbox ESP) and DSC signing
+  src/estamp      e-Stamp provider interface (sandbox)
+  src/messaging   SMS / WhatsApp providers
+  src/payments    Payment providers (sandbox, Stripe, Razorpay)
+  src/sso         OIDC single sign-on and SCIM 2.0
+  src/ai          Claude API features; src/mcp is the MCP server
+  src/team        Members, roles, invitations; src/organization holds settings and branding
+  src/integrations  Share-link import, REST hooks
+  src/reports     Reports dashboard data
   test/           Vitest unit + integration tests
 apps/web      Next.js — sender app, signer app, verification portal
 docs/         Architecture notes and roadmap mapping

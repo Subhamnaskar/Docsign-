@@ -17,7 +17,7 @@ Nothing here means a certification is held.
 | Data integrity (PI1, A.8.24) | PAdES seals with trusted timestamps, incremental signing that preserves earlier signatures, public verification portal |
 | Encryption (CC6.7, A.8.24) | TLS in transit (deployment), secrets encrypted at rest (AES-256-GCM), write-once object storage with retention locks |
 | Malware protection (CC6.8, A.8.7) | ClamAV scanning of every upload and signer attachment; uploads refused when the scanner is down |
-| Input validation / secure development (CC8.1, A.8.25–8.28) | Schema validation on every endpoint, SSRF-safe URL imports, PNG re-encoding, clickjacking protection, automated test suite (80+ tests) in CI |
+| Input validation / secure development (CC8.1, A.8.25–8.28) | Schema validation on every endpoint, SSRF-safe URL imports, PNG re-encoding, clickjacking protection, automated test suite in CI |
 | Change management (CC8.1, A.8.32) | Git history, CI on every push and pull request, migrations versioned in the repository |
 | Data residency (C1, A.5.34) | Regional cell model; jurisdiction-aware residency warnings |
 | Vendor data flows (CC9.2, A.5.19–5.22) | AI features are off per organisation until an admin opts in; payment and messaging providers are explicit adapters |
