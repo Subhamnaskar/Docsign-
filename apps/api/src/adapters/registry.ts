@@ -32,6 +32,9 @@ const signatureProviders: SignatureProviderInfo[] = [
 
 const identityProviders: IdentityProviderInfo[] = [
   { id: 'email-otp', name: 'Email one-time passcode', assurance: 'LOW', jurisdictions: '*' },
+  { id: 'sms-otp', name: 'SMS one-time passcode', assurance: 'LOW', jurisdictions: '*' },
+  { id: 'whatsapp-otp', name: 'WhatsApp one-time passcode', assurance: 'LOW', jurisdictions: '*' },
+  { id: 'access-code', name: 'Access code shared by the sender', assurance: 'LOW', jurisdictions: '*' },
 ];
 
 export function registerSignatureProvider(p: SignatureProviderInfo) {

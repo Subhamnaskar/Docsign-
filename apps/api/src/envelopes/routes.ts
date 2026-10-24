@@ -6,7 +6,9 @@ import { ingestDocument, MAX_UPLOAD_BYTES } from '../documents/ingest.js';
 import { clientInfo, requireAuth } from '../lib/auth.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { getObject, putObject } from '../lib/storage.js';
+import { sha256Hex } from '../lib/crypto.js';
 import { formulaRefs } from '../lib/formula.js';
+import { E164 } from '../messaging/providers.js';
 import { parse } from '../lib/validate.js';
 import { listDocumentTypes, listJurisdictions, resolvePolicy } from '../policy/engine.js';
 import { JURISDICTIONS, DOCUMENT_TYPES } from '../policy/jurisdictions.js';
@@ -46,6 +48,13 @@ const recipientsInput = z
       locale: z.enum(SUPPORTED_LOCALES as [string, ...string[]]).default('en'),
       /** Signs on the sender's device, hosted by the current user; no email is sent. */
       inPerson: z.boolean().default(false),
+      authMethod: z.enum(['EMAIL_OTP', 'SMS_OTP', 'WHATSAPP_OTP', 'ACCESS_CODE']).default('EMAIL_OTP'),
+      phone: z.string().trim().regex(E164, 'Use international format, e.g. +919876543210').nullish(),
+      /** Shared with the signer by the sender out of band; stored hashed. Omit to keep the current code. */
+      accessCode: z.string().trim().min(4).max(32).nullish(),
+      /** Signs inside your app via an embedded session; no emails are sent. */
+      embedded: z.boolean().default(false),
+      clientUserId: z.string().max(200).nullish(),
     }),
   )
   .max(50);
@@ -110,6 +119,11 @@ export function serializeEnvelope(env: FullEnvelope) {
       routingOrder: r.routingOrder,
       locale: r.locale,
       inPerson: Boolean(r.hostUserId),
+      authMethod: r.authMethod,
+      phone: r.phone,
+      hasAccessCode: Boolean(r.accessCodeHash),
+      embedded: r.embedded,
+      clientUserId: r.clientUserId,
       status: r.status,
       viewedAt: r.viewedAt,
       verifiedAt: r.verifiedAt,
@@ -372,6 +386,14 @@ export async function envelopeRoutes(app: FastifyInstance) {
       await tx.recipient.deleteMany({ where: { envelopeId: id, id: { notIn: keep } } });
       for (const r of list) {
         if (r.inPerson && (r.role !== 'SIGNER' || !req.auth.userId)) throw badRequest('Only signers can sign in person, hosted by a user.');
+        if ((r.authMethod === 'SMS_OTP' || r.authMethod === 'WHATSAPP_OTP') && !r.phone) {
+          throw badRequest(`Add a mobile number for ${r.name} to send codes by ${r.authMethod === 'SMS_OTP' ? 'SMS' : 'WhatsApp'}.`);
+        }
+        const existing = r.id && existingIds.has(r.id) ? env.recipients.find((x) => x.id === r.id) : undefined;
+        if (r.authMethod === 'ACCESS_CODE' && !r.accessCode && !existing?.accessCodeHash) {
+          throw badRequest(`Set an access code for ${r.name}.`);
+        }
+        if (r.embedded && r.inPerson) throw badRequest('A recipient can be embedded or in person, not both.');
         const data = {
           name: r.name,
           email: r.email,
@@ -379,9 +401,19 @@ export async function envelopeRoutes(app: FastifyInstance) {
           routingOrder: r.routingOrder,
           locale: r.locale,
           hostUserId: r.inPerson ? req.auth.userId : null,
+          // Embedded and in-person identity is established by the app or the host
+          authMethod: r.embedded || r.inPerson ? ('NONE' as const) : r.authMethod,
+          phone: r.phone ?? null,
+          embedded: r.embedded,
+          clientUserId: r.clientUserId ?? null,
         };
-        if (r.id && existingIds.has(r.id)) await tx.recipient.update({ where: { id: r.id }, data });
-        else await tx.recipient.create({ data: { ...data, envelopeId: id } });
+        const codeHash = (rid: string) => (r.accessCode ? { accessCodeHash: sha256Hex(`${rid}:${r.accessCode}`) } : {});
+        if (existing) {
+          await tx.recipient.update({ where: { id: existing.id }, data: { ...data, ...codeHash(existing.id) } });
+        } else {
+          const created = await tx.recipient.create({ data: { ...data, envelopeId: id } });
+          if (r.accessCode) await tx.recipient.update({ where: { id: created.id }, data: codeHash(created.id) });
+        }
       }
       // CC recipients and approvers don't fill in fields
       await tx.field.deleteMany({ where: { envelopeId: id, recipient: { role: { in: ['CC', 'APPROVER'] } } } });

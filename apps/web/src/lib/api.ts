@@ -16,12 +16,37 @@ export class ApiError extends Error {
   }
 }
 
+const SIGNER_SESSION_KEY = 'ds_signer_session';
+
+/**
+ * Embedded signing runs in a third-party iframe where cookies may be blocked,
+ * so its session is kept in sessionStorage and sent as a header instead.
+ */
+export function setSignerSession(token: string | null) {
+  try {
+    if (token) sessionStorage.setItem(SIGNER_SESSION_KEY, token);
+    else sessionStorage.removeItem(SIGNER_SESSION_KEY);
+  } catch {
+    // Storage unavailable (private mode): the cookie path still works outside iframes
+  }
+}
+
+export function signerSessionHeaders(): Record<string, string> {
+  try {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem(SIGNER_SESSION_KEY) : null;
+    return token ? { 'X-Signer-Session': token } : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function api<T = unknown>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, headers, ...rest } = init;
+  const base = path.startsWith('/signing/') ? signerSessionHeaders() : {};
   const res = await fetch(`/api/v1${path}`, {
     credentials: 'include',
     ...rest,
-    headers: json !== undefined ? { 'Content-Type': 'application/json', ...headers } : headers,
+    headers: json !== undefined ? { 'Content-Type': 'application/json', ...base, ...headers } : { ...base, ...headers },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
   if (res.status === 204) return undefined as T;

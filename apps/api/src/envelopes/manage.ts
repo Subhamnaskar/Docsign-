@@ -14,6 +14,7 @@ import { serializeEnvelope } from './routes.js';
 import { envelopeScope, getVisibleEnvelope, notifySigners } from './service.js';
 
 const MAX_DOWNLOAD = 50;
+const EMBED_TICKET_TTL_MS = 5 * 60 * 1000;
 
 const csvCell = (v: unknown) => {
   const s = v == null ? '' : v instanceof Date ? v.toISOString() : String(v);
@@ -100,6 +101,34 @@ export async function envelopeManageRoutes(app: FastifyInstance) {
       maxAge: SIGNER_SESSION_TTL_MS / 1000,
     });
     return { signPath: `/sign/${signingToken(r)}` };
+  });
+
+  /**
+   * Embedded signing: returns a one-time URL (valid 5 minutes) that starts a
+   * verified signing session for an embedded recipient inside your app. Your
+   * app is responsible for having authenticated the user.
+   */
+  app.post('/envelopes/:id/recipients/:rid/embedded-session', async (req) => {
+    const { id, rid } = req.params as { id: string; rid: string };
+    const { returnUrl } = parse(z.object({ returnUrl: z.string().url().nullish() }), req.body ?? {});
+    const env = await getVisibleEnvelope(req.auth, id);
+    const r = env.recipients.find((x) => x.id === rid);
+    if (!r) throw notFound('Recipient');
+    if (!r.embedded) throw badRequest('This recipient is not set up for embedded signing.');
+    if (env.status !== 'SENT' || (r.status !== 'SENT' && r.status !== 'VIEWED')) throw conflict("It is not this recipient's turn.");
+    if (returnUrl) {
+      const org = await prisma.organization.findUniqueOrThrow({ where: { id: env.orgId } });
+      if (!org.embedOrigins.includes(new URL(returnUrl).origin)) {
+        throw badRequest('returnUrl must be on one of your allowed embed origins (Settings → Organization).');
+      }
+    }
+    const ticket = randomToken();
+    const expiresAt = new Date(Date.now() + EMBED_TICKET_TTL_MS);
+    await prisma.recipient.update({
+      where: { id: rid },
+      data: { embedTicketHash: sha256Hex(ticket), embedTicketExpiresAt: expiresAt, embedReturnUrl: returnUrl ?? null },
+    });
+    return { url: `${config.appUrl}/embed/${ticket}`, expiresAt };
   });
 
   app.patch('/envelopes/:id/folder', async (req) => {

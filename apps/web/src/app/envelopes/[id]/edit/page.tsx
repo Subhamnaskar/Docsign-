@@ -23,6 +23,12 @@ interface RecipientDraft {
   routingOrder: number;
   locale: string;
   inPerson: boolean;
+  authMethod: 'EMAIL_OTP' | 'SMS_OTP' | 'WHATSAPP_OTP' | 'ACCESS_CODE';
+  phone: string;
+  /** New access code to set; empty keeps the existing one */
+  accessCode: string;
+  hasAccessCode: boolean;
+  embedded: boolean;
 }
 
 let keySeq = 0;
@@ -231,7 +237,7 @@ function RecipientsStep({
   const add = (r?: Partial<RecipientDraft>) =>
     setDrafts([
       ...drafts,
-      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
+      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, authMethod: 'EMAIL_OTP', phone: '', accessCode: '', hasAccessCode: false, embedded: false, routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
     ]);
 
   return (
@@ -275,9 +281,14 @@ function RecipientsStep({
                 <option value="CC">Receives a copy</option>
               </Select>
               {d.role === 'SIGNER' && (
-                <label className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-600" title="You hand your device to the signer; no email is sent">
-                  <input type="checkbox" checked={d.inPerson} onChange={(e) => update(d.key, { inPerson: e.target.checked })} /> In person
-                </label>
+                <div className="mt-1.5 flex gap-3">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600" title="You hand your device to the signer; no email is sent">
+                    <input type="checkbox" checked={d.inPerson} onChange={(e) => update(d.key, { inPerson: e.target.checked, embedded: false })} /> In person
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600" title="Signs inside your own app via the API; no email is sent">
+                    <input type="checkbox" checked={d.embedded} onChange={(e) => update(d.key, { embedded: e.target.checked, inPerson: false })} /> Embedded
+                  </label>
+                </div>
               )}
             </div>
             <div className="w-32">
@@ -290,6 +301,35 @@ function RecipientsStep({
                 ))}
               </Select>
             </div>
+            {d.role !== 'CC' && !d.inPerson && !d.embedded && (
+              <div className="flex w-full flex-wrap items-end gap-3">
+                <div className="w-48">
+                  <Label>Verify identity by</Label>
+                  <Select value={d.authMethod} onChange={(e) => update(d.key, { authMethod: e.target.value as RecipientDraft['authMethod'] })}>
+                    <option value="EMAIL_OTP">Email code</option>
+                    <option value="SMS_OTP">SMS code</option>
+                    <option value="WHATSAPP_OTP">WhatsApp code</option>
+                    <option value="ACCESS_CODE">Access code I share</option>
+                  </Select>
+                </div>
+                {(d.authMethod === 'SMS_OTP' || d.authMethod === 'WHATSAPP_OTP') && (
+                  <div className="w-48">
+                    <Label>Mobile number</Label>
+                    <Input type="tel" placeholder="+919876543210" value={d.phone} onChange={(e) => update(d.key, { phone: e.target.value.replace(/[^\d+]/g, '') })} />
+                  </div>
+                )}
+                {d.authMethod === 'ACCESS_CODE' && (
+                  <div className="w-48">
+                    <Label>Access code</Label>
+                    <Input
+                      placeholder={d.hasAccessCode ? 'Leave blank to keep' : 'e.g. BLUE-7731'}
+                      value={d.accessCode}
+                      onChange={(e) => update(d.key, { accessCode: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <button onClick={() => setDrafts(drafts.filter((x) => x.key !== d.key))} className="mb-2 text-sm text-gray-400 hover:text-red-600" aria-label="Remove recipient">
               Remove
             </button>
@@ -395,6 +435,11 @@ function Builder() {
         routingOrder: r.routingOrder,
         locale: r.locale,
         inPerson: Boolean(r.inPerson),
+        authMethod: r.authMethod && r.authMethod !== 'NONE' ? r.authMethod : 'EMAIL_OTP',
+        phone: r.phone ?? '',
+        accessCode: '',
+        hasAccessCode: Boolean(r.hasAccessCode),
+        embedded: Boolean(r.embedded),
       })),
     );
     setFields(e.fields);
@@ -426,7 +471,7 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/recipients`, {
             method: 'PUT',
-            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson }) => ({
+            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson, authMethod, phone, accessCode, embedded }) => ({
               id: rid,
               name: name.trim(),
               email: email.trim(),
@@ -434,6 +479,10 @@ function Builder() {
               routingOrder,
               locale,
               inPerson,
+              embedded,
+              authMethod: role === 'CC' ? 'EMAIL_OTP' : authMethod,
+              phone: phone.trim() || null,
+              accessCode: accessCode.trim() || null,
             })),
           }),
         );

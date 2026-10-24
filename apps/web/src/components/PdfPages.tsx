@@ -2,6 +2,7 @@
 
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { signerSessionHeaders } from '@/lib/api';
 import type { PageInfo } from '@/lib/types';
 import { Spinner } from './ui';
 
@@ -26,7 +27,7 @@ export function usePdf(url: string | null) {
     setError(null);
     loadPdfjs().then((pdfjs) => {
       if (cancelled) return;
-      const task = pdfjs.getDocument({ url, withCredentials: true });
+      const task = pdfjs.getDocument({ url, withCredentials: true, httpHeaders: url.includes('/signing/') ? signerSessionHeaders() : undefined });
       destroy = () => void task.destroy();
       task.promise.then(
         (doc) => !cancelled && setPdf(doc),

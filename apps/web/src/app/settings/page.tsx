@@ -5,7 +5,7 @@ import { AppShell, useMe } from '@/components/AppShell';
 import { ActivityLog } from '@/components/settings/Activity';
 import { BrandingSettings } from '@/components/settings/Branding';
 import { Team } from '@/components/settings/Team';
-import { Alert, Button, Card, cx, Input, Label, Select } from '@/components/ui';
+import { Alert, Button, Card, cx, Input, Label, Select, Textarea } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatDate, relativeTime } from '@/lib/format';
 import type { Option } from '@/lib/types';
@@ -34,6 +34,8 @@ function Organization() {
   const [name, setName] = useState(me?.organization.name ?? '');
   const [jurisdiction, setJurisdiction] = useState(me?.organization.jurisdiction ?? 'US');
   const [saved, setSaved] = useState(false);
+  const [origins, setOrigins] = useState((me?.organization.embedOrigins ?? []).join('\n'));
+  const [orgError, setOrgError] = useState<string | null>(null);
 
   useEffect(() => {
     api<{ jurisdictions: Option[] }>('/policy/options').then((o) => setJurisdictions(o.jurisdictions));
@@ -41,7 +43,16 @@ function Organization() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    await api('/organization', { method: 'PATCH', json: { name, jurisdiction } });
+    setOrgError(null);
+    try {
+      await api('/organization', {
+        method: 'PATCH',
+        json: { name, jurisdiction, embedOrigins: origins.split('\n').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean) },
+      });
+    } catch (err) {
+      setOrgError((err as Error).message);
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -63,6 +74,14 @@ function Organization() {
               </option>
             ))}
           </Select>
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="org-origins" hint="(one per line)">
+            Allowed embed origins
+          </Label>
+          <Textarea id="org-origins" rows={2} placeholder="https://app.yourcompany.com" value={origins} onChange={(e) => setOrigins(e.target.value)} />
+          <p className="mt-1 text-xs text-gray-500">Sites allowed to show embedded signing in an iframe and to receive signers back after signing.</p>
+          {orgError && <p className="mt-1 text-sm text-red-600">{orgError}</p>}
         </div>
         <div className="flex items-center gap-3 sm:col-span-2">
           <Button type="submit">Save</Button>

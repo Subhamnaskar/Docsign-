@@ -220,42 +220,46 @@ enum RecipientStatus {
 }
 
 model Recipient {
-  id                String          @id @default(cuid())
-  envelopeId        String
-  envelope          Envelope        @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
-  name              String
-  email             String
-  role              RecipientRole   @default(SIGNER)
-  routingOrder      Int             @default(1)
+  id                   String          @id @default(cuid())
+  envelopeId           String
+  envelope             Envelope        @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  name                 String
+  email                String
+  role                 RecipientRole   @default(SIGNER)
+  routingOrder         Int             @default(1)
   // Language for emails and the signing page (BCP 47 code, e.g. "hi", "es")
-  locale            String          @default("en")
-  authMethod        AuthMethod      @default(EMAIL_OTP)
+  locale               String          @default("en")
+  authMethod           AuthMethod      @default(EMAIL_OTP)
   // E.164 phone number for SMS / WhatsApp codes
-  phone             String?
-  accessCodeHash    String?
+  phone                String?
+  accessCodeHash       String?
   // Embedded recipients sign inside the integrator's app; no emails are sent
-  embedded          Boolean         @default(false)
-  clientUserId      String?
+  embedded             Boolean         @default(false)
+  clientUserId         String?
   // In-person signing hosted by a user of the sending organisation
-  hostUserId        String?
+  hostUserId           String?
   // Bumped when the recipient is corrected or reassigned, invalidating old links
-  tokenVersion      Int             @default(0)
-  status            RecipientStatus @default(CREATED)
+  tokenVersion         Int             @default(0)
+  // One-time ticket that starts an embedded signing session (hashed, short-lived)
+  embedTicketHash      String?         @unique
+  embedTicketExpiresAt DateTime?
+  embedReturnUrl       String?
+  status               RecipientStatus @default(CREATED)
   // One-time passcode for signer authentication (hashed)
-  otpHash           String?
-  otpExpiresAt      DateTime?
-  otpAttempts       Int             @default(0)
+  otpHash              String?
+  otpExpiresAt         DateTime?
+  otpAttempts          Int             @default(0)
   // Set after OTP verification; ties the signing session to one browser
-  signerSessionHash String?
-  verifiedAt        DateTime?
-  viewedAt          DateTime?
-  signedAt          DateTime?
-  declinedAt        DateTime?
-  declineReason     String?
-  lastNotifiedAt    DateTime?
-  signedIp          String?
-  signedUserAgent   String?
-  fields            Field[]
+  signerSessionHash    String?
+  verifiedAt           DateTime?
+  viewedAt             DateTime?
+  signedAt             DateTime?
+  declinedAt           DateTime?
+  declineReason        String?
+  lastNotifiedAt       DateTime?
+  signedIp             String?
+  signedUserAgent      String?
+  fields               Field[]
 
   @@index([envelopeId])
 }

@@ -83,6 +83,13 @@ const en = {
   chooseOne: 'Choose…',
   uploadFile: 'Upload file',
   uploading: 'Uploading…',
+  verifyIntroSms: "We'll text a 6-digit code to the mobile number ending {phone}.",
+  verifyIntroWhatsapp: "We'll send a 6-digit code on WhatsApp to the number ending {phone}.",
+  textCode: 'Text me a code',
+  whatsappCode: 'Send code on WhatsApp',
+  enterCodePhone: 'Enter the code we sent to the number ending {phone}. It expires in 10 minutes.',
+  accessCodeIntro: '{sender} gave you an access code for this document. Enter it to continue.',
+  accessCodeLabel: 'Access code',
 };
 
 export type SignerKey = keyof typeof en;

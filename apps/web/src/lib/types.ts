@@ -44,6 +44,11 @@ export interface Recipient {
   routingOrder: number;
   locale: string;
   inPerson?: boolean;
+  authMethod?: 'EMAIL_OTP' | 'SMS_OTP' | 'WHATSAPP_OTP' | 'ACCESS_CODE' | 'NONE';
+  phone?: string | null;
+  hasAccessCode?: boolean;
+  embedded?: boolean;
+  clientUserId?: string | null;
   status: RecipientStatus;
   viewedAt: string | null;
   verifiedAt: string | null;

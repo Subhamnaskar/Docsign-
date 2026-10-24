@@ -4,11 +4,12 @@ import { z } from 'zod';
 import { appendAudit, type Actor } from '../audit/audit.js';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
-import { clientInfo, parseSigningToken, signingTokenMatches } from '../lib/auth.js';
+import { clientInfo, parseSigningToken, signingToken, signingTokenMatches } from '../lib/auth.js';
 import { numericCode, randomToken, safeEqualHex, sha256Hex } from '../lib/crypto.js';
 import { badRequest, conflict, forbidden, HttpError, notFound, unauthorized } from '../lib/errors.js';
 import { assertClean } from '../lib/malware.js';
 import { t } from '../i18n/messages.js';
+import { maskPhone, sendOtpMessage } from '../messaging/providers.js';
 import { getBranding } from '../organization/branding.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { getObject, putObject } from '../lib/storage.js';
@@ -62,8 +63,13 @@ async function loadByToken(token: string) {
 
 type LoadedRecipient = Awaited<ReturnType<typeof loadByToken>>;
 
+/**
+ * The signer session travels in a cookie, or in the X-Signer-Session header
+ * for embedded signing (iframes can't rely on third-party cookies).
+ */
 function hasSession(req: FastifyRequest, r: Recipient): boolean {
-  const value = req.cookies[cookieName(r.id)];
+  const header = req.headers['x-signer-session'];
+  const value = req.cookies[cookieName(r.id)] ?? (typeof header === 'string' ? header : undefined);
   if (!value || !r.signerSessionHash || !r.verifiedAt) return false;
   if (Date.now() - r.verifiedAt.getTime() > SESSION_TTL_MS) return false;
   return safeEqualHex(sha256Hex(value), r.signerSessionHash);
@@ -92,6 +98,14 @@ function requireReady(r: LoadedRecipient) {
   if (state !== 'ready') throw conflict(`This signing request is ${state}.`);
 }
 
+/** Where one-time codes go for this recipient, or null for access codes. */
+function otpChannel(r: Recipient): 'email' | 'sms' | 'whatsapp' | null {
+  if (r.authMethod === 'SMS_OTP') return 'sms';
+  if (r.authMethod === 'WHATSAPP_OTP') return 'whatsapp';
+  if (r.authMethod === 'ACCESS_CODE' || r.authMethod === 'NONE') return null;
+  return 'email';
+}
+
 const actorOf = (r: Recipient): Actor => ({ kind: 'recipient', id: r.id, name: r.name, email: r.email });
 
 async function labelledValues(envelopeId: string, recipientId: string) {
@@ -102,6 +116,48 @@ async function labelledValues(envelopeId: string, recipientId: string) {
 const maskEmail = (email: string) => email.replace(/^(.{1,2})[^@]*(@.*)$/, (_, a, b) => `${a}***${b}`);
 
 export async function signingRoutes(app: FastifyInstance) {
+  /** Starts an embedded session from a one-time ticket. The ticket can be used once. */
+  app.post('/embed-sessions/:ticket', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    const { ticket } = req.params as { ticket: string };
+    const hash = sha256Hex(ticket);
+    const r = await prisma.recipient.findUnique({ where: { embedTicketHash: hash }, include: { envelope: { include: { org: true } } } });
+    if (!r || !r.embedTicketExpiresAt || r.embedTicketExpiresAt < new Date()) throw notFound('Signing session');
+    // Single use: clear the ticket atomically
+    const claimed = await prisma.recipient.updateMany({ where: { id: r.id, embedTicketHash: hash }, data: { embedTicketHash: null, embedTicketExpiresAt: null } });
+    if (claimed.count === 0) throw notFound('Signing session');
+    const session = randomToken();
+    await prisma.$transaction(async (tx) => {
+      await tx.recipient.update({ where: { id: r.id }, data: { verifiedAt: new Date(), signerSessionHash: sha256Hex(session) } });
+      await appendAudit(tx, {
+        envelopeId: r.envelopeId,
+        type: 'recipient.verified',
+        actor: actorOf(r),
+        data: { method: 'embedded', clientUserId: r.clientUserId },
+        ...clientInfo(req),
+      });
+    });
+    return {
+      signPath: `/sign/${signingToken(r)}`,
+      sessionToken: session,
+      recipientId: r.id,
+      returnUrl: r.embedReturnUrl,
+    };
+  });
+
+  /** Origins allowed to frame a signing page: the org's embed origins for embedded recipients only. */
+  app.get('/frame-origins', async (req) => {
+    const { token, ticket } = req.query as { token?: string; ticket?: string };
+    let recipient: { embedded: boolean; envelope: { org: { embedOrigins: string[] } } } | null = null;
+    if (ticket) {
+      recipient = await prisma.recipient.findUnique({ where: { embedTicketHash: sha256Hex(ticket) }, include: { envelope: { include: { org: true } } } });
+    } else if (token) {
+      const parsed = parseSigningToken(token);
+      const r = parsed && (await prisma.recipient.findUnique({ where: { id: parsed.id }, include: { envelope: { include: { org: true } } } }));
+      if (r && signingTokenMatches(r, parsed.mac)) recipient = r;
+    }
+    return { origins: recipient?.embedded ? recipient.envelope.org.embedOrigins : [] };
+  });
+
   app.get('/signing/:token', async (req) => {
     const { token } = req.params as { token: string };
     let r = await loadByToken(token);
@@ -143,6 +199,10 @@ export async function signingRoutes(app: FastifyInstance) {
         locale: r.locale,
         role: r.role,
         canReassign: !r.embedded && !r.hostUserId,
+        authMethod: r.authMethod,
+        maskedPhone: r.phone ? maskPhone(r.phone) : null,
+        embedded: r.embedded,
+        returnUrl: r.embedded ? r.embedReturnUrl : null,
       },
       branding: await getBranding(env.orgId),
       compliance: {
@@ -182,6 +242,8 @@ export async function signingRoutes(app: FastifyInstance) {
       const { token } = req.params as { token: string };
       const r = await loadByToken(token);
       requireReady(r);
+      const channel = otpChannel(r);
+      if (!channel) throw badRequest('This signing request uses an access code from the sender.');
       if (r.otpExpiresAt && r.otpExpiresAt.getTime() - OTP_TTL_MS > Date.now() - OTP_RESEND_MS) {
         throw new HttpError(429, 'Please wait a few seconds before requesting another code.', 'rate_limited');
       }
@@ -195,18 +257,22 @@ export async function signingRoutes(app: FastifyInstance) {
           envelopeId: r.envelopeId,
           type: 'recipient.otp_sent',
           actor: actorOf(r),
-          data: { channel: 'email' },
+          data: { channel, to: channel === 'email' ? r.email : maskPhone(r.phone!) },
           ...clientInfo(req),
         });
       });
-      const { html, text } = layout({
-        locale: r.locale,
-        brand: await getBranding(r.envelope.orgId),
-        heading: t(r.locale, 'otpHeading'),
-        paragraphs: [t(r.locale, 'otpIntro', { title: r.envelope.title }), code, t(r.locale, 'otpExpiry')],
-      });
-      await sendMail({ to: r.email, subject: t(r.locale, 'otpSubject', { code }), html, text });
-      return { sentTo: maskEmail(r.email), expiresInSeconds: OTP_TTL_MS / 1000 };
+      if (channel === 'email') {
+        const { html, text } = layout({
+          locale: r.locale,
+          brand: await getBranding(r.envelope.orgId),
+          heading: t(r.locale, 'otpHeading'),
+          paragraphs: [t(r.locale, 'otpIntro', { title: r.envelope.title }), code, t(r.locale, 'otpExpiry')],
+        });
+        await sendMail({ to: r.email, subject: t(r.locale, 'otpSubject', { code }), html, text });
+        return { sentTo: maskEmail(r.email), channel, expiresInSeconds: OTP_TTL_MS / 1000 };
+      }
+      await sendOtpMessage(channel, { to: r.phone!, code, text: t(r.locale, 'otpSubject', { code }) });
+      return { sentTo: maskPhone(r.phone!), channel, expiresInSeconds: OTP_TTL_MS / 1000 };
     },
   );
 
@@ -215,15 +281,23 @@ export async function signingRoutes(app: FastifyInstance) {
     { config: { rateLimit: { max: 10, timeWindow: '10 minutes' } } },
     async (req, reply: FastifyReply) => {
       const { token } = req.params as { token: string };
-      const { code } = parse(z.object({ code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code') }), req.body);
+      const { code } = parse(z.object({ code: z.string().trim().min(4).max(32) }), req.body);
       const r = await loadByToken(token);
       requireReady(r);
-      if (!r.otpHash || !r.otpExpiresAt || r.otpExpiresAt < new Date()) {
-        throw badRequest('The code has expired. Request a new one.');
+      const accessCode = r.authMethod === 'ACCESS_CODE';
+      if (accessCode) {
+        if (!r.accessCodeHash) throw badRequest('This signing request has no access code.');
+        if (r.otpAttempts >= OTP_MAX_ATTEMPTS) throw forbidden('Too many incorrect attempts. Ask the sender to reset your access code.');
+      } else {
+        if (!/^\d{6}$/.test(code)) throw badRequest('Enter the 6-digit code');
+        if (!r.otpHash || !r.otpExpiresAt || r.otpExpiresAt < new Date()) {
+          throw badRequest('The code has expired. Request a new one.');
+        }
+        if (r.otpAttempts >= OTP_MAX_ATTEMPTS) throw forbidden('Too many incorrect attempts. Request a new code.');
       }
-      if (r.otpAttempts >= OTP_MAX_ATTEMPTS) throw forbidden('Too many incorrect attempts. Request a new code.');
+      const expected = accessCode ? r.accessCodeHash! : r.otpHash!;
 
-      if (!safeEqualHex(sha256Hex(`${r.id}:${code}`), r.otpHash)) {
+      if (!safeEqualHex(sha256Hex(`${r.id}:${code}`), expected)) {
         await prisma.$transaction(async (tx) => {
           await tx.recipient.update({ where: { id: r.id }, data: { otpAttempts: { increment: 1 } } });
           await appendAudit(tx, { envelopeId: r.envelopeId, type: 'recipient.otp_failed', actor: actorOf(r), ...clientInfo(req) });
@@ -241,7 +315,7 @@ export async function signingRoutes(app: FastifyInstance) {
           envelopeId: r.envelopeId,
           type: 'recipient.verified',
           actor: actorOf(r),
-          data: { method: 'email-otp', assurance: 'LOW' },
+          data: { method: r.authMethod.toLowerCase(), assurance: 'LOW' },
           ...clientInfo(req),
         });
       });

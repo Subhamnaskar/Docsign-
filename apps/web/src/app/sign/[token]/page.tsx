@@ -15,7 +15,20 @@ interface SigningSession {
   state: 'ready' | 'waiting' | 'signed' | 'completed' | 'declined' | 'voided' | 'expired' | 'unavailable';
   verified: boolean;
   envelope: { id: string; title: string; message: string | null; sender: { name: string; email: string }; organization: string; expiresAt: string | null };
-  recipient: { id: string; name: string; email: string; maskedEmail: string; status: string; locale: string; role: string; canReassign: boolean };
+  recipient: {
+    id: string;
+    name: string;
+    email: string;
+    maskedEmail: string;
+    status: string;
+    locale: string;
+    role: string;
+    canReassign: boolean;
+    authMethod: 'EMAIL_OTP' | 'SMS_OTP' | 'WHATSAPP_OTP' | 'ACCESS_CODE' | 'NONE';
+    maskedPhone: string | null;
+    embedded: boolean;
+    returnUrl: string | null;
+  };
   branding: { name: string; color: string | null; logoUrl: string | null };
   compliance: { jurisdiction: string; laws: string[]; signatureLevel: string; consentText: string };
   documents: { id: string; name: string; pageCount: number; pages: PageInfo[] }[];
@@ -126,6 +139,13 @@ function Verify({ session, token, onVerified, tr }: { session: SigningSession; t
   }
 
   const email = session.recipient.maskedEmail;
+  const method = session.recipient.authMethod;
+  const phone = session.recipient.maskedPhone?.replace(/\D/g, '') ?? '';
+  const accessCode = method === 'ACCESS_CODE';
+  const intro =
+    method === 'SMS_OTP' ? tr('verifyIntroSms', { phone }) : method === 'WHATSAPP_OTP' ? tr('verifyIntroWhatsapp', { phone }) : tr('verifyIntro', { email });
+  const sendLabel = method === 'SMS_OTP' ? tr('textCode') : method === 'WHATSAPP_OTP' ? tr('whatsappCode') : tr('emailCode');
+  const enterText = method === 'SMS_OTP' || method === 'WHATSAPP_OTP' ? tr('enterCodePhone', { phone }) : tr('enterCode', { email });
   return (
     <Card className="mx-auto max-w-md p-7">
       <p className="text-sm text-gray-500">{tr('sentYou', { sender: session.envelope.sender.name, org: session.envelope.organization })}</p>
@@ -138,16 +158,34 @@ function Verify({ session, token, onVerified, tr }: { session: SigningSession; t
             <Alert>{error}</Alert>
           </div>
         )}
-        {!sent ? (
+        {accessCode ? (
+          <form onSubmit={verify}>
+            <p className="mt-1 text-sm text-gray-500">{tr('accessCodeIntro', { sender: session.envelope.sender.name })}</p>
+            <Input
+              className="mt-4 font-mono"
+              dir="ltr"
+              autoComplete="off"
+              maxLength={32}
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              aria-label={tr('accessCodeLabel')}
+              placeholder={tr('accessCodeLabel')}
+            />
+            <Button type="submit" className="mt-4 w-full" loading={loading} disabled={code.trim().length < 4}>
+              {tr('verifyContinue')}
+            </Button>
+          </form>
+        ) : !sent ? (
           <>
-            <p className="mt-1 text-sm text-gray-500">{tr('verifyIntro', { email })}</p>
+            <p className="mt-1 text-sm text-gray-500">{intro}</p>
             <Button className="mt-4 w-full" onClick={send} loading={loading}>
-              {tr('emailCode')}
+              {sendLabel}
             </Button>
           </>
         ) : (
           <form onSubmit={verify}>
-            <p className="mt-1 text-sm text-gray-500">{tr('enterCode', { email })}</p>
+            <p className="mt-1 text-sm text-gray-500">{enterText}</p>
             <Input
               className="mt-4 text-center font-mono text-2xl tracking-[0.5em]"
               dir="ltr"
@@ -580,6 +618,12 @@ function SignDocument({
   );
 }
 
+/** Tells an embedding app what happened. Messages carry no secrets. */
+function notifyParent(type: string, session: SigningSession | null) {
+  if (typeof window === 'undefined' || window.parent === window || !session) return;
+  window.parent.postMessage({ type: `docsign:${type}`, envelopeId: session.envelope.id, recipientId: session.recipient.id }, '*');
+}
+
 export default function SignPage() {
   const { token } = useParams<{ token: string }>();
   const [session, setSession] = useState<SigningSession | null>(null);
@@ -593,6 +637,16 @@ export default function SignPage() {
       .then((s) => {
         setSession(s);
         setLocale((l) => l ?? s.recipient.locale ?? 'en');
+        if (s.recipient.embedded) {
+          notifyParent(s.state === 'ready' ? 'ready' : s.state, s);
+          // Outside an iframe, embedded signers go back to the integrating app when done
+          const finished = s.state === 'signed' || s.state === 'completed' || s.state === 'declined';
+          if (finished && s.recipient.returnUrl && window.parent === window) {
+            const back = new URL(s.recipient.returnUrl);
+            back.searchParams.set('event', s.state);
+            window.location.assign(back.toString());
+          }
+        }
       })
       .catch((err) => setError(err.message));
   }, [token]);

@@ -28,6 +28,22 @@ export const config = {
   keysDir: env('KEYS_DIR', '.keys'),
   appSecret: env('APP_SECRET', 'change-me-to-a-long-random-string-at-least-32-chars'),
   salesEmail: env('SALES_EMAIL', 'sales@docsign.local'),
+  messaging: {
+    /** console (development, shows in Mailpit) | twilio | msg91 */
+    smsProvider: env('SMS_PROVIDER', 'console'),
+    /** console | twilio */
+    whatsappProvider: env('WHATSAPP_PROVIDER', 'console'),
+    twilio: {
+      accountSid: process.env.TWILIO_ACCOUNT_SID ?? '',
+      authToken: process.env.TWILIO_AUTH_TOKEN ?? '',
+      from: process.env.TWILIO_FROM ?? '',
+      whatsappFrom: process.env.TWILIO_WHATSAPP_FROM ?? '',
+    },
+    msg91: {
+      authKey: process.env.MSG91_AUTH_KEY ?? '',
+      templateId: process.env.MSG91_TEMPLATE_ID ?? '',
+    },
+  },
   /** 'inline' runs background jobs inside the API process; 'off' expects `npm run worker`. */
   workerMode: env('WORKER_MODE', 'inline') as 'inline' | 'off',
   clamav: {
