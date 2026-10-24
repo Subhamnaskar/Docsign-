@@ -13,6 +13,8 @@ export interface DocumentRule {
   retentionYears?: number;
   /** Electronic signing not legally effective for this document type. */
   blocked?: string;
+  /** Stamp duty must be paid (India: attach an e-stamp) */
+  stampDuty?: boolean;
   warning?: string;
 }
 
@@ -124,8 +126,10 @@ export const JURISDICTIONS: Record<string, JurisdictionPack> = {
         level: 'AES',
         identity: 'HIGH',
         retentionYears: 8,
-        warning: 'RBI digital lending practice expects Aadhaar eSign or DSC, plus e-stamping for the relevant state.',
+        stampDuty: true,
+        warning: 'RBI digital lending rules require Aadhaar eSign, PAN eSign or DSC (not OTP-only signing) and stamp duty for the relevant state.',
       },
+      lease: { stampDuty: true },
     },
   },
 };

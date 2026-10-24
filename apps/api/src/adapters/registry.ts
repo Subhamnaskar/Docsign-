@@ -1,3 +1,4 @@
+import { config } from '../config.js';
 import type { IdentityAssurance, SignatureLevel } from '../policy/jurisdictions.js';
 
 /**
@@ -36,6 +37,18 @@ const identityProviders: IdentityProviderInfo[] = [
   { id: 'whatsapp-otp', name: 'WhatsApp one-time passcode', assurance: 'LOW', jurisdictions: '*' },
   { id: 'access-code', name: 'Access code shared by the sender', assurance: 'LOW', jurisdictions: '*' },
 ];
+
+// India: advanced signatures through Aadhaar eSign (licensed ESP) or the signer's own DSC token
+if (config.esign.mode !== 'off') {
+  signatureProviders.push({
+    id: 'aadhaar-esign',
+    name: config.esign.mode === 'sandbox' ? 'Aadhaar eSign (sandbox ESP)' : 'Aadhaar eSign',
+    levels: ['AES'],
+    jurisdictions: ['IN'],
+  });
+  identityProviders.push({ id: 'aadhaar-otp', name: 'Aadhaar OTP via eSign', assurance: 'HIGH', jurisdictions: ['IN'] });
+}
+signatureProviders.push({ id: 'dsc', name: 'Digital Signature Certificate (USB token)', levels: ['AES'], jurisdictions: ['IN'] });
 
 export function registerSignatureProvider(p: SignatureProviderInfo) {
   signatureProviders.push(p);

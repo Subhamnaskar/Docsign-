@@ -28,6 +28,8 @@ interface SigningSession {
     maskedPhone: string | null;
     embedded: boolean;
     returnUrl: string | null;
+    signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
+    esignSandbox: boolean;
   };
   branding: { name: string; color: string | null; logoUrl: string | null };
   compliance: { jurisdiction: string; laws: string[]; signatureLevel: string; consentText: string };
@@ -289,12 +291,16 @@ function SignDocument({
     }
   };
 
+  const method = session.recipient.signatureMethod;
+  const crypto = method !== 'ELECTRONIC';
   const isDone = useCallback(
     (f: Field) =>
       f.type in autoFilled ||
       f.type === 'FORMULA' ||
+      // Aadhaar eSign / DSC signers sign cryptographically instead of drawing
+      (crypto && (f.type === 'SIGNATURE' || f.type === 'INITIALS')) ||
       (f.type === 'CHECKBOX' ? values[f.id] === 'true' : Boolean(values[f.id]?.trim())),
-    [values, autoFilled],
+    [values, autoFilled, crypto],
   );
   const shown = session.fields.filter(visible);
   const remaining = shown.filter((f) => f.required && !isDone(f));
@@ -345,12 +351,52 @@ function SignDocument({
     try {
       // Hidden (conditional) fields are not submitted
       const submitted = Object.fromEntries(Object.entries(values).filter(([id]) => shown.some((f) => f.id === id)));
+      if (method === 'AADHAAR_ESIGN') {
+        const res = await api<{ action: string; fields: Record<string, string> }>(`/signing/${token}/esign/start`, {
+          method: 'POST',
+          json: { consent: true, values: submitted },
+        });
+        postForm(res.action, res.fields);
+        return;
+      }
+      if (method === 'DSC') {
+        await signWithDsc(submitted);
+        return;
+      }
       await api(`/signing/${token}/complete`, { method: 'POST', json: { consent: true, values: submitted } });
       onDone();
     } catch (err) {
       setError((err as Error).message);
       setSubmitting(false);
     }
+  }
+
+  /**
+   * DSC tokens are reached through a signing utility on the signer's computer.
+   * Protocol: POST {documents:[{documentId,digest}]} to the utility, which
+   * returns {signatures:[{documentId,cms}]} (CAdES detached over each digest).
+   */
+  async function signWithDsc(submitted: Record<string, string>) {
+    const prep = await api<{ txn: string; documents: { documentId: string; digest: string }[] }>(`/signing/${token}/dsc/prepare`, {
+      method: 'POST',
+      json: { consent: true, values: submitted },
+    });
+    setError(tr('dscSigning'));
+    let signatures: { documentId: string; cms: string }[];
+    try {
+      const res = await fetch(`${DSC_UTILITY_URL}/sign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documents: prep.documents, signer: session.recipient.name }),
+      });
+      if (!res.ok) throw new Error(`utility responded ${res.status}`);
+      signatures = (await res.json()).signatures;
+    } catch {
+      throw new Error(tr('dscNoUtility'));
+    }
+    setError(null);
+    await api(`/signing/${token}/dsc/complete`, { method: 'POST', json: { txn: prep.txn, signatures } });
+    onDone();
   }
 
   async function reassign() {
@@ -403,12 +449,24 @@ function SignDocument({
           </Button>
         ) : (
           <Button size="sm" onClick={finish} loading={submitting}>
-            {approving ? tr('approve') : tr('finish')}
+            {approving ? tr('approve') : method === 'AADHAAR_ESIGN' ? tr('signAadhaar') : method === 'DSC' ? tr('signDsc') : tr('finish')}
           </Button>
         )}
       </div>
 
       {approving && <p className="mb-4 text-sm text-gray-600">{tr('approveIntro')}</p>}
+      {method === 'AADHAAR_ESIGN' && (
+        <div className="mb-4">
+          <Alert tone={session.recipient.esignSandbox ? 'warning' : 'info'}>
+            {tr('aadhaarIntro')} {session.recipient.esignSandbox && <strong>{tr('aadhaarSandbox')}</strong>}
+          </Alert>
+        </div>
+      )}
+      {method === 'DSC' && (
+        <div className="mb-4">
+          <Alert tone="info">{tr('dscIntro')}</Alert>
+        </div>
+      )}
       {error && (
         <div className="mb-4">
           <Alert>{error}</Alert>
@@ -524,6 +582,13 @@ function SignDocument({
                         </div>
                       );
                     }
+                    if (crypto && (f.type === 'SIGNATURE' || f.type === 'INITIALS')) {
+                      return (
+                        <div key={f.id} id={`field-${f.id}`} style={style} className="absolute flex items-center justify-center rounded border-2 border-dashed border-brand-500 bg-brand-50/80 px-1 text-center text-[clamp(7px,1.2vw,11px)] font-medium text-brand-700">
+                          {method === 'AADHAAR_ESIGN' ? 'Aadhaar eSign' : 'DSC'}
+                        </div>
+                      );
+                    }
                     const img = values[f.id];
                     return (
                       <button
@@ -559,7 +624,7 @@ function SignDocument({
 
       <div className="mt-10 flex justify-center">
         <Button onClick={finish} loading={submitting} disabled={remaining.length > 0}>
-          {approving ? tr('approve') : tr('finish')}
+          {approving ? tr('approve') : method === 'AADHAAR_ESIGN' ? tr('signAadhaar') : method === 'DSC' ? tr('signDsc') : tr('finish')}
         </Button>
       </div>
 
@@ -618,6 +683,25 @@ function SignDocument({
   );
 }
 
+/** Local DSC signing utility (see docs/dsc-utility.md). */
+const DSC_UTILITY_URL = process.env.NEXT_PUBLIC_DSC_UTILITY_URL ?? 'http://127.0.0.1:3434';
+
+/** Submits a form the classic way (eSign requests must reach the ESP as a browser POST). */
+function postForm(action: string, fields: Record<string, string>) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = action;
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
+
 /** Tells an embedding app what happened. Messages carry no secrets. */
 function notifyParent(type: string, session: SigningSession | null) {
   if (typeof window === 'undefined' || window.parent === window || !session) return;
@@ -631,6 +715,11 @@ export default function SignPage() {
   const [consented, setConsented] = useState(false);
   const [locale, setLocale] = useState<string | null>(null);
   const [reassignedTo, setReassignedTo] = useState<string | null>(null);
+  const [esignError, setEsignError] = useState<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('esign') === 'failed') setEsignError(q.get('reason') ?? 'unknown error');
+  }, []);
 
   const load = useCallback(() => {
     api<SigningSession>(`/signing/${token}`)
@@ -703,6 +792,11 @@ export default function SignPage() {
 
   return (
     <Shell {...shell} title={session.envelope.title}>
+      {esignError && (
+        <div className="mx-auto mb-4 max-w-3xl">
+          <Alert>{tr('esignFailed', { reason: esignError })}</Alert>
+        </div>
+      )}
       {!session.verified ? (
         <Verify session={session} token={token} onVerified={load} tr={tr} />
       ) : !consented ? (

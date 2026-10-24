@@ -26,11 +26,19 @@ describe('policy engine', () => {
     expect(p.blockers.length).toBeGreaterThan(0);
   });
 
-  it('requires an AES adapter for Indian loan agreements', () => {
+  it('routes Indian loan agreements to Aadhaar eSign with stamp duty', () => {
     const p = resolvePolicy('IN', 'loan_agreement');
     expect(p.signatureLevel).toBe('AES');
-    expect(p.signatureProvider).toBeNull();
-    expect(p.allowed).toBe(false);
+    expect(p.signatureProvider).toBe('aadhaar-esign');
+    expect(p.identityProvider).toBe('aadhaar-otp');
+    expect(p.stampDutyRequired).toBe(true);
+    expect(p.allowed).toBe(true);
+    // Tests run against the sandbox ESP, which must be called out
+    expect(p.warnings.join(' ')).toMatch(/SANDBOX/);
+  });
+
+  it('still requires an adapter for qualified-level identity elsewhere', () => {
+    expect(resolvePolicy('EU', 'loan_agreement').allowed).toBe(false);
   });
 
   it('records the TSA-less seal format when no timestamp authority is configured', () => {

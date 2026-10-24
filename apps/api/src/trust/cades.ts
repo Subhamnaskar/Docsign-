@@ -43,6 +43,11 @@ export class CadesSigner extends Signer {
   }
 
   async sign(content: Buffer): Promise<Buffer> {
+    return this.signDigest(sha256(content));
+  }
+
+  /** Signs a precomputed SHA-256 digest of the signed content (what remote signing services receive). */
+  async signDigest(digest: Buffer): Promise<Buffer> {
     const chainDer = this.keys.certificateChain();
     const certs = chainDer.map((der) => pkijs.Certificate.fromBER(toArrayBuffer(der)));
     const signerCert = certs[0];
@@ -71,7 +76,7 @@ export class CadesSigner extends Signer {
       new pkijs.Attribute({ type: OID.contentType, values: [new asn1js.ObjectIdentifier({ value: OID.data })] }),
       new pkijs.Attribute({
         type: OID.messageDigest,
-        values: [new asn1js.OctetString({ valueHex: toArrayBuffer(sha256(content)) })],
+        values: [new asn1js.OctetString({ valueHex: toArrayBuffer(digest) })],
       }),
       new pkijs.Attribute({
         type: OID.signingCertificateV2,

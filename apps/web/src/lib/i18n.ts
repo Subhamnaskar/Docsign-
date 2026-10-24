@@ -90,6 +90,14 @@ const en = {
   enterCodePhone: 'Enter the code we sent to the number ending {phone}. It expires in 10 minutes.',
   accessCodeIntro: '{sender} gave you an access code for this document. Enter it to continue.',
   accessCodeLabel: 'Access code',
+  signAadhaar: 'Sign with Aadhaar eSign',
+  signDsc: 'Sign with DSC token',
+  aadhaarIntro: 'You will be taken to the eSign service to confirm with an OTP sent to your Aadhaar-linked mobile.',
+  aadhaarSandbox: 'Test mode: this uses a sandbox eSign service and the signature is not legally valid.',
+  esignFailed: 'Aadhaar eSign did not complete: {reason}',
+  dscIntro: 'Insert your DSC token and keep your DSC signing utility running.',
+  dscNoUtility: 'We could not reach a DSC signing utility on this computer. Start it and try again.',
+  dscSigning: 'Waiting for your DSC token…',
 };
 
 export type SignerKey = keyof typeof en;

@@ -4,6 +4,7 @@ import { SUBFILTER_ETSI_CADES_DETACHED } from '@signpdf/utils';
 import { PDFDocument } from 'pdf-lib';
 import { config } from '../config.js';
 import { CadesSigner, type TimestampResult } from './cades.js';
+import { addSignatureField, embedCms, incrementalUpdate, prepareByteRange, type SignatureFieldOptions } from './incremental.js';
 import { sealKeyProvider } from './keys.js';
 
 export interface SealResult {
@@ -43,4 +44,30 @@ export async function sealPdf(
     timestamp: signer.lastTimestamp,
     keyProvider: keys.id,
   };
+}
+
+/**
+ * Appends a signature as an incremental update, keeping every earlier
+ * signature valid. `sign` receives the exact bytes covered and returns a CMS.
+ */
+export async function signIncremental(
+  pdf: Buffer,
+  field: SignatureFieldOptions,
+  sign: (signedContent: Buffer) => Promise<Buffer>,
+): Promise<Buffer> {
+  const withPlaceholder = await incrementalUpdate(pdf, (doc) => addSignatureField(doc, field));
+  const prepared = prepareByteRange(withPlaceholder);
+  return embedCms(prepared, await sign(prepared.signedContent));
+}
+
+/** Platform seal applied incrementally, for documents that already carry signer signatures. */
+export async function sealPdfIncremental(input: Buffer, opts: { reason: string }): Promise<SealResult> {
+  const keys = sealKeyProvider();
+  const signer = new CadesSigner(keys, config.tsaUrl);
+  const pdf = await signIncremental(
+    input,
+    { fieldName: `DocSign Seal ${Date.now()}`, reason: opts.reason, name: 'DocSign Platform Seal', contactInfo: config.appUrl, location: `DocSign cell: ${config.cellRegion}` },
+    (content) => signer.sign(content),
+  );
+  return { pdf, format: signer.lastTimestamp.timestamped ? 'PAdES-B-T' : 'PAdES-B-B', timestamp: signer.lastTimestamp, keyProvider: keys.id };
 }

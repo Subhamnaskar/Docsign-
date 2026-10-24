@@ -26,7 +26,9 @@ describe('formula evaluator', () => {
 
 /** Opens a signing link and verifies with the emailed code. */
 async function openAs(email: string) {
-  const link = lastMail(email, /Please sign|Firme/).text.match(/\/sign\/([\w.-]+)/)![1];
+  // The invitation goes out just after the recipient's status changes
+  const invite = await waitFor(async () => { try { return lastMail(email, /Please sign|Firme/); } catch { return null; } }, (m) => m !== null);
+  const link = invite!.text.match(/\/sign\/([\w.-]+)/)![1];
   const s = client(app);
   await s.json('POST', `/signing/${link}/otp/send`);
   await s.json('POST', `/signing/${link}/otp/verify`, { json: { code: lastMail(email, /\d{6}/).subject.match(/\d{6}/)![0] } });

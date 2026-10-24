@@ -22,6 +22,8 @@ export interface ResolvedPolicy {
   /** False when this cell is not the legal home for the jurisdiction's data. */
   residencySatisfied: boolean;
   consentText: string;
+  /** Stamp duty must be paid before signing (India: e-stamp) */
+  stampDutyRequired: boolean;
   allowed: boolean;
   blockers: string[];
   warnings: string[];
@@ -57,6 +59,10 @@ export function resolvePolicy(jurisdiction: string, documentType: string): Resol
     );
   }
 
+  if (sigProvider?.id === 'aadhaar-esign' && config.esign.mode === 'sandbox') {
+    warnings.push('Aadhaar eSign is running against the SANDBOX ESP: signatures are for testing and are not legally valid.');
+  }
+
   // 'local' is the development cell and may hold any jurisdiction's data.
   const residencySatisfied = config.cellRegion === 'local' || config.cellRegion === pack.dataRegion;
   if (!residencySatisfied) {
@@ -79,6 +85,7 @@ export function resolvePolicy(jurisdiction: string, documentType: string): Resol
     dataRegion: pack.dataRegion,
     residencySatisfied,
     consentText: pack.consentText,
+    stampDutyRequired: Boolean(rule.stampDuty),
     allowed: blockers.length === 0,
     blockers,
     warnings,

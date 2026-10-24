@@ -43,7 +43,11 @@ function RecipientRow({ r, sequential, onCorrect, onHost }: { r: Recipient; sequ
         <div className="truncate text-sm font-medium">
           {r.name} <span className="font-normal text-gray-500">{r.email}</span>
         </div>
-        <div className="truncate text-xs text-gray-500">{detail}</div>
+        <div className="truncate text-xs text-gray-500">
+          {detail}
+          {r.signatureMethod === 'AADHAAR_ESIGN' && ' · Aadhaar eSign'}
+          {r.signatureMethod === 'DSC' && ' · DSC token'}
+        </div>
       </div>
       {onHost && (
         <Button size="sm" onClick={onHost}>
@@ -280,6 +284,20 @@ function Detail() {
         </div>
         <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <CompliancePanel policy={env.policy} />
+          {env.estampResult && (
+            <Card className="p-4 text-sm">
+              <h3 className="font-semibold">e-Stamp</h3>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-gray-600">
+                <dt className="text-gray-400">Certificate</dt>
+                <dd className="font-mono text-xs">{env.estampResult.certificateNumber}</dd>
+                <dt className="text-gray-400">State</dt>
+                <dd>{env.estampResult.state}</dd>
+                <dt className="text-gray-400">Duty</dt>
+                <dd>₹{env.estampResult.dutyAmount.toFixed(2)}</dd>
+              </dl>
+              {env.estampResult.sandbox && <p className="mt-2 text-xs text-amber-700">Sandbox specimen: not a valid stamp.</p>}
+            </Card>
+          )}
           <Card className="p-4 text-sm text-gray-600">
             Anyone can check a signed PDF or certificate on the{' '}
             <Link href="/verify" className="font-medium text-brand-600 hover:underline">

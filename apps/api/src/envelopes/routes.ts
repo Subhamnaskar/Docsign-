@@ -7,8 +7,11 @@ import { clientInfo, requireAuth } from '../lib/auth.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { getObject, putObject } from '../lib/storage.js';
 import { sha256Hex } from '../lib/crypto.js';
+import { Prisma } from '@prisma/client';
+import { INDIAN_STATES } from '../estamp/provider.js';
 import { formulaRefs } from '../lib/formula.js';
 import { E164 } from '../messaging/providers.js';
+import { config } from '../config.js';
 import { parse } from '../lib/validate.js';
 import { listDocumentTypes, listJurisdictions, resolvePolicy } from '../policy/engine.js';
 import { JURISDICTIONS, DOCUMENT_TYPES } from '../policy/jurisdictions.js';
@@ -35,6 +38,17 @@ const envelopeInput = z.object({
   routing: z.enum(['SEQUENTIAL', 'PARALLEL']).optional(),
   reminderDays: z.number().int().min(0).max(30).optional(),
   expiresAt: z.coerce.date().nullish(),
+  /** India: buy an e-stamp for this agreement when it is sent */
+  estamp: z
+    .object({
+      state: z.string().refine((s) => s in INDIAN_STATES, 'Unknown state'),
+      article: z.string().trim().min(1).max(120),
+      dutyAmount: z.number().min(1).max(10_000_000),
+      firstParty: z.string().trim().min(1).max(160),
+      secondParty: z.string().trim().min(1).max(160),
+      purpose: z.string().trim().min(1).max(200),
+    })
+    .nullish(),
 });
 
 const recipientsInput = z
@@ -49,6 +63,7 @@ const recipientsInput = z
       /** Signs on the sender's device, hosted by the current user; no email is sent. */
       inPerson: z.boolean().default(false),
       authMethod: z.enum(['EMAIL_OTP', 'SMS_OTP', 'WHATSAPP_OTP', 'ACCESS_CODE']).default('EMAIL_OTP'),
+      signatureMethod: z.enum(['ELECTRONIC', 'AADHAAR_ESIGN', 'DSC']).default('ELECTRONIC'),
       phone: z.string().trim().regex(E164, 'Use international format, e.g. +919876543210').nullish(),
       /** Shared with the signer by the sender out of band; stored hashed. Omit to keep the current code. */
       accessCode: z.string().trim().min(4).max(32).nullish(),
@@ -98,6 +113,8 @@ export function serializeEnvelope(env: FullEnvelope) {
     createdAt: env.createdAt,
     updatedAt: env.updatedAt,
     hasCertificate: Boolean(env.certificateKey),
+    estamp: env.estamp,
+    estampResult: env.estampResult,
     certificateSha256: env.certificateSha256,
     policy: env.status === 'DRAFT' ? resolvePolicy(env.jurisdiction, env.documentType) : env.policy,
     readiness: env.status === 'DRAFT' ? sendReadinessProblems(env) : [],
@@ -124,6 +141,7 @@ export function serializeEnvelope(env: FullEnvelope) {
       hasAccessCode: Boolean(r.accessCodeHash),
       embedded: r.embedded,
       clientUserId: r.clientUserId,
+      signatureMethod: r.signatureMethod,
       status: r.status,
       viewedAt: r.viewedAt,
       verifiedAt: r.verifiedAt,
@@ -158,6 +176,8 @@ export async function envelopeRoutes(app: FastifyInstance) {
   app.get('/policy/options', async () => ({
     jurisdictions: listJurisdictions(),
     documentTypes: listDocumentTypes(),
+    indianStates: Object.entries(INDIAN_STATES).map(([code, name]) => ({ code, name })),
+    esign: { aadhaar: config.esign.mode, dsc: true },
   }));
 
   app.get('/policy/resolve', async (req) => {
@@ -277,8 +297,11 @@ export async function envelopeRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
-    const body = parse(envelopeInput.partial(), req.body);
-    await prisma.envelope.update({ where: { id }, data: body });
+    const { estamp, ...body } = parse(envelopeInput.partial(), req.body);
+    await prisma.envelope.update({
+      where: { id },
+      data: { ...body, ...(estamp !== undefined ? { estamp: estamp ?? Prisma.DbNull } : {}) },
+    });
     return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });
 
@@ -406,6 +429,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
           phone: r.phone ?? null,
           embedded: r.embedded,
           clientUserId: r.clientUserId ?? null,
+          signatureMethod: r.role === 'SIGNER' ? r.signatureMethod : ('ELECTRONIC' as const),
         };
         const codeHash = (rid: string) => (r.accessCode ? { accessCodeHash: sha256Hex(`${rid}:${r.accessCode}`) } : {});
         if (existing) {

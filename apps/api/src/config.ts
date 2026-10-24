@@ -44,6 +44,25 @@ export const config = {
       templateId: process.env.MSG91_TEMPLATE_ID ?? '',
     },
   },
+  esign: {
+    /**
+     * off | sandbox | production. sandbox uses the built-in test ESP (signatures
+     * are NOT legally valid); production posts to a licensed ESP.
+     */
+    mode: env('ESIGN_MODE', 'sandbox') as 'off' | 'sandbox' | 'production',
+    /** ESP gateway URL the signer's browser is sent to (production) */
+    espUrl: process.env.ESIGN_ESP_URL ?? '',
+    /** ASP id issued by the ESP */
+    aspId: env('ESIGN_ASP_ID', 'DOCSIGN-SANDBOX'),
+    /** PEM path of the ESP's response-signing certificate (production) */
+    espCertPath: process.env.ESIGN_ESP_CERT ?? '',
+    /** Directory of trusted root/intermediate PEMs for DSC certificates (e.g. CCA India). Empty = chain not checked. */
+    dscTrustDir: process.env.DSC_TRUST_DIR ?? '',
+  },
+  estamp: {
+    /** sandbox (specimen certificates, not valid) | off */
+    provider: env('ESTAMP_PROVIDER', 'sandbox'),
+  },
   /** 'inline' runs background jobs inside the API process; 'off' expects `npm run worker`. */
   workerMode: env('WORKER_MODE', 'inline') as 'inline' | 'off',
   clamav: {

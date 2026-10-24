@@ -27,6 +27,8 @@ export function resolveFieldValues(
   others: Field[],
   submitted: Record<string, string>,
   attachments: Pick<SignerAttachment, 'id' | 'fieldId'>[],
+  /** Aadhaar eSign / DSC signers: the cryptographic signature replaces drawn signatures and initials */
+  opts: { crypto?: boolean } = {},
 ): { id: string; value: string | null }[] {
   const raw = new Map(own.map((f) => [f.id, submitted[f.id]?.trim() || null]));
   const byLabel = (label: string): string | null => {
@@ -59,6 +61,10 @@ export function resolveFieldValues(
         break;
       case 'SIGNATURE':
       case 'INITIALS':
+        if (opts.crypto) {
+          out.push({ id: f.id, value: null });
+          continue;
+        }
         if (value) {
           if (Buffer.byteLength(value) > MAX_SIGNATURE_BYTES * 1.4) throw badRequest('Signature image is too large.');
           value = normalizeSignaturePng(value);

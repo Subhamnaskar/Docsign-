@@ -152,6 +152,9 @@ model Envelope {
   folder            Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
   // Set when created through a self-serve signing form
   formId            String?
+  // e-Stamp request (state, article, duty, parties) and the issued certificate
+  estamp            Json?
+  estampResult      Json?
   // Snapshot of the resolved compliance profile at send time
   policy            Json?
   reminderDays      Int            @default(2)
@@ -186,6 +189,8 @@ model Document {
   // [{ width, height }] in PDF points, used by the field editor
   pages       Json
   // Completed, sealed PDF
+  // Copy that signer signatures are appended to (incremental updates); AES envelopes only
+  workingKey  String?
   finalKey    String?
   finalSha256 String?
   createdAt   DateTime @default(now())
@@ -199,6 +204,15 @@ enum RecipientRole {
   // Reviews and approves without filling fields
   APPROVER
   CC
+}
+
+enum SignatureMethod {
+  // Electronic signature (SES) sealed by the platform
+  ELECTRONIC
+  // Aadhaar eSign through a licensed eSign Service Provider (India, AES)
+  AADHAAR_ESIGN
+  // Signer's own Digital Signature Certificate on a USB token (AES)
+  DSC
 }
 
 enum AuthMethod {
@@ -230,6 +244,7 @@ model Recipient {
   // Language for emails and the signing page (BCP 47 code, e.g. "hi", "es")
   locale               String          @default("en")
   authMethod           AuthMethod      @default(EMAIL_OTP)
+  signatureMethod      SignatureMethod @default(ELECTRONIC)
   // E.164 phone number for SMS / WhatsApp codes
   phone                String?
   accessCodeHash       String?
@@ -496,4 +511,20 @@ model SigningForm {
   maxUses    Int?
   uses       Int          @default(0)
   createdAt  DateTime     @default(now())
+}
+
+// One Aadhaar eSign / DSC request awaiting the signer's authentication
+model EsignTransaction {
+  id          String    @id
+  envelopeId  String
+  recipientId String
+  provider    String
+  status      String    @default("PENDING")
+  // [{ documentId, preparedKey, contentsStart, contentsEnd, digest }]
+  documents   Json
+  error       String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([recipientId])
 }

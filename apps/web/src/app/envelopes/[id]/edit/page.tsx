@@ -10,9 +10,15 @@ import { Alert, Button, Card, cx, Input, Label, PageLoader, Select, Spinner, Tex
 import { api, ApiError, upload } from '@/lib/api';
 import { FIELD_LABELS } from '@/lib/format';
 import { LANGUAGES } from '@/lib/i18n';
-import type { Envelope, Field, Option } from '@/lib/types';
+import type { Envelope, Estamp, Field, Option } from '@/lib/types';
 
 const STEPS = ['Documents', 'Recipients', 'Fields', 'Review & send'] as const;
+
+interface Options {
+  jurisdictions: Option[];
+  documentTypes: Option[];
+  indianStates?: Option[];
+}
 
 interface RecipientDraft {
   key: string;
@@ -29,6 +35,7 @@ interface RecipientDraft {
   accessCode: string;
   hasAccessCode: boolean;
   embedded: boolean;
+  signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
 }
 
 let keySeq = 0;
@@ -57,7 +64,7 @@ function Stepper({ step, onStep, maxStep }: { step: number; onStep: (s: number) 
   );
 }
 
-function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope: (e: Envelope) => void; options: { jurisdictions: Option[]; documentTypes: Option[] } }) {
+function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope: (e: Envelope) => void; options: Options }) {
   const [uploading, setUploading] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -213,10 +220,75 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
           </div>
         </Card>
       </div>
-      <div className="lg:sticky lg:top-20 lg:self-start">
+      <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
         <CompliancePanel policy={env.policy} />
+        {env.jurisdiction === 'IN' && <EstampCard env={env} onEnvelope={onEnvelope} states={options.indianStates ?? []} />}
       </div>
     </div>
+  );
+}
+
+/** India: stamp duty details; the e-stamp is bought and attached as page 1 when the agreement is sent. */
+function EstampCard({ env, onEnvelope, states }: { env: Envelope; onEnvelope: (e: Envelope) => void; states: Option[] }) {
+  const [form, setForm] = useState<Estamp>(
+    env.estamp ?? { state: states[0]?.code ?? 'MH', article: '', dutyAmount: 100, firstParty: '', secondParty: '', purpose: env.title },
+  );
+  const [enabled, setEnabled] = useState(Boolean(env.estamp) || Boolean(env.policy.stampDutyRequired));
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const set = (k: keyof Estamp) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [k]: k === 'dutyAmount' ? Number(e.target.value) : e.target.value }));
+
+  async function save(on: boolean) {
+    setError(null);
+    setSaved(false);
+    try {
+      onEnvelope(await api<Envelope>(`/envelopes/${env.id}`, { method: 'PATCH', json: { estamp: on ? form : null } }));
+      setSaved(on);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  return (
+    <Card className="p-4 text-sm">
+      <label className="flex items-center gap-2 font-semibold">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => {
+            setEnabled(e.target.checked);
+            if (!e.target.checked) save(false);
+          }}
+        />
+        e-Stamp (stamp duty)
+      </label>
+      {env.policy.stampDutyRequired && <p className="mt-1 text-xs text-amber-700">Required for this document type.</p>}
+      {enabled && (
+        <div className="mt-3 space-y-2">
+          <Select value={form.state} onChange={set('state')} aria-label="State">
+            {states.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.name}
+              </option>
+            ))}
+          </Select>
+          <Input placeholder="Article, e.g. Article 5(h)" value={form.article} onChange={set('article')} />
+          <Input type="number" min={1} placeholder="Duty amount (₹)" value={form.dutyAmount} onChange={set('dutyAmount')} />
+          <Input placeholder="First party (pays duty)" value={form.firstParty} onChange={set('firstParty')} />
+          <Input placeholder="Second party" value={form.secondParty} onChange={set('secondParty')} />
+          <Input placeholder="Purpose" value={form.purpose} onChange={set('purpose')} />
+          {error && <p className="text-red-600">{error}</p>}
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => save(true)}>
+              Save stamp details
+            </Button>
+            {saved && <span className="text-green-700">Saved</span>}
+          </div>
+          <p className="text-xs text-gray-500">The e-stamp is purchased and added as page 1 when you send.</p>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -237,7 +309,7 @@ function RecipientsStep({
   const add = (r?: Partial<RecipientDraft>) =>
     setDrafts([
       ...drafts,
-      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, authMethod: 'EMAIL_OTP', phone: '', accessCode: '', hasAccessCode: false, embedded: false, routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
+      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, authMethod: 'EMAIL_OTP', phone: '', accessCode: '', hasAccessCode: false, embedded: false, signatureMethod: env.jurisdiction === 'IN' && env.policy.signatureLevel !== 'SES' ? 'AADHAAR_ESIGN' : 'ELECTRONIC', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
     ]);
 
   return (
@@ -301,6 +373,16 @@ function RecipientsStep({
                 ))}
               </Select>
             </div>
+            {d.role === 'SIGNER' && (
+              <div className="w-48">
+                <Label>Sign with</Label>
+                <Select value={d.signatureMethod} onChange={(e) => update(d.key, { signatureMethod: e.target.value as RecipientDraft['signatureMethod'] })}>
+                  <option value="ELECTRONIC">Electronic signature</option>
+                  {env.jurisdiction === 'IN' && <option value="AADHAAR_ESIGN">Aadhaar eSign</option>}
+                  <option value="DSC">DSC token</option>
+                </Select>
+              </div>
+            )}
             {d.role !== 'CC' && !d.inPerson && !d.embedded && (
               <div className="flex w-full flex-wrap items-end gap-3">
                 <div className="w-48">
@@ -415,7 +497,7 @@ function Builder() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [env, setEnv] = useState<Envelope | null>(null);
-  const [options, setOptions] = useState<{ jurisdictions: Option[]; documentTypes: Option[] } | null>(null);
+  const [options, setOptions] = useState<Options | null>(null);
   const [step, setStep] = useState(0);
   const [drafts, setDrafts] = useState<RecipientDraft[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
@@ -440,6 +522,7 @@ function Builder() {
         accessCode: '',
         hasAccessCode: Boolean(r.hasAccessCode),
         embedded: Boolean(r.embedded),
+        signatureMethod: r.signatureMethod ?? 'ELECTRONIC',
       })),
     );
     setFields(e.fields);
@@ -471,7 +554,7 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/recipients`, {
             method: 'PUT',
-            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson, authMethod, phone, accessCode, embedded }) => ({
+            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson, authMethod, phone, accessCode, embedded, signatureMethod }) => ({
               id: rid,
               name: name.trim(),
               email: email.trim(),
@@ -483,6 +566,7 @@ function Builder() {
               authMethod: role === 'CC' ? 'EMAIL_OTP' : authMethod,
               phone: phone.trim() || null,
               accessCode: accessCode.trim() || null,
+              signatureMethod: role === 'SIGNER' ? signatureMethod : 'ELECTRONIC',
             })),
           }),
         );

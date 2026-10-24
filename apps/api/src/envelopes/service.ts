@@ -11,7 +11,8 @@ import { getBranding } from '../organization/branding.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { getObject, putObject } from '../lib/storage.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
-import { sealPdf } from '../trust/pades.js';
+import { isIncremental, prepareForSend } from '../esign/service.js';
+import { sealPdf, sealPdfIncremental } from '../trust/pades.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 
 export const envelopeInclude = {
@@ -51,6 +52,23 @@ export function sendReadinessProblems(env: FullEnvelope): string[] {
   if (signers.length === 0) problems.push('Add at least one signer.');
   const signerIds = new Set(signers.map((s) => s.id));
   if (env.fields.some((f) => !signerIds.has(f.recipientId))) problems.push('Some fields belong to recipients who no longer sign.');
+
+  const policy = resolvePolicy(env.jurisdiction, env.documentType);
+  if (policy.signatureLevel !== 'SES') {
+    for (const s of signers.filter((x) => x.signatureMethod === 'ELECTRONIC')) {
+      problems.push(`${s.name} must sign with Aadhaar eSign or a DSC (${policy.signatureLevel} signature required for this document).`);
+    }
+  }
+  if (isIncremental(env.recipients)) {
+    const actors = env.recipients.filter(actsOn);
+    if (env.routing !== 'SEQUENTIAL' || new Set(actors.map((r) => r.routingOrder)).size !== actors.length) {
+      problems.push('With Aadhaar eSign or DSC, set a signing order with one person per step.');
+    }
+    if (env.fields.some((f) => f.type === 'ATTACHMENT')) problems.push('Attachment fields are not available with Aadhaar eSign or DSC yet.');
+    if (env.recipients.some((r) => r.signatureMethod === 'AADHAAR_ESIGN') && env.jurisdiction !== 'IN') problems.push('Aadhaar eSign is only available for Indian agreements.');
+    if (env.recipients.some((r) => r.signatureMethod === 'AADHAAR_ESIGN' && (r.embedded || r.hostUserId))) problems.push('Aadhaar eSign signers cannot be embedded or in person.');
+  }
+  if (policy.stampDutyRequired && !env.estamp) problems.push('Add e-stamp details (stamp duty is payable for this document).');
   for (const s of signers) {
     if (!env.fields.some((f) => f.recipientId === s.id && f.type === 'SIGNATURE')) {
       problems.push(`Place at least one signature field for ${s.name}.`);
@@ -78,6 +96,10 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
   const policy = resolvePolicy(env.jurisdiction, env.documentType);
   if (!policy.allowed) throw unprocessable('This document cannot be sent under the selected compliance profile.', { problems: policy.blockers });
 
+  await prepareForSend(id, actor);
+  // Documents may have changed (e-stamp page added); record what is actually sent
+  const sent = await getEnvelope(orgId, id);
+
   const toNotify = await prisma.$transaction(async (tx) => {
     const updated = await tx.envelope.update({
       where: { id },
@@ -89,7 +111,8 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
       actor,
       data: {
         policy: { jurisdiction: policy.jurisdiction, level: policy.signatureLevel, format: policy.signatureFormat },
-        documents: env.documents.map((d) => ({ id: d.id, name: d.name, sha256: d.sha256 })),
+        documents: sent.documents.map((d) => ({ id: d.id, name: d.name, sha256: d.sha256 })),
+        ...(sent.estampResult ? { estamp: sent.estampResult } : {}),
         recipients: env.recipients.map((r) => ({ id: r.id, name: r.name, email: r.email, role: r.role, order: r.routingOrder })),
       },
       ...client,
@@ -192,8 +215,27 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
   const attachmentNames = new Map(attachments.map((a) => [a.id, a.name]));
   const byRecipient = new Map(env.recipients.map((r) => [r.id, r.name]));
 
+  const incremental = isIncremental(env.recipients);
   for (const [index, doc] of env.documents.entries()) {
     if (doc.finalKey) continue;
+    if (incremental) {
+      // Signer signatures are already in the working copy; append the platform seal
+      const sealed = await sealPdfIncremental(await getObject(doc.workingKey!), { reason });
+      const finalSha256 = sha256Hex(sealed.pdf);
+      const finalKey = `envelopes/${env.id}/completed/${doc.id}.pdf`;
+      await putObject(finalKey, sealed.pdf, 'application/pdf', policy.retentionYears);
+      sealFormat = sealed.format;
+      await prisma.$transaction(async (tx) => {
+        await tx.document.update({ where: { id: doc.id }, data: { finalKey, finalSha256 } });
+        await appendAudit(tx, {
+          envelopeId: env.id,
+          type: 'document.sealed',
+          actor: { kind: 'system' },
+          data: { documentId: doc.id, sha256: finalSha256, format: sealed.format, keyProvider: sealed.keyProvider, incremental: true },
+        });
+      });
+      continue;
+    }
     const original = await getObject(doc.storageKey);
     const embed =
       index === 0

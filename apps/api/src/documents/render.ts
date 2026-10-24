@@ -4,20 +4,20 @@ import { degrees, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } 
 const INK = rgb(0.06, 0.09, 0.35);
 
 /** Pick the largest font size (up to `max`) at which `text` fits in the box. */
-function fitText(font: PDFFont, text: string, boxW: number, boxH: number, max = 14): number {
+export function fitText(font: PDFFont, text: string, boxW: number, boxH: number, max = 14): number {
   let size = Math.min(max, boxH * 0.75);
   while (size > 5 && font.widthOfTextAtSize(text, size) > boxW - 4) size -= 0.5;
   return size;
 }
 
 /** WinAnsi (standard fonts) can't encode every character; replace the rest. */
-const winAnsiSafe = (s: string) => s.replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+export const winAnsiSafe = (s: string) => s.replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
 
 /**
  * Converts a field box (fractions of the page as displayed, top-left origin)
  * into PDF user-space coordinates, accounting for /Rotate.
  */
-function boxToPdf(page: PDFPage, f: Pick<Field, 'x' | 'y' | 'width' | 'height'>) {
+export function boxToPdf(page: PDFPage, f: Pick<Field, 'x' | 'y' | 'width' | 'height'>) {
   const { width: W, height: H } = page.getSize();
   const rot = ((page.getRotation().angle % 360) + 360) % 360;
   // Displayed page dimensions

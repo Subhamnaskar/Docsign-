@@ -49,6 +49,7 @@ export interface Recipient {
   hasAccessCode?: boolean;
   embedded?: boolean;
   clientUserId?: string | null;
+  signatureMethod?: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
   status: RecipientStatus;
   viewedAt: string | null;
   verifiedAt: string | null;
@@ -91,6 +92,7 @@ export interface Policy {
   dataRegion: string;
   residencySatisfied: boolean;
   consentText: string;
+  stampDutyRequired?: boolean;
   allowed: boolean;
   blockers: string[];
   warnings: string[];
@@ -113,6 +115,8 @@ export interface Envelope {
   updatedAt: string;
   hasCertificate: boolean;
   certificateSha256: string | null;
+  estamp?: Estamp | null;
+  estampResult?: { certificateNumber: string; state: string; dutyAmount: number; sandbox: boolean; issuedAt: string } | null;
   policy: Policy;
   readiness: string[];
   documents: DocumentInfo[];
@@ -150,6 +154,15 @@ export interface Me {
   user: { id: string; name: string; email: string; role: string } | null;
   organization: { id: string; name: string; jurisdiction: string; dataRegion: string; brandColor: string | null; embedOrigins: string[] };
   cell: string;
+}
+
+export interface Estamp {
+  state: string;
+  article: string;
+  dutyAmount: number;
+  firstParty: string;
+  secondParty: string;
+  purpose: string;
 }
 
 export interface Option {

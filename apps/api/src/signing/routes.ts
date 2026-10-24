@@ -17,6 +17,7 @@ import { MAX_SIGNATURE_BYTES, resolveFieldValues } from './values.js';
 import { parse } from '../lib/validate.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
 import { advanceEnvelope, notifySender, notifySigners } from '../envelopes/service.js';
+import { applyElectronicIncrement, isIncremental } from '../esign/service.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -42,7 +43,7 @@ function identityEvidence(r: Recipient) {
 
 export const cookieName = (recipientId: string) => `ds_signer_${recipientId}`;
 
-async function loadByToken(token: string) {
+export async function loadByToken(token: string) {
   const parsed = parseSigningToken(token);
   if (!parsed) throw notFound('Signing request');
   const recipient = await prisma.recipient.findUnique({
@@ -75,7 +76,7 @@ function hasSession(req: FastifyRequest, r: Recipient): boolean {
   return safeEqualHex(sha256Hex(value), r.signerSessionHash);
 }
 
-function requireSession(req: FastifyRequest, r: Recipient) {
+export function requireSession(req: FastifyRequest, r: Recipient) {
   if (!hasSession(req, r)) throw unauthorized('Verify your identity to continue.');
 }
 
@@ -93,7 +94,7 @@ function signerState(r: LoadedRecipient) {
   return 'ready';
 }
 
-function requireReady(r: LoadedRecipient) {
+export function requireReady(r: LoadedRecipient) {
   const state = signerState(r);
   if (state !== 'ready') throw conflict(`This signing request is ${state}.`);
 }
@@ -106,9 +107,9 @@ function otpChannel(r: Recipient): 'email' | 'sms' | 'whatsapp' | null {
   return 'email';
 }
 
-const actorOf = (r: Recipient): Actor => ({ kind: 'recipient', id: r.id, name: r.name, email: r.email });
+export const actorOf = (r: Recipient): Actor => ({ kind: 'recipient', id: r.id, name: r.name, email: r.email });
 
-async function labelledValues(envelopeId: string, recipientId: string) {
+export async function labelledValues(envelopeId: string, recipientId: string) {
   const fields = await prisma.field.findMany({ where: { envelopeId, recipientId: { not: recipientId }, label: { not: null }, value: { not: null } } });
   return Object.fromEntries(fields.filter((f) => f.type !== 'SIGNATURE' && f.type !== 'INITIALS').map((f) => [f.label!, f.value!]));
 }
@@ -200,6 +201,8 @@ export async function signingRoutes(app: FastifyInstance) {
         role: r.role,
         canReassign: !r.embedded && !r.hostUserId,
         authMethod: r.authMethod,
+        signatureMethod: r.signatureMethod,
+        esignSandbox: r.signatureMethod === 'AADHAAR_ESIGN' && config.esign.mode === 'sandbox',
         maskedPhone: r.phone ? maskPhone(r.phone) : null,
         embedded: r.embedded,
         returnUrl: r.embedded ? r.embedReturnUrl : null,
@@ -354,6 +357,7 @@ export async function signingRoutes(app: FastifyInstance) {
     const r = await loadByToken(token);
     requireReady(r);
     requireSession(req, r);
+    if (r.signatureMethod !== 'ELECTRONIC') throw badRequest('This document is signed with Aadhaar eSign or a DSC; use that option to sign.');
     const [fields, others, attachments] = await Promise.all([
       prisma.field.findMany({ where: { recipientId: r.id } }),
       prisma.field.findMany({ where: { envelopeId: r.envelopeId, recipientId: { not: r.id } } }),
@@ -401,6 +405,10 @@ export async function signingRoutes(app: FastifyInstance) {
         email: r.email,
       });
     });
+
+    // In envelopes with cryptographic signers, values are appended now so later signatures cover them
+    const envRecipients = await prisma.recipient.findMany({ where: { envelopeId: r.envelopeId }, select: { signatureMethod: true } });
+    if (isIncremental(envRecipients)) await applyElectronicIncrement(r.envelopeId, r.id);
 
     // Routing and sealing can take a few seconds (timestamp authority round-trip); run after responding.
     advanceEnvelope(r.envelopeId).catch((err) => req.log.error({ err }, 'advanceEnvelope failed'));
