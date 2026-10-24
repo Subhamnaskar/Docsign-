@@ -38,7 +38,7 @@ export async function verifyRoutes(app: FastifyInstance) {
         completedAt: envelope.completedAt,
         jurisdiction: envelope.jurisdiction,
         signers: envelope.recipients
-          .filter((r) => r.role === 'SIGNER')
+          .filter((r) => r.role !== 'CC')
           .sort((a, b) => a.routingOrder - b.routingOrder)
           .map((r) => ({ name: r.name, email: maskEmail(r.email), signedAt: r.signedAt })),
         auditTrail: { valid: chain.valid, events: chain.count },

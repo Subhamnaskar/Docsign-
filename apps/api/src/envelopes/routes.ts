@@ -6,6 +6,7 @@ import { ingestDocument, MAX_UPLOAD_BYTES } from '../documents/ingest.js';
 import { clientInfo, requireAuth } from '../lib/auth.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { getObject, putObject } from '../lib/storage.js';
+import { formulaRefs } from '../lib/formula.js';
 import { parse } from '../lib/validate.js';
 import { listDocumentTypes, listJurisdictions, resolvePolicy } from '../policy/engine.js';
 import { JURISDICTIONS, DOCUMENT_TYPES } from '../policy/jurisdictions.js';
@@ -40,9 +41,11 @@ const recipientsInput = z
       id: z.string().optional(),
       name: z.string().trim().min(1).max(120),
       email: z.string().trim().toLowerCase().email(),
-      role: z.enum(['SIGNER', 'CC']).default('SIGNER'),
+      role: z.enum(['SIGNER', 'APPROVER', 'CC']).default('SIGNER'),
       routingOrder: z.number().int().min(1).max(50).default(1),
       locale: z.enum(SUPPORTED_LOCALES as [string, ...string[]]).default('en'),
+      /** Signs on the sender's device, hosted by the current user; no email is sent. */
+      inPerson: z.boolean().default(false),
     }),
   )
   .max(50);
@@ -53,7 +56,7 @@ const fieldsInput = z
     z.object({
       documentId: z.string(),
       recipientId: z.string(),
-      type: z.enum(['SIGNATURE', 'INITIALS', 'DATE_SIGNED', 'NAME', 'EMAIL', 'TEXT', 'CHECKBOX']),
+      type: z.enum(['SIGNATURE', 'INITIALS', 'DATE_SIGNED', 'NAME', 'EMAIL', 'TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT']),
       page: z.number().int().min(0),
       x: fraction,
       y: fraction,
@@ -61,6 +64,9 @@ const fieldsInput = z
       height: fraction.refine((v) => v > 0),
       required: z.boolean().default(true),
       label: z.string().max(100).nullish(),
+      options: z.array(z.string().trim().min(1).max(100)).max(50).default([]),
+      formula: z.string().max(300).nullish(),
+      condition: z.object({ fieldLabel: z.string().min(1).max(100), equals: z.string().max(100) }).nullish(),
     }),
   )
   .max(500);
@@ -103,6 +109,7 @@ export function serializeEnvelope(env: FullEnvelope) {
       role: r.role,
       routingOrder: r.routingOrder,
       locale: r.locale,
+      inPerson: Boolean(r.hostUserId),
       status: r.status,
       viewedAt: r.viewedAt,
       verifiedAt: r.verifiedAt,
@@ -123,6 +130,9 @@ export function serializeEnvelope(env: FullEnvelope) {
       height: f.height,
       required: f.required,
       label: f.label,
+      options: f.options,
+      formula: f.formula,
+      condition: f.condition,
       filled: f.value !== null,
     })),
   };
@@ -361,12 +371,20 @@ export async function envelopeRoutes(app: FastifyInstance) {
       const keep = list.filter((r) => r.id && existingIds.has(r.id)).map((r) => r.id!);
       await tx.recipient.deleteMany({ where: { envelopeId: id, id: { notIn: keep } } });
       for (const r of list) {
-        const data = { name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder, locale: r.locale };
+        if (r.inPerson && (r.role !== 'SIGNER' || !req.auth.userId)) throw badRequest('Only signers can sign in person, hosted by a user.');
+        const data = {
+          name: r.name,
+          email: r.email,
+          role: r.role,
+          routingOrder: r.routingOrder,
+          locale: r.locale,
+          hostUserId: r.inPerson ? req.auth.userId : null,
+        };
         if (r.id && existingIds.has(r.id)) await tx.recipient.update({ where: { id: r.id }, data });
         else await tx.recipient.create({ data: { ...data, envelopeId: id } });
       }
-      // CC recipients don't sign, so they can't own fields
-      await tx.field.deleteMany({ where: { envelopeId: id, recipient: { role: 'CC' } } });
+      // CC recipients and approvers don't fill in fields
+      await tx.field.deleteMany({ where: { envelopeId: id, recipient: { role: { in: ['CC', 'APPROVER'] } } } });
     });
     return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });
@@ -385,10 +403,36 @@ export async function envelopeRoutes(app: FastifyInstance) {
       if (f.page >= doc.pageCount) throw badRequest(`Page ${f.page + 1} does not exist in ${doc.name}`);
       if (!signers.has(f.recipientId)) throw badRequest('Fields can only be assigned to signers of this envelope.');
       if (f.x + f.width > 1.001 || f.y + f.height > 1.001) throw badRequest('A field extends beyond the page.');
+      if ((f.type === 'DROPDOWN' || f.type === 'RADIO') && f.options.length < 2) {
+        throw badRequest(`${f.label ?? f.type} needs at least two options.`);
+      }
+      if (f.type === 'FORMULA') {
+        if (!f.formula) throw badRequest('Formula fields need a formula.');
+        try {
+          for (const ref of formulaRefs(f.formula)) {
+            if (!list.some((g) => g.type === 'NUMBER' && g.label === ref)) throw new Error(`no number field labelled "${ref}"`);
+          }
+        } catch (err) {
+          throw badRequest(`Formula "${f.formula}": ${(err as Error).message}`);
+        }
+      }
+      if (f.condition && !list.some((g) => g.label === f.condition!.fieldLabel)) {
+        throw badRequest(`Condition refers to a field labelled "${f.condition.fieldLabel}" that doesn't exist.`);
+      }
     }
+    const labels = list.filter((f) => f.label).map((f) => f.label);
+    if (new Set(labels).size !== labels.length) throw badRequest('Field labels must be unique so formulas and conditions can refer to them.');
     await prisma.$transaction([
       prisma.field.deleteMany({ where: { envelopeId: id } }),
-      prisma.field.createMany({ data: list.map((f) => ({ ...f, label: f.label ?? null, envelopeId: id })) }),
+      prisma.field.createMany({
+        data: list.map((f) => ({
+          ...f,
+          label: f.label ?? null,
+          formula: f.type === 'FORMULA' ? f.formula! : null,
+          condition: f.condition ?? undefined,
+          envelopeId: id,
+        })),
+      }),
     ]);
     return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });
@@ -410,7 +454,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const env = await getVisibleEnvelope(req.auth, id);
     if (env.status !== 'SENT') throw conflict('Only envelopes that are out for signature can be reminded.');
-    const pending = env.recipients.filter((r) => r.role === 'SIGNER' && (r.status === 'SENT' || r.status === 'VIEWED'));
+    const pending = env.recipients.filter((r) => r.role !== 'CC' && (r.status === 'SENT' || r.status === 'VIEWED'));
     await notifySigners(env, pending, 'reminder');
     return { reminded: pending.map((r) => r.email) };
   });
@@ -464,7 +508,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
       const recMap = new Map<string, string>();
       for (const r of src.recipients) {
         const nr = await tx.recipient.create({
-          data: { envelopeId: env.id, name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder, locale: r.locale },
+          data: { envelopeId: env.id, name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder, locale: r.locale, hostUserId: r.hostUserId },
         });
         recMap.set(r.id, nr.id);
       }
@@ -481,6 +525,9 @@ export async function envelopeRoutes(app: FastifyInstance) {
           height: f.height,
           required: f.required,
           label: f.label,
+          options: f.options,
+          formula: f.formula,
+          condition: f.condition ?? undefined,
         })),
       });
       await appendAudit(tx, {

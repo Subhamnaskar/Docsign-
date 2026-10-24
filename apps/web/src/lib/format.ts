@@ -27,6 +27,11 @@ export const FIELD_LABELS: Record<string, string> = {
   EMAIL: 'Email',
   TEXT: 'Text',
   CHECKBOX: 'Checkbox',
+  DROPDOWN: 'Dropdown',
+  RADIO: 'Choice',
+  NUMBER: 'Number',
+  FORMULA: 'Formula',
+  ATTACHMENT: 'Attachment',
 };
 
 export const AUDIT_LABELS: Record<string, string> = {
@@ -42,6 +47,9 @@ export const AUDIT_LABELS: Record<string, string> = {
   'recipient.verified': 'Identity verified',
   'recipient.consented': 'Agreed to sign electronically',
   'recipient.signed': 'Signed',
+  'recipient.approved': 'Approved',
+  'recipient.corrected': 'Recipient corrected',
+  'recipient.reassigned': 'Reassigned by signer',
   'recipient.declined': 'Declined to sign',
   'document.sealed': 'Document sealed',
   'envelope.completed': 'Envelope completed',

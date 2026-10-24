@@ -7,11 +7,12 @@ import { prisma } from '../db.js';
 import { clientInfo, parseSigningToken, signingTokenMatches } from '../lib/auth.js';
 import { numericCode, randomToken, safeEqualHex, sha256Hex } from '../lib/crypto.js';
 import { badRequest, conflict, forbidden, HttpError, notFound, unauthorized } from '../lib/errors.js';
-import { normalizeSignaturePng } from '../lib/image.js';
+import { assertClean } from '../lib/malware.js';
 import { t } from '../i18n/messages.js';
 import { getBranding } from '../organization/branding.js';
 import { layout, sendMail } from '../lib/mailer.js';
-import { getObject } from '../lib/storage.js';
+import { getObject, putObject } from '../lib/storage.js';
+import { MAX_SIGNATURE_BYTES, resolveFieldValues } from './values.js';
 import { parse } from '../lib/validate.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
 import { advanceEnvelope, notifySender, notifySigners } from '../envelopes/service.js';
@@ -20,10 +21,25 @@ import { enqueueWebhook } from '../webhooks/dispatcher.js';
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_MS = 30 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
-const SESSION_TTL_MS = 2 * 3600 * 1000;
-const MAX_SIGNATURE_BYTES = 400 * 1024;
+export const SIGNER_SESSION_TTL_MS = 2 * 3600 * 1000;
+const SESSION_TTL_MS = SIGNER_SESSION_TTL_MS;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
-const cookieName = (recipientId: string) => `ds_signer_${recipientId}`;
+function sniffAttachment(data: Buffer): string | null {
+  if (data.subarray(0, 5).toString('latin1') === '%PDF-') return 'application/pdf';
+  if (data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (data.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return 'image/jpeg';
+  return null;
+}
+
+/** What established the signer's identity, for the audit trail. */
+function identityEvidence(r: Recipient) {
+  if (r.hostUserId) return { method: 'in_person', hostUserId: r.hostUserId, verifiedAt: r.verifiedAt?.toISOString() };
+  if (r.embedded) return { method: 'embedded', clientUserId: r.clientUserId, verifiedAt: r.verifiedAt?.toISOString() };
+  return { method: r.authMethod.toLowerCase(), verifiedAt: r.verifiedAt?.toISOString() };
+}
+
+export const cookieName = (recipientId: string) => `ds_signer_${recipientId}`;
 
 async function loadByToken(token: string) {
   const parsed = parseSigningToken(token);
@@ -77,6 +93,11 @@ function requireReady(r: LoadedRecipient) {
 }
 
 const actorOf = (r: Recipient): Actor => ({ kind: 'recipient', id: r.id, name: r.name, email: r.email });
+
+async function labelledValues(envelopeId: string, recipientId: string) {
+  const fields = await prisma.field.findMany({ where: { envelopeId, recipientId: { not: recipientId }, label: { not: null }, value: { not: null } } });
+  return Object.fromEntries(fields.filter((f) => f.type !== 'SIGNATURE' && f.type !== 'INITIALS').map((f) => [f.label!, f.value!]));
+}
 
 const maskEmail = (email: string) => email.replace(/^(.{1,2})[^@]*(@.*)$/, (_, a, b) => `${a}***${b}`);
 
@@ -144,8 +165,13 @@ export async function signingRoutes(app: FastifyInstance) {
         height: f.height,
         required: f.required,
         label: f.label,
+        options: f.options,
+        formula: f.formula,
+        condition: f.condition,
         value: f.value,
       })),
+      // Values from earlier signers that this signer's conditions/formulas may refer to
+      context: verified ? await labelledValues(r.envelopeId, r.id) : {},
     };
   });
 
@@ -254,41 +280,13 @@ export async function signingRoutes(app: FastifyInstance) {
     const r = await loadByToken(token);
     requireReady(r);
     requireSession(req, r);
-    const fields = await prisma.field.findMany({ where: { recipientId: r.id } });
-
-    const updates: { id: string; value: string | null }[] = [];
-    for (const f of fields) {
-      let value: string | null = body.values[f.id]?.trim() || null;
-      switch (f.type) {
-        case 'NAME':
-          value = r.name;
-          break;
-        case 'EMAIL':
-          value = r.email;
-          break;
-        case 'DATE_SIGNED':
-          // Rendered from signedAt at sealing time
-          value = new Date().toISOString().slice(0, 10);
-          break;
-        case 'SIGNATURE':
-        case 'INITIALS':
-          if (value) {
-            if (Buffer.byteLength(value) > MAX_SIGNATURE_BYTES * 1.4) throw badRequest('Signature image is too large.');
-            value = normalizeSignaturePng(value);
-          }
-          break;
-        case 'CHECKBOX':
-          value = value === 'true' ? 'true' : f.required ? null : 'false';
-          break;
-        case 'TEXT':
-          if (value && value.length > 500) throw badRequest('Text fields are limited to 500 characters.');
-          break;
-      }
-      if (f.required && !value) {
-        throw badRequest(`Complete all required fields (${f.label ?? f.type.toLowerCase().replace('_', ' ')} on page ${f.page + 1}).`);
-      }
-      updates.push({ id: f.id, value });
-    }
+    const [fields, others, attachments] = await Promise.all([
+      prisma.field.findMany({ where: { recipientId: r.id } }),
+      prisma.field.findMany({ where: { envelopeId: r.envelopeId, recipientId: { not: r.id } } }),
+      prisma.signerAttachment.findMany({ where: { recipientId: r.id } }),
+    ]);
+    const updates = resolveFieldValues(r, fields, others, body.values, attachments);
+    const approving = r.role === 'APPROVER';
 
     const policy = (r.envelope.policy as unknown as ResolvedPolicy | null) ?? resolvePolicy(r.envelope.jurisdiction, r.envelope.documentType);
     const client = clientInfo(req);
@@ -311,12 +309,15 @@ export async function signingRoutes(app: FastifyInstance) {
       });
       await appendAudit(tx, {
         envelopeId: r.envelopeId,
-        type: 'recipient.signed',
+        type: approving ? 'recipient.approved' : 'recipient.signed',
         actor: actorOf(r),
         data: {
           fieldsCompleted: updates.filter((u) => u.value).length,
           signatureImageSha256: signature ? sha256Hex(signature) : null,
-          identity: { method: 'email-otp', verifiedAt: r.verifiedAt?.toISOString() },
+          attachments: attachments
+            .filter((a) => updates.some((u) => u.value === a.id))
+            .map((a) => ({ name: a.name, sha256: a.sha256 })),
+          identity: identityEvidence(r),
         },
         ...client,
       });
@@ -330,6 +331,41 @@ export async function signingRoutes(app: FastifyInstance) {
     // Routing and sealing can take a few seconds (timestamp authority round-trip); run after responding.
     advanceEnvelope(r.envelopeId).catch((err) => req.log.error({ err }, 'advanceEnvelope failed'));
     return { signed: true };
+  });
+
+  /** Upload a file for an ATTACHMENT field; returns an id to submit as the field's value. */
+  app.post('/signing/:token/attachments/:fieldId', async (req, reply) => {
+    const { token, fieldId } = req.params as { token: string; fieldId: string };
+    const r = await loadByToken(token);
+    requireReady(r);
+    requireSession(req, r);
+    const field = await prisma.field.findFirst({ where: { id: fieldId, recipientId: r.id, type: 'ATTACHMENT' } });
+    if (!field) throw notFound('Attachment field');
+    const file = await req.file({ limits: { fileSize: MAX_ATTACHMENT_BYTES } });
+    if (!file) throw badRequest('Attach a file in the "file" field.');
+    const data = await file.toBuffer();
+    if (file.file.truncated) throw badRequest('Attachments are limited to 10 MB.');
+    const kind = sniffAttachment(data);
+    if (!kind) throw badRequest('Upload a PDF, PNG or JPG file.');
+    await assertClean(file.filename, data);
+    const sha256 = sha256Hex(data);
+    const created = await prisma.signerAttachment.create({
+      data: {
+        envelopeId: r.envelopeId,
+        fieldId,
+        recipientId: r.id,
+        name: file.filename.slice(0, 200),
+        contentType: kind,
+        size: data.length,
+        sha256,
+        storageKey: '',
+      },
+    });
+    const storageKey = `envelopes/${r.envelopeId}/attachments/${created.id}`;
+    await putObject(storageKey, data, kind);
+    await prisma.signerAttachment.update({ where: { id: created.id }, data: { storageKey } });
+    reply.code(201);
+    return { id: created.id, name: created.name, size: created.size };
   });
 
   /** The signer hands the request to someone else (e.g. the right person in their company). */

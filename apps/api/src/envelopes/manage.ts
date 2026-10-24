@@ -3,8 +3,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { appendAudit } from '../audit/audit.js';
 import { prisma } from '../db.js';
-import { clientInfo, requireAuth } from '../lib/auth.js';
-import { badRequest, conflict, notFound } from '../lib/errors.js';
+import { config } from '../config.js';
+import { clientInfo, requireAuth, signingToken } from '../lib/auth.js';
+import { randomToken, sha256Hex } from '../lib/crypto.js';
+import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
+import { cookieName, SIGNER_SESSION_TTL_MS } from '../signing/routes.js';
 import { getObject } from '../lib/storage.js';
 import { parse } from '../lib/validate.js';
 import { serializeEnvelope } from './routes.js';
@@ -64,6 +67,39 @@ export async function envelopeManageRoutes(app: FastifyInstance) {
     });
     if (updated.status === 'SENT') await notifySigners(env, [updated], 'invite');
     return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
+  });
+
+  /**
+   * In-person signing: the hosting user hands their device to the signer.
+   * The host's own session stands in for the signer's one-time code, and the
+   * audit trail records who hosted.
+   */
+  app.post('/envelopes/:id/recipients/:rid/host-session', async (req, reply) => {
+    const { id, rid } = req.params as { id: string; rid: string };
+    const env = await getVisibleEnvelope(req.auth, id);
+    const r = env.recipients.find((x) => x.id === rid);
+    if (!r) throw notFound('Recipient');
+    if (!r.hostUserId || r.hostUserId !== req.auth.userId) throw forbidden('Only the host can start in-person signing.');
+    if (env.status !== 'SENT' || (r.status !== 'SENT' && r.status !== 'VIEWED')) throw conflict("It is not this signer's turn.");
+    const session = randomToken();
+    await prisma.$transaction(async (tx) => {
+      await tx.recipient.update({ where: { id: rid }, data: { verifiedAt: new Date(), signerSessionHash: sha256Hex(session) } });
+      await appendAudit(tx, {
+        envelopeId: id,
+        type: 'recipient.verified',
+        actor: { kind: 'recipient', id: r.id, name: r.name, email: r.email },
+        data: { method: 'in_person', host: req.auth.actor },
+        ...clientInfo(req),
+      });
+    });
+    reply.setCookie(cookieName(rid), session, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: config.isProduction,
+      maxAge: SIGNER_SESSION_TTL_MS / 1000,
+    });
+    return { signPath: `/sign/${signingToken(r)}` };
   });
 
   app.patch('/envelopes/:id/folder', async (req) => {

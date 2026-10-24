@@ -13,6 +13,7 @@ import { signingRoutes } from './signing/routes.js';
 import { envelopeManageRoutes } from './envelopes/manage.js';
 import { organizationRoutes } from './organization/routes.js';
 import { teamRoutes } from './team/routes.js';
+import { formRoutes } from './templates/forms.js';
 import { templateRoutes } from './templates/routes.js';
 import { verifyRoutes } from './verify/routes.js';
 import { websiteRoutes } from './website/routes.js';
@@ -55,6 +56,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(websiteRoutes);
       await v1.register(envelopeRoutes);
       await v1.register(templateRoutes);
+      await v1.register(formRoutes);
       await v1.register(envelopeManageRoutes);
       await v1.register(teamRoutes);
       await v1.register(organizationRoutes);

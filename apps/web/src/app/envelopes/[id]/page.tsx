@@ -16,7 +16,7 @@ interface AuditResponse {
   events: AuditEvent[];
 }
 
-function RecipientRow({ r, sequential, onCorrect }: { r: Recipient; sequential: boolean; onCorrect?: () => void }) {
+function RecipientRow({ r, sequential, onCorrect, onHost }: { r: Recipient; sequential: boolean; onCorrect?: () => void; onHost?: () => void }) {
   const detail =
     r.status === 'SIGNED'
       ? `Signed ${formatDate(r.signedAt)}`
@@ -45,6 +45,11 @@ function RecipientRow({ r, sequential, onCorrect }: { r: Recipient; sequential: 
         </div>
         <div className="truncate text-xs text-gray-500">{detail}</div>
       </div>
+      {onHost && (
+        <Button size="sm" onClick={onHost}>
+          Start in-person signing
+        </Button>
+      )}
       {onCorrect && (
         <button onClick={onCorrect} className="text-xs font-medium text-brand-600 hover:underline">
           Correct
@@ -189,6 +194,15 @@ function Detail() {
                   key={r.id}
                   r={r}
                   sequential={env.routing === 'SEQUENTIAL'}
+                  onHost={
+                    r.inPerson && env.status === 'SENT' && (r.status === 'SENT' || r.status === 'VIEWED')
+                      ? () =>
+                          action('host', async () => {
+                            const { signPath } = await api<{ signPath: string }>(`/envelopes/${id}/recipients/${r.id}/host-session`, { method: 'POST' });
+                            router.push(signPath);
+                          })
+                      : undefined
+                  }
                   onCorrect={
                     env.status === 'SENT' && r.role !== 'CC' && r.status !== 'SIGNED' && r.status !== 'DECLINED'
                       ? () => {

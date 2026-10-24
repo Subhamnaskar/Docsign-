@@ -144,6 +144,9 @@ const EVENT_LABELS: Record<string, string> = {
   'recipient.verified': 'Identity verified (email OTP)',
   'recipient.consented': 'Consent to electronic signing given',
   'recipient.signed': 'Signed',
+  'recipient.approved': 'Approved',
+  'recipient.corrected': 'Recipient corrected by sender',
+  'recipient.reassigned': 'Reassigned by signer',
   'recipient.declined': 'Declined',
   'envelope.completed': 'Envelope completed',
   'envelope.voided': 'Envelope voided',
@@ -191,10 +194,11 @@ export async function buildCertificate(input: CertificateInput): Promise<Uint8Ar
   }
 
   w.heading('Signers');
-  const signers = input.recipients.filter((r) => r.role === 'SIGNER').sort((a, b) => a.routingOrder - b.routingOrder);
+  const signers = input.recipients.filter((r) => r.role !== 'CC').sort((a, b) => a.routingOrder - b.routingOrder);
   for (const r of signers) {
     w.text(`${r.name} <${r.email}>`, { bold: true });
-    w.row('Status', r.status);
+    w.row('Role', r.role === 'APPROVER' ? 'Approver' : r.hostUserId ? 'Signer (in person)' : 'Signer');
+    w.row('Status', r.role === 'APPROVER' && r.status === 'SIGNED' ? 'APPROVED' : r.status);
     w.row('Identity verified', fmt(r.verifiedAt));
     w.row('Signed', fmt(r.signedAt));
     if (r.signedIp) w.row('IP address', r.signedIp);

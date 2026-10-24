@@ -78,6 +78,11 @@ const en = {
   reassignReason: 'Why are you reassigning?',
   reassignDone: 'Sent to {name}. You can close this page.',
   via: 'via DocSign',
+  approve: 'Approve',
+  approveIntro: 'Review the document below, then approve it or decline.',
+  chooseOne: 'Choose…',
+  uploadFile: 'Upload file',
+  uploading: 'Uploading…',
 };
 
 export type SignerKey = keyof typeof en;

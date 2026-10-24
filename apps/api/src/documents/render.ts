@@ -46,6 +46,10 @@ export interface RenderOptions {
   envelopeId: string;
   /** Map of recipientId → signed timestamp, for DATE_SIGNED fields. */
   signedAt: Map<string, Date>;
+  /** attachment id → display name, for ATTACHMENT fields */
+  attachmentNames?: Map<string, string>;
+  /** Files embedded in the PDF before sealing, so the seal covers them too */
+  embed?: { name: string; data: Buffer; mimeType: string; description: string }[];
 }
 
 /** Burns completed field values into the PDF and stamps the envelope ID on every page. */
@@ -85,10 +89,15 @@ export async function renderCompletedPdf(
         page.drawText('X', { x: box.x + size * 0.2, y: box.y + size * 0.15, size, font, color: INK, rotate });
       }
     } else {
-      const text = winAnsiSafe(value);
+      const shown = f.type === 'ATTACHMENT' ? `Attached: ${opts.attachmentNames?.get(value) ?? 'file'}` : value;
+      const text = winAnsiSafe(shown);
       const size = fitText(font, text, box.w, box.h);
       page.drawText(text, { x: box.x + 2, y: box.y + (box.h - size) / 2 + size * 0.2, size, font, color: INK, rotate });
     }
+  }
+
+  for (const file of opts.embed ?? []) {
+    await doc.attach(file.data, file.name, { mimeType: file.mimeType, description: file.description });
   }
 
   const stamp = `DocSign Envelope ID: ${opts.envelopeId}`;

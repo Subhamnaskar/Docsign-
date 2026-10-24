@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PdfPages } from '@/components/PdfPages';
 import { SignaturePad } from '@/components/SignaturePad';
 import { Alert, Button, Card, cx, Input, Logo, Modal, PageLoader, Textarea } from '@/components/ui';
-import { api, fileUrl } from '@/lib/api';
+import { api, fileUrl, upload } from '@/lib/api';
+import { evaluateFormula } from '@/lib/formula';
 import { FIELD_LABELS } from '@/lib/format';
 import { isRtl, LANGUAGES, signerT, type SignerKey, type Translate } from '@/lib/i18n';
 import type { Field, PageInfo } from '@/lib/types';
@@ -19,6 +20,8 @@ interface SigningSession {
   compliance: { jurisdiction: string; laws: string[]; signatureLevel: string; consentText: string };
   documents: { id: string; name: string; pageCount: number; pages: PageInfo[] }[];
   fields: Field[];
+  /** Labelled values entered by earlier signers (for conditions and formulas) */
+  context: Record<string, string>;
 }
 
 const STATE_KEYS: Record<string, [SignerKey, SignerKey]> = {
@@ -221,11 +224,57 @@ function SignDocument({
     () => ({ NAME: session.recipient.name, EMAIL: session.recipient.email, DATE_SIGNED: new Date().toISOString().slice(0, 10) }),
     [session],
   );
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [fileNames, setFileNames] = useState<Record<string, string>>({});
+
+  /** Current value of a labelled field: this signer's input first, then earlier signers'. */
+  const byLabel = useCallback(
+    (label: string): string | null => {
+      const mine = session.fields.find((f) => f.label === label);
+      if (mine) return values[mine.id] ?? (mine.type === 'CHECKBOX' ? 'false' : null);
+      return session.context?.[label] ?? null;
+    },
+    [session, values],
+  );
+  const visible = useCallback((f: Field) => !f.condition || (byLabel(f.condition.fieldLabel) ?? '') === f.condition.equals, [byLabel]);
+  const formulaValue = (f: Field) => {
+    if (!f.formula) return null;
+    try {
+      const v = evaluateFormula(f.formula, (l) => {
+        const raw = byLabel(l);
+        const n = raw == null || raw.trim() === '' ? NaN : Number(raw.replace(/,/g, ''));
+        return Number.isFinite(n) ? n : null;
+      });
+      return v === null ? null : String(v);
+    } catch {
+      return null;
+    }
+  };
+
   const isDone = useCallback(
-    (f: Field) => f.type in autoFilled || (f.type === 'CHECKBOX' ? values[f.id] === 'true' : Boolean(values[f.id]?.trim())),
+    (f: Field) =>
+      f.type in autoFilled ||
+      f.type === 'FORMULA' ||
+      (f.type === 'CHECKBOX' ? values[f.id] === 'true' : Boolean(values[f.id]?.trim())),
     [values, autoFilled],
   );
-  const remaining = session.fields.filter((f) => f.required && !isDone(f));
+  const shown = session.fields.filter(visible);
+  const remaining = shown.filter((f) => f.required && !isDone(f));
+  const approving = session.recipient.role === 'APPROVER';
+
+  async function uploadAttachment(f: Field, file: File) {
+    setUploading(f.id);
+    setError(null);
+    try {
+      const res = await upload<{ id: string; name: string }>(`/signing/${token}/attachments/${f.id}`, file);
+      setValues((v) => ({ ...v, [f.id]: res.id }));
+      setFileNames((n) => ({ ...n, [f.id]: res.name }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUploading(null);
+    }
+  }
   const ordered = useMemo(
     () =>
       [...session.fields].sort(
@@ -238,7 +287,7 @@ function SignDocument({
   );
 
   function next() {
-    const target = ordered.find((f) => f.required && !isDone(f)) ?? ordered.find((f) => !isDone(f));
+    const target = ordered.find((f) => visible(f) && f.required && !isDone(f)) ?? ordered.find((f) => visible(f) && !isDone(f));
     if (target) document.getElementById(`field-${target.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
@@ -256,7 +305,9 @@ function SignDocument({
     setSubmitting(true);
     setError(null);
     try {
-      await api(`/signing/${token}/complete`, { method: 'POST', json: { consent: true, values } });
+      // Hidden (conditional) fields are not submitted
+      const submitted = Object.fromEntries(Object.entries(values).filter(([id]) => shown.some((f) => f.id === id)));
+      await api(`/signing/${token}/complete`, { method: 'POST', json: { consent: true, values: submitted } });
       onDone();
     } catch (err) {
       setError((err as Error).message);
@@ -314,11 +365,12 @@ function SignDocument({
           </Button>
         ) : (
           <Button size="sm" onClick={finish} loading={submitting}>
-            {tr('finish')}
+            {approving ? tr('approve') : tr('finish')}
           </Button>
         )}
       </div>
 
+      {approving && <p className="mb-4 text-sm text-gray-600">{tr('approveIntro')}</p>}
       {error && (
         <div className="mb-4">
           <Alert>{error}</Alert>
@@ -334,11 +386,82 @@ function SignDocument({
               url={fileUrl(`/signing/${token}/documents/${doc.id}/file`)}
               pages={doc.pages}
               overlay={(page) =>
-                session.fields
+                shown
                   .filter((f) => f.documentId === doc.id && f.page === page)
                   .map((f) => {
                     const done = isDone(f);
                     const style = { left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.width * 100}%`, height: `${f.height * 100}%` };
+                    const boxClass = cx(
+                      'absolute rounded border-2 text-[clamp(8px,1.4vw,13px)] outline-none',
+                      done ? 'border-green-500/60 bg-white/85' : 'border-amber-400 bg-amber-50/90 focus-within:border-brand-500',
+                    );
+                    if (f.type === 'DROPDOWN') {
+                      return (
+                        <select
+                          key={f.id}
+                          id={`field-${f.id}`}
+                          style={style}
+                          title={f.label ?? undefined}
+                          value={values[f.id] ?? ''}
+                          onChange={(e) => setValues((v) => ({ ...v, [f.id]: e.target.value }))}
+                          className={cx(boxClass, 'px-0.5')}
+                        >
+                          <option value="">{f.label ?? tr('chooseOne')}</option>
+                          {(f.options ?? []).map((o) => (
+                            <option key={o} value={o}>
+                              {o}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    }
+                    if (f.type === 'RADIO') {
+                      return (
+                        <div key={f.id} id={`field-${f.id}`} style={style} role="radiogroup" aria-label={f.label ?? undefined} className={cx(boxClass, 'flex items-stretch gap-0.5 overflow-hidden p-0.5')}>
+                          {(f.options ?? []).map((o) => (
+                            <button
+                              key={o}
+                              type="button"
+                              role="radio"
+                              aria-checked={values[f.id] === o}
+                              onClick={() => setValues((v) => ({ ...v, [f.id]: o }))}
+                              className={cx('min-w-0 flex-1 truncate rounded px-1', values[f.id] === o ? 'bg-brand-600 text-white' : 'bg-white/70 text-gray-700 hover:bg-white')}
+                            >
+                              {o}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    }
+                    if (f.type === 'NUMBER') {
+                      return (
+                        <input
+                          key={f.id}
+                          id={`field-${f.id}`}
+                          style={style}
+                          inputMode="decimal"
+                          placeholder={f.label ?? FIELD_LABELS.NUMBER}
+                          value={values[f.id] ?? ''}
+                          onChange={(e) => setValues((v) => ({ ...v, [f.id]: e.target.value.replace(/[^0-9.,-]/g, '') }))}
+                          className={cx(boxClass, 'px-1 text-right')}
+                        />
+                      );
+                    }
+                    if (f.type === 'FORMULA') {
+                      return (
+                        <div key={f.id} id={`field-${f.id}`} style={style} title={f.formula ?? undefined} className="absolute flex items-center justify-end truncate rounded bg-brand-50/70 px-1 text-[clamp(8px,1.4vw,13px)] font-semibold text-[#111c59]">
+                          {formulaValue(f) ?? '—'}
+                        </div>
+                      );
+                    }
+                    if (f.type === 'ATTACHMENT') {
+                      return (
+                        <label key={f.id} id={`field-${f.id}`} style={style} className={cx(boxClass, 'flex cursor-pointer items-center justify-center truncate px-1 font-medium')}>
+                          <input type="file" accept="application/pdf,image/png,image/jpeg" className="hidden" onChange={(e) => e.target.files?.[0] && uploadAttachment(f, e.target.files[0])} />
+                          {uploading === f.id ? tr('uploading') : (fileNames[f.id] ?? (values[f.id] ? '✓' : `📎 ${f.label ?? tr('uploadFile')}`))}
+                        </label>
+                      );
+                    }
                     if (f.type === 'TEXT') {
                       return (
                         <input
@@ -398,7 +521,7 @@ function SignDocument({
 
       <div className="mt-10 flex justify-center">
         <Button onClick={finish} loading={submitting} disabled={remaining.length > 0}>
-          {tr('finish')}
+          {approving ? tr('approve') : tr('finish')}
         </Button>
       </div>
 

@@ -19,9 +19,10 @@ interface RecipientDraft {
   id?: string;
   name: string;
   email: string;
-  role: 'SIGNER' | 'CC';
+  role: 'SIGNER' | 'APPROVER' | 'CC';
   routingOrder: number;
   locale: string;
+  inPerson: boolean;
 }
 
 let keySeq = 0;
@@ -230,7 +231,7 @@ function RecipientsStep({
   const add = (r?: Partial<RecipientDraft>) =>
     setDrafts([
       ...drafts,
-      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
+      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
     ]);
 
   return (
@@ -268,10 +269,16 @@ function RecipientsStep({
             </div>
             <div className="w-36">
               <Label>Role</Label>
-              <Select value={d.role} onChange={(e) => update(d.key, { role: e.target.value as 'SIGNER' | 'CC' })}>
+              <Select value={d.role} onChange={(e) => update(d.key, { role: e.target.value as RecipientDraft['role'], inPerson: false })}>
                 <option value="SIGNER">Needs to sign</option>
+                <option value="APPROVER">Needs to approve</option>
                 <option value="CC">Receives a copy</option>
               </Select>
+              {d.role === 'SIGNER' && (
+                <label className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-600" title="You hand your device to the signer; no email is sent">
+                  <input type="checkbox" checked={d.inPerson} onChange={(e) => update(d.key, { inPerson: e.target.checked })} /> In person
+                </label>
+              )}
             </div>
             <div className="w-32">
               <Label>Language</Label>
@@ -328,7 +335,14 @@ function ReviewStep({ env }: { env: Envelope }) {
                 {env.routing === 'SEQUENTIAL' && <span className="text-xs font-semibold text-gray-400">{r.routingOrder}.</span>}
                 <span className="font-medium">{r.name}</span>
                 <span className="text-gray-500">{r.email}</span>
-                <span className="text-xs text-gray-400">{r.role === 'CC' ? 'Receives a copy' : counts.map(([t, n]) => `${n} ${FIELD_LABELS[t].toLowerCase()}`).join(', ')}</span>
+                <span className="text-xs text-gray-400">
+                  {r.role === 'CC'
+                    ? 'Receives a copy'
+                    : r.role === 'APPROVER'
+                      ? 'Approves'
+                      : counts.map(([t, n]) => `${n} ${FIELD_LABELS[t].toLowerCase()}`).join(', ')}
+                  {r.inPerson && ' · in person'}
+                </span>
               </li>
             );
           })}
@@ -371,7 +385,18 @@ function Builder() {
 
   const adopt = useCallback((e: Envelope) => {
     setEnv(e);
-    setDrafts(e.recipients.map((r) => ({ key: newKey(), id: r.id, name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder, locale: r.locale })));
+    setDrafts(
+      e.recipients.map((r) => ({
+        key: newKey(),
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        role: r.role,
+        routingOrder: r.routingOrder,
+        locale: r.locale,
+        inPerson: Boolean(r.inPerson),
+      })),
+    );
     setFields(e.fields);
   }, []);
 
@@ -401,14 +426,22 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/recipients`, {
             method: 'PUT',
-            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale }) => ({ id: rid, name: name.trim(), email: email.trim(), role, routingOrder, locale })),
+            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson }) => ({
+              id: rid,
+              name: name.trim(),
+              email: email.trim(),
+              role,
+              routingOrder,
+              locale,
+              inPerson,
+            })),
           }),
         );
       } else if (step === 2) {
         adopt(
           await api<Envelope>(`/envelopes/${id}/fields`, {
             method: 'PUT',
-            json: fields.map(({ documentId, recipientId, type, page, x, y, width, height, required, label }) => ({
+            json: fields.map(({ documentId, recipientId, type, page, x, y, width, height, required, label, options, formula, condition }) => ({
               documentId,
               recipientId,
               type,
@@ -419,6 +452,9 @@ function Builder() {
               height,
               required,
               label,
+              options: (options ?? []).map((o) => o.trim()).filter(Boolean),
+              formula,
+              condition,
             })),
           }),
         );

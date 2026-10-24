@@ -1,6 +1,23 @@
 export type EnvelopeStatus = 'DRAFT' | 'SENT' | 'COMPLETED' | 'DECLINED' | 'VOIDED' | 'EXPIRED';
 export type RecipientStatus = 'CREATED' | 'SENT' | 'VIEWED' | 'SIGNED' | 'DECLINED';
-export type FieldType = 'SIGNATURE' | 'INITIALS' | 'DATE_SIGNED' | 'NAME' | 'EMAIL' | 'TEXT' | 'CHECKBOX';
+export type FieldType =
+  | 'SIGNATURE'
+  | 'INITIALS'
+  | 'DATE_SIGNED'
+  | 'NAME'
+  | 'EMAIL'
+  | 'TEXT'
+  | 'CHECKBOX'
+  | 'DROPDOWN'
+  | 'RADIO'
+  | 'NUMBER'
+  | 'FORMULA'
+  | 'ATTACHMENT';
+
+export interface FieldCondition {
+  fieldLabel: string;
+  equals: string;
+}
 
 export interface PageInfo {
   width: number;
@@ -23,9 +40,10 @@ export interface Recipient {
   id: string;
   name: string;
   email: string;
-  role: 'SIGNER' | 'CC';
+  role: 'SIGNER' | 'APPROVER' | 'CC';
   routingOrder: number;
   locale: string;
+  inPerson?: boolean;
   status: RecipientStatus;
   viewedAt: string | null;
   verifiedAt: string | null;
@@ -47,6 +65,9 @@ export interface Field {
   height: number;
   required: boolean;
   label: string | null;
+  options?: string[];
+  formula?: string | null;
+  condition?: FieldCondition | null;
   filled?: boolean;
   value?: string | null;
 }

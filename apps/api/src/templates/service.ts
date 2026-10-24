@@ -66,7 +66,7 @@ export async function createTemplateFromEnvelope(
       }
       const roleMap = new Map<string, string>();
       for (const r of env.recipients) {
-        const fallback = r.role === 'SIGNER' ? `Signer ${++signerN}` : `Copy ${++ccN}`;
+        const fallback = r.role === 'SIGNER' ? `Signer ${++signerN}` : r.role === 'APPROVER' ? `Approver ${++signerN}` : `Copy ${++ccN}`;
         const role = await tx.templateRole.create({
           data: { templateId: t.id, name: input.roleNames?.[r.id]?.trim() || fallback, role: r.role, routingOrder: r.routingOrder },
         });
@@ -85,6 +85,9 @@ export async function createTemplateFromEnvelope(
           height: f.height,
           required: f.required,
           label: f.label,
+          options: f.options,
+          formula: f.formula,
+          condition: f.condition ?? undefined,
         })),
       });
       return t;
@@ -179,6 +182,9 @@ export async function createEnvelopeFromTemplate(
           height: f.height,
           required: f.required,
           label: f.label,
+          options: f.options,
+          formula: f.formula,
+          condition: f.condition ?? undefined,
         })),
       });
       await appendAudit(tx, {

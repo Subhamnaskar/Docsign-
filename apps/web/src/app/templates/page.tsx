@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
+import { SigningLinks } from '@/components/SigningLinks';
 import { Alert, Button, Card, EmptyState, Input, Label, Modal, PageLoader, Select } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { parseCsv, toCsv } from '@/lib/csv';
@@ -298,6 +299,7 @@ function Templates() {
           </ul>
         )}
       </Card>
+      <SigningLinks templates={list} />
       <Modal open={!!active} onClose={() => setActive(null)} title={active ? `${active.mode === 'use' ? 'Use' : 'Bulk send'}: ${active.template.name}` : ''} wide>
         {active?.mode === 'use' && <UseTemplate template={active.template} onClose={() => setActive(null)} />}
         {active?.mode === 'bulk' && <BulkSend template={active.template} onClose={() => setActive(null)} />}

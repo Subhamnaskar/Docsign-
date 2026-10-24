@@ -5,7 +5,7 @@ import { fileUrl } from '@/lib/api';
 import { FIELD_LABELS } from '@/lib/format';
 import type { DocumentInfo, Field, FieldType, Recipient } from '@/lib/types';
 import { displaySize, PdfPages } from './PdfPages';
-import { Button, cx, Input, Label, Select } from './ui';
+import { Button, cx, Input, Label, Select, Textarea } from './ui';
 
 /** Default field sizes in PDF points. */
 const DEFAULT_SIZE: Record<FieldType, [number, number]> = {
@@ -16,6 +16,11 @@ const DEFAULT_SIZE: Record<FieldType, [number, number]> = {
   EMAIL: [190, 20],
   TEXT: [160, 20],
   CHECKBOX: [16, 16],
+  DROPDOWN: [140, 20],
+  RADIO: [180, 20],
+  NUMBER: [90, 20],
+  FORMULA: [90, 20],
+  ATTACHMENT: [160, 22],
 };
 const MIN_SIZE_PT = 12;
 
@@ -27,7 +32,26 @@ const PALETTE: { type: FieldType; icon: string }[] = [
   { type: 'EMAIL', icon: 'M3 6h14v9H3zm0 0 7 5 7-5' },
   { type: 'TEXT', icon: 'M4 6h12M10 6v10' },
   { type: 'CHECKBOX', icon: 'M4 4h12v12H4zm3 6 2 2 4-4' },
+  { type: 'DROPDOWN', icon: 'M3 6h14v8H3zm9 3 2 2 2-2' },
+  { type: 'RADIO', icon: 'M7 10a3 3 0 1 0 0-.01M14 10a3 3 0 1 0 0-.01' },
+  { type: 'NUMBER', icon: 'M7 4 5 16m8-12-2 12M4 8h12M3 12h12' },
+  { type: 'FORMULA', icon: 'M5 15c2 0 2-10 5-10M5 9h6m2 2 4 4m0-4-4 4' },
+  { type: 'ATTACHMENT', icon: 'M14 9l-5 5a2.5 2.5 0 0 1-3.5-3.5L11 5a1.7 1.7 0 0 1 2.4 2.4L8 12.8' },
 ];
+
+/** Types whose label others can reference in formulas and conditions. */
+const NEEDS_LABEL: FieldType[] = ['TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT'];
+
+function uniqueLabel(fields: Field[], base: string): string {
+  const taken = new Set(fields.map((f) => f.label));
+  for (let i = 1; ; i++) if (!taken.has(`${base} ${i}`)) return `${base} ${i}`;
+}
+
+function conditionDefault(fields: Field[], label: string): string {
+  const f = fields.find((x) => x.label === label);
+  if (f?.type === 'CHECKBOX') return 'true';
+  return f?.options?.[0] ?? '';
+}
 
 let tmpCounter = 0;
 export const newFieldId = () => `tmp_${Date.now().toString(36)}_${tmpCounter++}`;
@@ -98,8 +122,11 @@ export function FieldEditor({
       y: Math.min(Math.max(clickY - h / 2, 0), 1 - h),
       width: w,
       height: h,
-      required: placing !== 'CHECKBOX',
-      label: null,
+      required: placing !== 'CHECKBOX' && placing !== 'FORMULA',
+      label: NEEDS_LABEL.includes(placing) ? uniqueLabel(fieldsRef.current, FIELD_LABELS[placing]) : null,
+      options: placing === 'DROPDOWN' || placing === 'RADIO' ? ['Option 1', 'Option 2'] : [],
+      formula: placing === 'FORMULA' ? '' : null,
+      condition: null,
     };
     onChange([...fieldsRef.current, field]);
     setSelected(field.id);
@@ -199,18 +226,82 @@ export function FieldEditor({
                   ))}
                 </Select>
               </div>
-              {(selectedField.type === 'TEXT' || selectedField.type === 'CHECKBOX') && (
+              {NEEDS_LABEL.includes(selectedField.type) && (
                 <div>
                   <Label htmlFor="field-label">Label</Label>
                   <Input
                     id="field-label"
                     value={selectedField.label ?? ''}
-                    placeholder={selectedField.type === 'TEXT' ? 'e.g. Job title' : 'e.g. I accept the terms'}
+                    placeholder={selectedField.type === 'CHECKBOX' ? 'e.g. I accept the terms' : 'e.g. Job title'}
                     onChange={(e) => update(selectedField.id, { label: e.target.value || null })}
                   />
                 </div>
               )}
-              {!['NAME', 'EMAIL', 'DATE_SIGNED'].includes(selectedField.type) && (
+              {(selectedField.type === 'DROPDOWN' || selectedField.type === 'RADIO') && (
+                <div>
+                  <Label htmlFor="field-options" hint="(one per line)">
+                    Options
+                  </Label>
+                  <Textarea
+                    id="field-options"
+                    rows={4}
+                    value={(selectedField.options ?? []).join('\n')}
+                    onChange={(e) => update(selectedField.id, { options: e.target.value.split('\n').map((o) => o.trimStart()).slice(0, 50) })}
+                  />
+                </div>
+              )}
+              {selectedField.type === 'FORMULA' && (
+                <div>
+                  <Label htmlFor="field-formula">Formula</Label>
+                  <Input
+                    id="field-formula"
+                    className="font-mono"
+                    placeholder="{Qty} * {Price}"
+                    value={selectedField.formula ?? ''}
+                    onChange={(e) => update(selectedField.id, { formula: e.target.value })}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Use + − × ÷ and number fields by label:{' '}
+                    {fields.filter((f) => f.type === 'NUMBER' && f.label).map((f) => `{${f.label}}`).join(', ') || 'add a Number field first'}
+                  </p>
+                </div>
+              )}
+              {selectedField.type !== 'SIGNATURE' && (
+                <div>
+                  <Label htmlFor="field-cond" hint="(optional)">
+                    Show only when
+                  </Label>
+                  <Select
+                    id="field-cond"
+                    value={selectedField.condition?.fieldLabel ?? ''}
+                    onChange={(e) =>
+                      update(selectedField.id, {
+                        condition: e.target.value ? { fieldLabel: e.target.value, equals: conditionDefault(fields, e.target.value) } : null,
+                      })
+                    }
+                  >
+                    <option value="">Always shown</option>
+                    {fields
+                      .filter((f) => f.id !== selectedField.id && f.label && ['CHECKBOX', 'DROPDOWN', 'RADIO', 'TEXT'].includes(f.type))
+                      .map((f) => (
+                        <option key={f.id} value={f.label!}>
+                          {f.label}
+                        </option>
+                      ))}
+                  </Select>
+                  {selectedField.condition && (
+                    <Input
+                      className="mt-2"
+                      aria-label="Equals"
+                      placeholder="equals…"
+                      value={selectedField.condition.equals}
+                      onChange={(e) => update(selectedField.id, { condition: { ...selectedField.condition!, equals: e.target.value } })}
+                    />
+                  )}
+                  {selectedField.condition && <p className="mt-1 text-xs text-gray-500">For checkboxes use “true” (ticked) or “false”.</p>}
+                </div>
+              )}
+              {!['NAME', 'EMAIL', 'DATE_SIGNED', 'FORMULA'].includes(selectedField.type) && (
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={selectedField.required} onChange={(e) => update(selectedField.id, { required: e.target.checked })} />
                   Required

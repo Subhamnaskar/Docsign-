@@ -24,7 +24,7 @@ async function expireEnvelopes() {
 async function sendReminders() {
   const envelopes = await prisma.envelope.findMany({
     where: { status: 'SENT', reminderDays: { gt: 0 } },
-    include: { recipients: { where: { role: 'SIGNER', status: { in: ['SENT', 'VIEWED'] } } } },
+    include: { recipients: { where: { role: { in: ['SIGNER', 'APPROVER'] }, status: { in: ['SENT', 'VIEWED'] } } } },
     take: 200,
   });
   for (const env of envelopes) {

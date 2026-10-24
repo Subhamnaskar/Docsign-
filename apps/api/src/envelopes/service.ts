@@ -49,6 +49,8 @@ export function sendReadinessProblems(env: FullEnvelope): string[] {
   if (env.documents.length === 0) problems.push('Add at least one document.');
   const signers = env.recipients.filter((r) => r.role === 'SIGNER');
   if (signers.length === 0) problems.push('Add at least one signer.');
+  const signerIds = new Set(signers.map((s) => s.id));
+  if (env.fields.some((f) => !signerIds.has(f.recipientId))) problems.push('Some fields belong to recipients who no longer sign.');
   for (const s of signers) {
     if (!env.fields.some((f) => f.recipientId === s.id && f.type === 'SIGNATURE')) {
       problems.push(`Place at least one signature field for ${s.name}.`);
@@ -57,9 +59,12 @@ export function sendReadinessProblems(env: FullEnvelope): string[] {
   return problems;
 }
 
-/** Signers whose turn it is: everyone for parallel routing, the lowest pending order otherwise. */
+/** Recipients who must act (signers and approvers). */
+export const actsOn = (r: Recipient) => r.role === 'SIGNER' || r.role === 'APPROVER';
+
+/** Recipients whose turn it is: everyone for parallel routing, the lowest pending order otherwise. */
 function activeSigners(env: Envelope, recipients: Recipient[]): Recipient[] {
-  const pending = recipients.filter((r) => r.role === 'SIGNER' && r.status !== 'SIGNED' && r.status !== 'DECLINED');
+  const pending = recipients.filter((r) => actsOn(r) && r.status !== 'SIGNED' && r.status !== 'DECLINED');
   if (env.routing === 'PARALLEL') return pending;
   const next = Math.min(...pending.map((r) => r.routingOrder));
   return pending.filter((r) => r.routingOrder === next);
@@ -144,7 +149,7 @@ export async function notifySigners(env: Envelope, recipients: Recipient[], kind
 export async function advanceEnvelope(envelopeId: string) {
   const env = await prisma.envelope.findUnique({ where: { id: envelopeId }, include: { recipients: true } });
   if (!env || env.status !== 'SENT') return;
-  const signers = env.recipients.filter((r) => r.role === 'SIGNER');
+  const signers = env.recipients.filter(actsOn);
   if (signers.every((r) => r.status === 'SIGNED')) {
     await finalizeEnvelope(envelopeId);
     return;
@@ -176,17 +181,35 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
   const env = await prisma.envelope.findUniqueOrThrow({ where: { id: envelopeId }, include: envelopeInclude });
   const policy = (env.policy as unknown as ResolvedPolicy) ?? resolvePolicy(env.jurisdiction, env.documentType);
   const signers = env.recipients.filter((r) => r.role === 'SIGNER');
-  const signedAt = new Map(signers.map((r) => [r.id, r.signedAt!]));
+  const signedAt = new Map(env.recipients.filter(actsOn).map((r) => [r.id, r.signedAt!]));
   const reason = `Signed electronically by ${signers.map((s) => s.name).join(', ')}`;
   let sealFormat = policy.signatureFormat;
 
-  for (const doc of env.documents) {
+  // Signer attachments are embedded in the first document, inside the seal
+  const attachments = await prisma.signerAttachment.findMany({
+    where: { envelopeId: env.id, id: { in: env.fields.filter((f) => f.type === 'ATTACHMENT' && f.value).map((f) => f.value!) } },
+  });
+  const attachmentNames = new Map(attachments.map((a) => [a.id, a.name]));
+  const byRecipient = new Map(env.recipients.map((r) => [r.id, r.name]));
+
+  for (const [index, doc] of env.documents.entries()) {
     if (doc.finalKey) continue;
     const original = await getObject(doc.storageKey);
+    const embed =
+      index === 0
+        ? await Promise.all(
+            attachments.map(async (a) => ({
+              name: a.name,
+              data: await getObject(a.storageKey),
+              mimeType: a.contentType,
+              description: `Uploaded by ${byRecipient.get(a.recipientId) ?? 'signer'} (SHA-256 ${a.sha256})`,
+            })),
+          )
+        : [];
     const rendered = await renderCompletedPdf(
       original,
       env.fields.filter((f) => f.documentId === doc.id),
-      { envelopeId: env.id, signedAt },
+      { envelopeId: env.id, signedAt, attachmentNames, embed },
     );
     const sealed = await sealPdf(Buffer.from(rendered), { reason });
     sealFormat = sealed.format;
