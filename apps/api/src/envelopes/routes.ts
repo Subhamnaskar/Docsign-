@@ -12,7 +12,8 @@ import { JURISDICTIONS, DOCUMENT_TYPES } from '../policy/jurisdictions.js';
 import { SUPPORTED_LOCALES } from '../i18n/messages.js';
 import {
   assertDraft,
-  getEnvelope,
+  envelopeScope,
+  getVisibleEnvelope,
   notifySigners,
   sendEnvelope,
   sendReadinessProblems,
@@ -143,7 +144,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
   app.get('/stats', async (req) => {
     const groups = await prisma.envelope.groupBy({
       by: ['status'],
-      where: { orgId: req.auth.orgId },
+      where: envelopeScope(req.auth),
       _count: { _all: true },
     });
     const counts = Object.fromEntries(groups.map((g) => [g.status, g._count._all]));
@@ -166,12 +167,18 @@ export async function envelopeRoutes(app: FastifyInstance) {
         search: z.string().max(100).optional(),
         limit: z.coerce.number().int().min(1).max(100).default(50),
         cursor: z.string().optional(),
+        /** A folder id, or "none" for agreements not in a folder */
+        folderId: z.string().optional(),
+        /** "me" limits to agreements I sent */
+        sender: z.literal('me').optional(),
       }),
       req.query,
     );
     const items = await prisma.envelope.findMany({
       where: {
-        orgId: req.auth.orgId,
+        ...envelopeScope(req.auth),
+        ...(q.folderId ? { folderId: q.folderId === 'none' ? null : q.folderId } : {}),
+        ...(q.sender === 'me' && req.auth.userId ? { createdById: req.auth.userId } : {}),
         ...(q.status ? { status: q.status } : {}),
         ...(q.search
           ? {
@@ -186,7 +193,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
       orderBy: { updatedAt: 'desc' },
       take: q.limit + 1,
       ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
-      include: { recipients: { orderBy: { routingOrder: 'asc' } } },
+      include: { recipients: { orderBy: { routingOrder: 'asc' } }, createdBy: { select: { name: true } }, folder: { select: { id: true, name: true } } },
     });
     const hasMore = items.length > q.limit;
     return {
@@ -198,6 +205,8 @@ export async function envelopeRoutes(app: FastifyInstance) {
         sentAt: e.sentAt,
         completedAt: e.completedAt,
         updatedAt: e.updatedAt,
+        sender: e.createdBy.name,
+        folder: e.folder,
         recipients: e.recipients.map((r) => ({ name: r.name, email: r.email, role: r.role, status: r.status })),
       })),
       nextCursor: hasMore ? items[q.limit - 1].id : null,
@@ -232,26 +241,26 @@ export async function envelopeRoutes(app: FastifyInstance) {
       return created;
     });
     reply.code(201);
-    return serializeEnvelope(await getEnvelope(req.auth.orgId, env.id));
+    return serializeEnvelope(await getVisibleEnvelope(req.auth, env.id));
   });
 
   app.get('/envelopes/:id', async (req) => {
     const { id } = req.params as { id: string };
-    return serializeEnvelope(await getEnvelope(req.auth.orgId, id));
+    return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });
 
   app.patch('/envelopes/:id', async (req) => {
     const { id } = req.params as { id: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
     const body = parse(envelopeInput.partial(), req.body);
     await prisma.envelope.update({ where: { id }, data: body });
-    return serializeEnvelope(await getEnvelope(req.auth.orgId, id));
+    return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });
 
   app.delete('/envelopes/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
     await prisma.envelope.delete({ where: { id } });
     reply.code(204);
@@ -259,7 +268,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
 
   app.post('/envelopes/:id/documents', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
     const file = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
     if (!file) throw badRequest('Attach a file in the "file" field.');
@@ -296,7 +305,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
 
   app.delete('/envelopes/:id/documents/:docId', async (req, reply) => {
     const { id, docId } = req.params as { id: string; docId: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
     const doc = env.documents.find((d) => d.id === docId);
     if (!doc) throw notFound('Document');
@@ -317,7 +326,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
   app.get('/envelopes/:id/documents/:docId/file', async (req, reply) => {
     const { id, docId } = req.params as { id: string; docId: string };
     const { version } = req.query as { version?: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     const doc = env.documents.find((d) => d.id === docId);
     if (!doc) throw notFound('Document');
     const useFinal = version !== 'original' && doc.finalKey;
@@ -331,7 +340,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
 
   app.get('/envelopes/:id/certificate', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     if (!env.certificateKey) throw notFound('Certificate');
     reply
       .header('Content-Type', 'application/pdf')
@@ -342,7 +351,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
   /** Upserts recipients by id; recipients missing from the list are removed with their fields. */
   app.put('/envelopes/:id/recipients', async (req) => {
     const { id } = req.params as { id: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
     const list = parse(recipientsInput, req.body);
     const emails = list.map((r) => `${r.role}:${r.email}`);
@@ -359,13 +368,13 @@ export async function envelopeRoutes(app: FastifyInstance) {
       // CC recipients don't sign, so they can't own fields
       await tx.field.deleteMany({ where: { envelopeId: id, recipient: { role: 'CC' } } });
     });
-    return serializeEnvelope(await getEnvelope(req.auth.orgId, id));
+    return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });
 
   /** Replaces all fields. */
   app.put('/envelopes/:id/fields', async (req) => {
     const { id } = req.params as { id: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
     const list = parse(fieldsInput, req.body);
     const docs = new Map(env.documents.map((d) => [d.id, d]));
@@ -381,23 +390,25 @@ export async function envelopeRoutes(app: FastifyInstance) {
       prisma.field.deleteMany({ where: { envelopeId: id } }),
       prisma.field.createMany({ data: list.map((f) => ({ ...f, label: f.label ?? null, envelopeId: id })) }),
     ]);
-    return serializeEnvelope(await getEnvelope(req.auth.orgId, id));
+    return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });
 
   app.post('/envelopes/:id/send', async (req) => {
     const { id } = req.params as { id: string };
+    await getVisibleEnvelope(req.auth, id);
     return serializeEnvelope(await sendEnvelope(req.auth.orgId, id, req.auth.actor, clientInfo(req)));
   });
 
   app.post('/envelopes/:id/void', async (req) => {
     const { id } = req.params as { id: string };
     const { reason } = parse(z.object({ reason: z.string().trim().min(1).max(500) }), req.body);
+    await getVisibleEnvelope(req.auth, id);
     return serializeEnvelope(await voidEnvelope(req.auth.orgId, id, reason, req.auth.actor, clientInfo(req)));
   });
 
   app.post('/envelopes/:id/remind', async (req) => {
     const { id } = req.params as { id: string };
-    const env = await getEnvelope(req.auth.orgId, id);
+    const env = await getVisibleEnvelope(req.auth, id);
     if (env.status !== 'SENT') throw conflict('Only envelopes that are out for signature can be reminded.');
     const pending = env.recipients.filter((r) => r.role === 'SIGNER' && (r.status === 'SENT' || r.status === 'VIEWED'));
     await notifySigners(env, pending, 'reminder');
@@ -406,7 +417,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
 
   app.get('/envelopes/:id/audit', async (req) => {
     const { id } = req.params as { id: string };
-    await getEnvelope(req.auth.orgId, id);
+    await getVisibleEnvelope(req.auth, id);
     const [events, chain] = await Promise.all([
       prisma.auditEvent.findMany({ where: { envelopeId: id }, orderBy: { seq: 'asc' } }),
       verifyChain(id),
@@ -417,7 +428,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
   /** Duplicate an envelope (documents, recipients, fields) into a new draft. */
   app.post('/envelopes/:id/duplicate', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const src = await getEnvelope(req.auth.orgId, id);
+    const src = await getVisibleEnvelope(req.auth, id);
     if (!req.auth.userId) throw badRequest('The organisation has no owner to attribute this envelope to.');
     const copy = await prisma.$transaction(async (tx) => {
       const env = await tx.envelope.create({
@@ -482,6 +493,6 @@ export async function envelopeRoutes(app: FastifyInstance) {
       return env;
     }, { timeout: 60_000 });
     reply.code(201);
-    return serializeEnvelope(await getEnvelope(req.auth.orgId, copy.id));
+    return serializeEnvelope(await getVisibleEnvelope(req.auth, copy.id));
   });
 }

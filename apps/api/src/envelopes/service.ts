@@ -7,6 +7,7 @@ import { signingUrl } from '../lib/auth.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { conflict, notFound, unprocessable } from '../lib/errors.js';
 import { formatDateFor, t } from '../i18n/messages.js';
+import { getBranding } from '../organization/branding.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { getObject, putObject } from '../lib/storage.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
@@ -20,6 +21,17 @@ export const envelopeInclude = {
 } satisfies Prisma.EnvelopeInclude;
 
 export type FullEnvelope = Prisma.EnvelopeGetPayload<{ include: typeof envelopeInclude }>;
+
+/** Members see the envelopes they created; admins and owners see the whole organisation's. */
+export function envelopeScope(auth: { orgId: string; userId: string | null; role: string }): Prisma.EnvelopeWhereInput {
+  return auth.role === 'MEMBER' ? { orgId: auth.orgId, createdById: auth.userId ?? '-' } : { orgId: auth.orgId };
+}
+
+export async function getVisibleEnvelope(auth: { orgId: string; userId: string | null; role: string }, id: string): Promise<FullEnvelope> {
+  const env = await prisma.envelope.findFirst({ where: { id, ...envelopeScope(auth) }, include: envelopeInclude });
+  if (!env) throw notFound('Envelope');
+  return env;
+}
 
 export async function getEnvelope(orgId: string, id: string): Promise<FullEnvelope> {
   const env = await prisma.envelope.findFirst({ where: { id, orgId }, include: envelopeInclude });
@@ -90,10 +102,14 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
 /** Emails signing links and records each notification in the audit trail. */
 export async function notifySigners(env: Envelope, recipients: Recipient[], kind: 'invite' | 'reminder') {
   const sender = await prisma.user.findUnique({ where: { id: env.createdById } });
+  const brand = await getBranding(env.orgId);
   for (const r of recipients) {
+    // Embedded and in-person signers are reached through the integrating app or the host
+    if (r.embedded || r.hostUserId) continue;
     const vars = { title: env.title, sender: sender?.name ?? 'DocSign', name: r.name };
     const { html, text } = layout({
       locale: r.locale,
+      brand,
       heading: t(r.locale, kind === 'invite' ? 'inviteHeading' : 'reminderHeading', vars),
       paragraphs: [
         t(r.locale, 'hello', vars),
@@ -101,7 +117,7 @@ export async function notifySigners(env: Envelope, recipients: Recipient[], kind
         ...(env.message ? [t(r.locale, 'senderMessage', { ...vars, message: env.message })] : []),
         ...(env.expiresAt ? [t(r.locale, 'expires', { date: formatDateFor(r.locale, env.expiresAt) })] : []),
       ],
-      button: { label: t(r.locale, 'reviewAndSign'), url: signingUrl(r.id) },
+      button: { label: t(r.locale, 'reviewAndSign'), url: signingUrl(r) },
     });
     await sendMail({
       to: r.email,
@@ -256,6 +272,7 @@ async function sendCompletionEmails(envelopeId: string) {
   // Keep emails deliverable; large envelopes are downloaded from the app instead
   const attach = total + cert.length < 15 * 1024 * 1024;
 
+  const brand = await getBranding(env.orgId);
   const to = [
     ...env.recipients.map((r) => ({ name: r.name, email: r.email, locale: r.locale })),
     { name: env.createdBy.name, email: env.createdBy.email, locale: 'en' },
@@ -265,6 +282,7 @@ async function sendCompletionEmails(envelopeId: string) {
     const vars = { title: env.title, name: person.name };
     const { html, text } = layout({
       locale: person.locale,
+      brand,
       heading: t(person.locale, 'completedSubject', vars),
       paragraphs: [
         t(person.locale, 'hello', vars),

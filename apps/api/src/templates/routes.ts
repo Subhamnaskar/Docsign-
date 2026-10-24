@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { serializeEnvelope } from '../envelopes/routes.js';
-import { getEnvelope, sendEnvelope } from '../envelopes/service.js';
+import { getEnvelope, getVisibleEnvelope, sendEnvelope } from '../envelopes/service.js';
 import { SUPPORTED_LOCALES } from '../i18n/messages.js';
 import { clientInfo, requireAuth } from '../lib/auth.js';
 import { badRequest, notFound, unprocessable } from '../lib/errors.js';
@@ -108,6 +108,7 @@ export async function templateRoutes(app: FastifyInstance) {
       req.body,
     );
     if (!req.auth.userId) throw badRequest('The organisation has no owner to attribute this template to.');
+    await getVisibleEnvelope(req.auth, id);
     reply.code(201);
     return serializeTemplate(await createTemplateFromEnvelope(req.auth.orgId, req.auth.userId, id, body));
   });

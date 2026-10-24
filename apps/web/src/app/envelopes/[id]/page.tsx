@@ -6,7 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { CompliancePanel } from '@/components/CompliancePanel';
 import { SaveTemplateModal } from '@/components/SaveTemplateModal';
-import { Alert, Button, Card, cx, Modal, PageLoader, StatusBadge, Textarea } from '@/components/ui';
+import { Alert, Button, Card, cx, Input, Label, Modal, PageLoader, StatusBadge, Textarea } from '@/components/ui';
 import { api, fileUrl } from '@/lib/api';
 import { AUDIT_LABELS, formatDate } from '@/lib/format';
 import type { AuditEvent, Envelope, Recipient } from '@/lib/types';
@@ -16,7 +16,7 @@ interface AuditResponse {
   events: AuditEvent[];
 }
 
-function RecipientRow({ r, sequential }: { r: Recipient; sequential: boolean }) {
+function RecipientRow({ r, sequential, onCorrect }: { r: Recipient; sequential: boolean; onCorrect?: () => void }) {
   const detail =
     r.status === 'SIGNED'
       ? `Signed ${formatDate(r.signedAt)}`
@@ -45,7 +45,12 @@ function RecipientRow({ r, sequential }: { r: Recipient; sequential: boolean }) 
         </div>
         <div className="truncate text-xs text-gray-500">{detail}</div>
       </div>
-      {r.role === 'SIGNER' ? <StatusBadge status={r.status} recipient /> : <span className="text-xs text-gray-400">CC</span>}
+      {onCorrect && (
+        <button onClick={onCorrect} className="text-xs font-medium text-brand-600 hover:underline">
+          Correct
+        </button>
+      )}
+      {r.role !== 'CC' ? <StatusBadge status={r.status} recipient /> : <span className="text-xs text-gray-400">CC</span>}
     </li>
   );
 }
@@ -60,6 +65,8 @@ function Detail() {
   const [notice, setNotice] = useState<string | null>(params.get('sent') ? 'Sent! Signers will receive an email with their signing link.' : null);
   const [voidOpen, setVoidOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [correcting, setCorrecting] = useState<Recipient | null>(null);
+  const [correction, setCorrection] = useState({ name: '', email: '' });
   const [voidReason, setVoidReason] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -178,7 +185,19 @@ function Detail() {
             </div>
             <ul className="mt-2 divide-y divide-gray-100">
               {env.recipients.map((r) => (
-                <RecipientRow key={r.id} r={r} sequential={env.routing === 'SEQUENTIAL'} />
+                <RecipientRow
+                  key={r.id}
+                  r={r}
+                  sequential={env.routing === 'SEQUENTIAL'}
+                  onCorrect={
+                    env.status === 'SENT' && r.role !== 'CC' && r.status !== 'SIGNED' && r.status !== 'DECLINED'
+                      ? () => {
+                          setCorrection({ name: r.name, email: r.email });
+                          setCorrecting(r);
+                        }
+                      : undefined
+                  }
+                />
               ))}
             </ul>
           </Card>
@@ -256,6 +275,41 @@ function Detail() {
           </Card>
         </div>
       </div>
+
+      <Modal open={!!correcting} onClose={() => setCorrecting(null)} title="Correct recipient">
+        <p className="text-sm text-gray-600">Fix a typo or send to the right person. Their previous signing link stops working and a new one is emailed.</p>
+        <div className="mt-4 space-y-3">
+          <div>
+            <Label htmlFor="cor-name">Name</Label>
+            <Input id="cor-name" value={correction.name} onChange={(e) => setCorrection((c) => ({ ...c, name: e.target.value }))} />
+          </div>
+          <div>
+            <Label htmlFor="cor-email">Email</Label>
+            <Input id="cor-email" type="email" value={correction.email} onChange={(e) => setCorrection((c) => ({ ...c, email: e.target.value }))} />
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setCorrecting(null)}>
+            Cancel
+          </Button>
+          <Button
+            loading={busy === 'correct'}
+            disabled={!correction.name.trim() || !correction.email.trim()}
+            onClick={() =>
+              action(
+                'correct',
+                async () => {
+                  await api(`/envelopes/${id}/recipients/${correcting!.id}/correct`, { method: 'POST', json: correction });
+                  setCorrecting(null);
+                },
+                'Recipient updated and a new signing link sent.',
+              )
+            }
+          >
+            Save and resend
+          </Button>
+        </div>
+      </Modal>
 
       {templateOpen && <SaveTemplateModal env={env} open onClose={() => setTemplateOpen(false)} />}
 

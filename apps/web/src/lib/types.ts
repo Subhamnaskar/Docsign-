@@ -102,6 +102,8 @@ export interface EnvelopeSummary {
   sentAt: string | null;
   completedAt: string | null;
   updatedAt: string;
+  sender?: string;
+  folder?: { id: string; name: string } | null;
   recipients: { name: string; email: string; role: string; status: RecipientStatus }[];
 }
 
@@ -120,7 +122,7 @@ export interface AuditEvent {
 
 export interface Me {
   user: { id: string; name: string; email: string; role: string } | null;
-  organization: { id: string; name: string; jurisdiction: string; dataRegion: string };
+  organization: { id: string; name: string; jurisdiction: string; dataRegion: string; brandColor: string | null; embedOrigins: string[] };
   cell: string;
 }
 

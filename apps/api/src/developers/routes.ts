@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { API_KEY_PREFIX, requireAuth } from '../lib/auth.js';
+import { logActivity } from '../lib/activity.js';
+import { API_KEY_PREFIX, requireAuth, requireRole } from '../lib/auth.js';
 import { randomToken, sha256Hex } from '../lib/crypto.js';
 import { notFound } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
@@ -10,6 +11,8 @@ import { signPayload, WEBHOOK_EVENTS } from '../webhooks/dispatcher.js';
 
 export async function developerRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
+  // Keys and webhooks grant access to every agreement in the organisation
+  app.addHook('preHandler', requireRole('OWNER', 'ADMIN'));
 
   app.get('/api-keys', async (req) => {
     const keys = await prisma.apiKey.findMany({
@@ -26,6 +29,7 @@ export async function developerRoutes(app: FastifyInstance) {
     const created = await prisma.apiKey.create({
       data: { orgId: req.auth.orgId, name, prefix: key.slice(0, 12), keyHash: sha256Hex(key) },
     });
+    await logActivity(req, 'api_key.created', { id: created.id, name, prefix: created.prefix });
     reply.code(201);
     return { id: created.id, name: created.name, prefix: created.prefix, createdAt: created.createdAt, key };
   });
@@ -37,6 +41,7 @@ export async function developerRoutes(app: FastifyInstance) {
       data: { revokedAt: new Date() },
     });
     if (res.count === 0) throw notFound('API key');
+    await logActivity(req, 'api_key.revoked', { id });
     reply.code(204);
   });
 
@@ -60,6 +65,7 @@ export async function developerRoutes(app: FastifyInstance) {
     const endpoint = await prisma.webhookEndpoint.create({
       data: { orgId: req.auth.orgId, url: body.url, events: body.events, secret: `whsec_${randomToken(24)}` },
     });
+    await logActivity(req, 'webhook.created', { id: endpoint.id, url: body.url });
     reply.code(201);
     return endpoint;
   });
@@ -68,6 +74,7 @@ export async function developerRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const res = await prisma.webhookEndpoint.deleteMany({ where: { id, orgId: req.auth.orgId } });
     if (res.count === 0) throw notFound('Webhook endpoint');
+    await logActivity(req, 'webhook.deleted', { id });
     reply.code(204);
   });
 

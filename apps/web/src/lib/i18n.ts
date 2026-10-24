@@ -71,6 +71,13 @@ const en = {
   unavailableTitle: 'This request is not available',
   unavailableBody: 'The link may be out of date.',
   language: 'Language',
+  reassign: 'Assign to someone else',
+  reassignBody: 'Send this request to the right person instead. You will no longer be able to sign it.',
+  newName: 'Their full name',
+  newEmail: 'Their email',
+  reassignReason: 'Why are you reassigning?',
+  reassignDone: 'Sent to {name}. You can close this page.',
+  via: 'via DocSign',
 };
 
 export type SignerKey = keyof typeof en;

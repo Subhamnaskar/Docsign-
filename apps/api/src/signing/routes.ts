@@ -4,16 +4,17 @@ import { z } from 'zod';
 import { appendAudit, type Actor } from '../audit/audit.js';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
-import { clientInfo, parseSigningToken } from '../lib/auth.js';
+import { clientInfo, parseSigningToken, signingTokenMatches } from '../lib/auth.js';
 import { numericCode, randomToken, safeEqualHex, sha256Hex } from '../lib/crypto.js';
 import { badRequest, conflict, forbidden, HttpError, notFound, unauthorized } from '../lib/errors.js';
 import { normalizeSignaturePng } from '../lib/image.js';
 import { t } from '../i18n/messages.js';
+import { getBranding } from '../organization/branding.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { getObject } from '../lib/storage.js';
 import { parse } from '../lib/validate.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
-import { advanceEnvelope, notifySender } from '../envelopes/service.js';
+import { advanceEnvelope, notifySender, notifySigners } from '../envelopes/service.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -25,10 +26,10 @@ const MAX_SIGNATURE_BYTES = 400 * 1024;
 const cookieName = (recipientId: string) => `ds_signer_${recipientId}`;
 
 async function loadByToken(token: string) {
-  const recipientId = parseSigningToken(token);
-  if (!recipientId) throw notFound('Signing request');
+  const parsed = parseSigningToken(token);
+  if (!parsed) throw notFound('Signing request');
   const recipient = await prisma.recipient.findUnique({
-    where: { id: recipientId },
+    where: { id: parsed.id },
     include: {
       envelope: {
         include: {
@@ -39,7 +40,7 @@ async function loadByToken(token: string) {
       },
     },
   });
-  if (!recipient || recipient.role !== 'SIGNER') throw notFound('Signing request');
+  if (!recipient || recipient.role === 'CC' || !signingTokenMatches(recipient, parsed.mac)) throw notFound('Signing request');
   return recipient;
 }
 
@@ -112,7 +113,17 @@ export async function signingRoutes(app: FastifyInstance) {
         organization: env.org.name,
         expiresAt: env.expiresAt,
       },
-      recipient: { id: r.id, name: r.name, email: r.email, maskedEmail: maskEmail(r.email), status: r.status, locale: r.locale },
+      recipient: {
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        maskedEmail: maskEmail(r.email),
+        status: r.status,
+        locale: r.locale,
+        role: r.role,
+        canReassign: !r.embedded && !r.hostUserId,
+      },
+      branding: await getBranding(env.orgId),
       compliance: {
         jurisdiction: policy.jurisdictionName,
         laws: policy.laws,
@@ -164,6 +175,7 @@ export async function signingRoutes(app: FastifyInstance) {
       });
       const { html, text } = layout({
         locale: r.locale,
+        brand: await getBranding(r.envelope.orgId),
         heading: t(r.locale, 'otpHeading'),
         paragraphs: [t(r.locale, 'otpIntro', { title: r.envelope.title }), code, t(r.locale, 'otpExpiry')],
       });
@@ -318,6 +330,55 @@ export async function signingRoutes(app: FastifyInstance) {
     // Routing and sealing can take a few seconds (timestamp authority round-trip); run after responding.
     advanceEnvelope(r.envelopeId).catch((err) => req.log.error({ err }, 'advanceEnvelope failed'));
     return { signed: true };
+  });
+
+  /** The signer hands the request to someone else (e.g. the right person in their company). */
+  app.post('/signing/:token/reassign', async (req) => {
+    const { token } = req.params as { token: string };
+    const body = parse(
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        email: z.string().trim().toLowerCase().email(),
+        reason: z.string().trim().min(1).max(500),
+      }),
+      req.body,
+    );
+    const r = await loadByToken(token);
+    requireReady(r);
+    requireSession(req, r);
+    if (r.embedded || r.hostUserId) throw conflict('This signing request cannot be reassigned.');
+    if (body.email === r.email) throw badRequest('Enter a different person.');
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.recipient.update({
+        where: { id: r.id },
+        data: {
+          name: body.name,
+          email: body.email,
+          status: 'SENT',
+          tokenVersion: { increment: 1 },
+          signerSessionHash: null,
+          verifiedAt: null,
+          viewedAt: null,
+          otpHash: null,
+          // The new person may use a different language; start from the default
+          locale: r.locale,
+        },
+      });
+      await appendAudit(tx, {
+        envelopeId: r.envelopeId,
+        type: 'recipient.reassigned',
+        actor: actorOf(r),
+        data: { recipientId: r.id, from: { name: r.name, email: r.email }, to: { name: body.name, email: body.email }, reason: body.reason },
+        ...clientInfo(req),
+      });
+      return u;
+    });
+    await notifySigners(r.envelope, [updated], 'invite');
+    await notifySender(r.envelope, `Reassigned: ${r.envelope.title}`, [
+      `${r.name} (${r.email}) passed "${r.envelope.title}" to ${body.name} (${body.email}).`,
+      `Reason: ${body.reason}`,
+    ]).catch(() => {});
+    return { reassigned: true };
   });
 
   app.post('/signing/:token/decline', async (req) => {

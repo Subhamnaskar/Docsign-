@@ -3,15 +3,19 @@ import type { Actor } from '../audit/audit.js';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { hmacSha256Hex, randomToken, safeEqualHex, sha256Hex } from './crypto.js';
-import { unauthorized } from './errors.js';
+import { forbidden, unauthorized } from './errors.js';
 
 export const SESSION_COOKIE = 'ds_session';
 export const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 export const API_KEY_PREFIX = 'dsk_';
 
+export type Role = 'OWNER' | 'ADMIN' | 'MEMBER';
+
 export interface AuthContext {
   orgId: string;
   userId: string | null;
+  /** API keys act with owner rights. */
+  role: Role;
   actor: Actor;
 }
 
@@ -50,6 +54,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     request.auth = {
       orgId: apiKey.orgId,
       userId: owner?.id ?? null,
+      role: 'OWNER',
       actor: { kind: 'api_key', id: apiKey.id, name: apiKey.name },
     };
     return;
@@ -63,27 +68,53 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
   });
   if (!session || session.expiresAt < new Date()) throw unauthorized('Session expired');
   const { user } = session;
+  if (user.disabledAt) throw unauthorized('This account has been deactivated.');
   request.auth = {
     orgId: user.orgId,
     userId: user.id,
+    role: user.role,
     actor: { kind: 'user', id: user.id, name: user.name, email: user.email },
   };
 }
 
-/** Signing links carry `<recipientId>.<hmac>`; nothing secret is stored server-side. */
-export function signingToken(recipientId: string): string {
-  return `${recipientId}.${hmacSha256Hex(config.appSecret, `sign:${recipientId}`).slice(0, 48)}`;
+/** Pre-handler factory restricting a route to the given roles. */
+export function requireRole(...roles: Role[]) {
+  return async (request: FastifyRequest) => {
+    if (!roles.includes(request.auth.role)) throw forbidden('You need an administrator to do this.');
+  };
 }
 
-export function parseSigningToken(token: string): string | null {
+export const isAdmin = (auth: AuthContext) => auth.role === 'OWNER' || auth.role === 'ADMIN';
+
+/**
+ * Signing links carry `<recipientId>.<hmac>`; nothing secret is stored
+ * server-side. The recipient's tokenVersion is part of the MAC, so correcting
+ * or reassigning a recipient invalidates links already sent.
+ */
+interface TokenSubject {
+  id: string;
+  tokenVersion: number;
+}
+
+const signingMac = (r: TokenSubject) => hmacSha256Hex(config.appSecret, `sign:${r.id}:${r.tokenVersion}`).slice(0, 48);
+
+export function signingToken(r: TokenSubject): string {
+  return `${r.id}.${signingMac(r)}`;
+}
+
+/** Splits a token; the MAC is checked with `signingTokenMatches` once the recipient is loaded. */
+export function parseSigningToken(token: string): { id: string; mac: string } | null {
   const [id, mac] = token.split('.');
   if (!id || !mac || !/^[0-9a-f]{48}$/.test(mac)) return null;
-  const expected = hmacSha256Hex(config.appSecret, `sign:${id}`).slice(0, 48);
-  return safeEqualHex(mac, expected) ? id : null;
+  return { id, mac };
 }
 
-export function signingUrl(recipientId: string): string {
-  return `${config.appUrl}/sign/${signingToken(recipientId)}`;
+export function signingTokenMatches(r: TokenSubject, mac: string): boolean {
+  return safeEqualHex(mac, signingMac(r));
+}
+
+export function signingUrl(r: TokenSubject): string {
+  return `${config.appUrl}/sign/${signingToken(r)}`;
 }
 
 export function clientInfo(request: FastifyRequest) {

@@ -18,12 +18,21 @@ model Organization {
   jurisdiction String            @default("US")
   // Regional cell that owns this tenant's data
   dataRegion   String
+  // Branding on emails and the signing page
+  brandColor   String?
+  logoKey      String?
+  // Origins allowed to frame embedded signing (e.g. https://app.example.com)
+  embedOrigins String[]          @default([])
   createdAt    DateTime          @default(now())
   users        User[]
   envelopes    Envelope[]
   apiKeys      ApiKey[]
   webhooks     WebhookEndpoint[]
   templates    Template[]
+  invitations  Invitation[]
+  folders      Folder[]
+  activity     ActivityLog[]
+  forms        SigningForm[]
 }
 
 enum UserRole {
@@ -33,16 +42,58 @@ enum UserRole {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   name         String
   passwordHash String
-  role         UserRole   @default(MEMBER)
+  role         UserRole     @default(MEMBER)
   orgId        String
   org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   sessions     Session[]
   envelopes    Envelope[]
-  createdAt    DateTime   @default(now())
+  // Deactivated users can't sign in; their envelopes stay with the organisation
+  disabledAt   DateTime?
+  createdAt    DateTime     @default(now())
+}
+
+model Invitation {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email       String
+  role        UserRole     @default(MEMBER)
+  tokenHash   String       @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId])
+}
+
+model Folder {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime     @default(now())
+  envelopes Envelope[]
+
+  @@unique([orgId, name])
+}
+
+// Organisation-level admin events (users, keys, branding, settings)
+model ActivityLog {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  type      String
+  actor     Json
+  data      Json
+  ip        String?
+  createdAt DateTime     @default(now())
+
+  @@index([orgId, createdAt])
 }
 
 model Session {
@@ -86,34 +137,38 @@ enum RoutingMode {
 }
 
 model Envelope {
-  id             String         @id @default(cuid())
-  orgId          String
-  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  createdById    String
-  createdBy      User           @relation(fields: [createdById], references: [id])
-  title          String
-  message        String?
-  status         EnvelopeStatus @default(DRAFT)
-  routing        RoutingMode    @default(SEQUENTIAL)
-  jurisdiction   String
-  documentType   String         @default("general")
+  id                String         @id @default(cuid())
+  orgId             String
+  org               Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdById       String
+  createdBy         User           @relation(fields: [createdById], references: [id])
+  title             String
+  message           String?
+  status            EnvelopeStatus @default(DRAFT)
+  routing           RoutingMode    @default(SEQUENTIAL)
+  jurisdiction      String
+  documentType      String         @default("general")
+  folderId          String?
+  folder            Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  // Set when created through a self-serve signing form
+  formId            String?
   // Snapshot of the resolved compliance profile at send time
-  policy         Json?
-  reminderDays   Int            @default(2)
-  expiresAt      DateTime?
-  sentAt         DateTime?
-  completedAt    DateTime?
+  policy            Json?
+  reminderDays      Int            @default(2)
+  expiresAt         DateTime?
+  sentAt            DateTime?
+  completedAt       DateTime?
   // Claim marker so only one worker seals a fully signed envelope; stale claims are retried
-  finalizingAt   DateTime?
-  voidReason     String?
-  certificateKey String?
+  finalizingAt      DateTime?
+  voidReason        String?
+  certificateKey    String?
   certificateSha256 String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  documents      Document[]
-  recipients     Recipient[]
-  fields         Field[]
-  auditEvents    AuditEvent[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  documents         Document[]
+  recipients        Recipient[]
+  fields            Field[]
+  auditEvents       AuditEvent[]
 
   @@index([orgId, status])
 }
@@ -141,7 +196,19 @@ model Document {
 
 enum RecipientRole {
   SIGNER
+  // Reviews and approves without filling fields
+  APPROVER
   CC
+}
+
+enum AuthMethod {
+  EMAIL_OTP
+  SMS_OTP
+  WHATSAPP_OTP
+  // Code shared with the signer out of band by the sender
+  ACCESS_CODE
+  // Identity established by the integrating app (embedded signing) or a host (in person)
+  NONE
 }
 
 enum RecipientStatus {
@@ -153,31 +220,42 @@ enum RecipientStatus {
 }
 
 model Recipient {
-  id                 String          @id @default(cuid())
-  envelopeId         String
-  envelope           Envelope        @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
-  name               String
-  email              String
-  role               RecipientRole   @default(SIGNER)
-  routingOrder       Int             @default(1)
+  id                String          @id @default(cuid())
+  envelopeId        String
+  envelope          Envelope        @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  name              String
+  email             String
+  role              RecipientRole   @default(SIGNER)
+  routingOrder      Int             @default(1)
   // Language for emails and the signing page (BCP 47 code, e.g. "hi", "es")
-  locale             String          @default("en")
-  status             RecipientStatus @default(CREATED)
+  locale            String          @default("en")
+  authMethod        AuthMethod      @default(EMAIL_OTP)
+  // E.164 phone number for SMS / WhatsApp codes
+  phone             String?
+  accessCodeHash    String?
+  // Embedded recipients sign inside the integrator's app; no emails are sent
+  embedded          Boolean         @default(false)
+  clientUserId      String?
+  // In-person signing hosted by a user of the sending organisation
+  hostUserId        String?
+  // Bumped when the recipient is corrected or reassigned, invalidating old links
+  tokenVersion      Int             @default(0)
+  status            RecipientStatus @default(CREATED)
   // One-time passcode for signer authentication (hashed)
-  otpHash            String?
-  otpExpiresAt       DateTime?
-  otpAttempts        Int             @default(0)
+  otpHash           String?
+  otpExpiresAt      DateTime?
+  otpAttempts       Int             @default(0)
   // Set after OTP verification; ties the signing session to one browser
-  signerSessionHash  String?
-  verifiedAt         DateTime?
-  viewedAt           DateTime?
-  signedAt           DateTime?
-  declinedAt         DateTime?
-  declineReason      String?
-  lastNotifiedAt     DateTime?
-  signedIp           String?
-  signedUserAgent    String?
-  fields             Field[]
+  signerSessionHash String?
+  verifiedAt        DateTime?
+  viewedAt          DateTime?
+  signedAt          DateTime?
+  declinedAt        DateTime?
+  declineReason     String?
+  lastNotifiedAt    DateTime?
+  signedIp          String?
+  signedUserAgent   String?
+  fields            Field[]
 
   @@index([envelopeId])
 }
@@ -190,6 +268,13 @@ enum FieldType {
   EMAIL
   TEXT
   CHECKBOX
+  DROPDOWN
+  RADIO
+  NUMBER
+  // Read-only value computed from NUMBER fields, e.g. "{Qty} * {Price}"
+  FORMULA
+  // Signer uploads a supporting file
+  ATTACHMENT
 }
 
 model Field {
@@ -210,6 +295,12 @@ model Field {
   height      Float
   required    Boolean   @default(true)
   label       String?
+  // Choices for DROPDOWN / RADIO
+  options     String[]  @default([])
+  // Expression for FORMULA fields, referencing NUMBER fields by label: "{Qty} * {Price}"
+  formula     String?
+  // Show this field only when another field has a value: { "fieldLabel": "Has guarantor", "equals": "true" }
+  condition   Json?
   // Filled in by the signer. Signatures/initials are PNG data URLs.
   value       String?
 
@@ -348,6 +439,9 @@ model TemplateField {
   height     Float
   required   Boolean          @default(true)
   label      String?
+  options    String[]         @default([])
+  formula    String?
+  condition  Json?
 }
 
 // ---------------------------------------------------------------------------
@@ -368,4 +462,34 @@ model Lead {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// Files uploaded by signers through ATTACHMENT fields
+model SignerAttachment {
+  id          String   @id @default(cuid())
+  envelopeId  String
+  fieldId     String
+  recipientId String
+  name        String
+  contentType String
+  size        Int
+  sha256      String
+  storageKey  String
+  createdAt   DateTime @default(now())
+
+  @@index([envelopeId])
+}
+
+// Self-serve signing link: anyone with the link can sign a copy of a template
+model SigningForm {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  templateId String
+  name       String
+  slug       String       @unique
+  active     Boolean      @default(true)
+  maxUses    Int?
+  uses       Int          @default(0)
+  createdAt  DateTime     @default(now())
 }

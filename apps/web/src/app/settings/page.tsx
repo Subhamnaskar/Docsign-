@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell, useMe } from '@/components/AppShell';
+import { ActivityLog } from '@/components/settings/Activity';
+import { BrandingSettings } from '@/components/settings/Branding';
+import { Team } from '@/components/settings/Team';
 import { Alert, Button, Card, cx, Input, Label, Select } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatDate, relativeTime } from '@/lib/format';
@@ -241,15 +244,56 @@ function Webhooks() {
   );
 }
 
+const TABS = [
+  { id: 'organization', label: 'Organization', admin: true },
+  { id: 'team', label: 'Team', admin: false },
+  { id: 'branding', label: 'Branding', admin: true },
+  { id: 'developers', label: 'API & webhooks', admin: true },
+  { id: 'activity', label: 'Activity', admin: true },
+] as const;
+
+function Settings() {
+  const me = useMe();
+  const admin = me?.user?.role === 'OWNER' || me?.user?.role === 'ADMIN' || !me?.user;
+  const tabs = TABS.filter((t) => admin || !t.admin);
+  const [tab, setTab] = useState<string>(tabs[0].id);
+  return (
+    <>
+      <h1 className="text-2xl font-semibold">Settings</h1>
+      <div className="mt-4 flex flex-wrap gap-1 border-b border-gray-200">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cx(
+              '-mb-px border-b-2 px-4 py-2 text-sm font-medium',
+              tab === t.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-6 space-y-6">
+        {tab === 'organization' && <Organization />}
+        {tab === 'team' && <Team />}
+        {tab === 'branding' && <BrandingSettings />}
+        {tab === 'developers' && (
+          <>
+            <ApiKeys />
+            <Webhooks />
+          </>
+        )}
+        {tab === 'activity' && <ActivityLog />}
+      </div>
+    </>
+  );
+}
+
 export default function SettingsPage() {
   return (
     <AppShell>
-      <h1 className="text-2xl font-semibold">Settings</h1>
-      <div className="mt-6 space-y-6">
-        <Organization />
-        <ApiKeys />
-        <Webhooks />
-      </div>
+      <Settings />
     </AppShell>
   );
 }

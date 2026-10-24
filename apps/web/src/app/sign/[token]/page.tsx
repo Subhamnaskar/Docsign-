@@ -14,7 +14,8 @@ interface SigningSession {
   state: 'ready' | 'waiting' | 'signed' | 'completed' | 'declined' | 'voided' | 'expired' | 'unavailable';
   verified: boolean;
   envelope: { id: string; title: string; message: string | null; sender: { name: string; email: string }; organization: string; expiresAt: string | null };
-  recipient: { id: string; name: string; email: string; maskedEmail: string; status: string; locale: string };
+  recipient: { id: string; name: string; email: string; maskedEmail: string; status: string; locale: string; role: string; canReassign: boolean };
+  branding: { name: string; color: string | null; logoUrl: string | null };
   compliance: { jurisdiction: string; laws: string[]; signatureLevel: string; consentText: string };
   documents: { id: string; name: string; pageCount: number; pages: PageInfo[] }[];
   fields: Field[];
@@ -30,12 +31,45 @@ const STATE_KEYS: Record<string, [SignerKey, SignerKey]> = {
   unavailable: ['unavailableTitle', 'unavailableBody'],
 };
 
-function Shell({ children, title, locale, onLocale, tr }: { children: React.ReactNode; title?: string; locale: string; onLocale: (l: string) => void; tr: Translate }) {
+/** Re-themes the brand colour scale (used by buttons and accents) with the sender's colour. */
+function brandStyle(color: string | null | undefined): React.CSSProperties | undefined {
+  if (!color) return undefined;
+  return {
+    ['--color-brand-50' as string]: `color-mix(in srgb, ${color} 8%, white)`,
+    ['--color-brand-100' as string]: `color-mix(in srgb, ${color} 18%, white)`,
+    ['--color-brand-500' as string]: `color-mix(in srgb, ${color} 85%, white)`,
+    ['--color-brand-600' as string]: color,
+    ['--color-brand-700' as string]: `color-mix(in srgb, ${color} 80%, black)`,
+  };
+}
+
+function Shell({
+  children,
+  title,
+  locale,
+  onLocale,
+  tr,
+  branding,
+}: {
+  children: React.ReactNode;
+  title?: string;
+  locale: string;
+  onLocale: (l: string) => void;
+  tr: Translate;
+  branding?: SigningSession['branding'];
+}) {
   return (
-    <div className="min-h-screen" dir={isRtl(locale) ? 'rtl' : 'ltr'} lang={locale}>
+    <div className="min-h-screen" dir={isRtl(locale) ? 'rtl' : 'ltr'} lang={locale} style={brandStyle(branding?.color)}>
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
-          <Logo className="text-gray-900" />
+          {branding?.logoUrl ? (
+            <span className="flex items-center gap-2">
+              <img src={branding.logoUrl} alt={branding.name} className="max-h-8 max-w-[160px]" />
+              <span className="hidden text-xs text-gray-400 sm:inline">{tr('via')}</span>
+            </span>
+          ) : (
+            <Logo className="text-gray-900" />
+          )}
           {title && <span className="min-w-0 flex-1 truncate text-sm text-gray-500">{title}</span>}
           <select
             aria-label={tr('language')}
@@ -158,7 +192,19 @@ function Consent({ session, onAccept, tr }: { session: SigningSession; onAccept:
   );
 }
 
-function SignDocument({ session, token, onDone, tr }: { session: SigningSession; token: string; onDone: () => void; tr: Translate }) {
+function SignDocument({
+  session,
+  token,
+  onDone,
+  onReassigned,
+  tr,
+}: {
+  session: SigningSession;
+  token: string;
+  onDone: () => void;
+  onReassigned: (name: string) => void;
+  tr: Translate;
+}) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(session.fields.filter((f) => f.value).map((f) => [f.id, f.value!])),
   );
@@ -166,6 +212,8 @@ function SignDocument({ session, token, onDone, tr }: { session: SigningSession;
   const [padFor, setPadFor] = useState<Field | null>(null);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reassignTo, setReassignTo] = useState({ name: '', email: '', reason: '' });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -216,6 +264,19 @@ function SignDocument({ session, token, onDone, tr }: { session: SigningSession;
     }
   }
 
+  async function reassign() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api(`/signing/${token}/reassign`, { method: 'POST', json: reassignTo });
+      setReassignOpen(false);
+      onReassigned(reassignTo.name);
+    } catch (err) {
+      setError((err as Error).message);
+      setSubmitting(false);
+    }
+  }
+
   async function decline() {
     setSubmitting(true);
     try {
@@ -239,6 +300,11 @@ function SignDocument({ session, token, onDone, tr }: { session: SigningSession;
         <div className="min-w-0 flex-1 text-sm">
           {remaining.length > 0 ? <span>{tr('fieldsLeft', { n: remaining.length })}</span> : <span className="font-medium text-green-700">{tr('allDone')}</span>}
         </div>
+        {session.recipient.canReassign && (
+          <Button variant="ghost" size="sm" onClick={() => setReassignOpen(true)}>
+            {tr('reassign')}
+          </Button>
+        )}
         <Button variant="ghost" size="sm" onClick={() => setDeclineOpen(true)}>
           {tr('decline')}
         </Button>
@@ -358,6 +424,23 @@ function SignDocument({ session, token, onDone, tr }: { session: SigningSession;
         )}
       </Modal>
 
+      <Modal open={reassignOpen} onClose={() => setReassignOpen(false)} title={tr('reassign')}>
+        <p className="text-sm text-gray-600">{tr('reassignBody')}</p>
+        <div className="mt-4 space-y-3">
+          <Input placeholder={tr('newName')} value={reassignTo.name} onChange={(e) => setReassignTo((r) => ({ ...r, name: e.target.value }))} />
+          <Input type="email" placeholder={tr('newEmail')} value={reassignTo.email} onChange={(e) => setReassignTo((r) => ({ ...r, email: e.target.value }))} />
+          <Textarea rows={2} placeholder={tr('reassignReason')} value={reassignTo.reason} onChange={(e) => setReassignTo((r) => ({ ...r, reason: e.target.value }))} />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setReassignOpen(false)}>
+            {tr('cancel')}
+          </Button>
+          <Button loading={submitting} disabled={!reassignTo.name.trim() || !reassignTo.email.trim() || !reassignTo.reason.trim()} onClick={reassign}>
+            {tr('reassign')}
+          </Button>
+        </div>
+      </Modal>
+
       <Modal open={declineOpen} onClose={() => setDeclineOpen(false)} title={tr('declineTitle')}>
         <p className="text-sm text-gray-600">{tr('declineBody')}</p>
         <Textarea className="mt-4" rows={3} placeholder={tr('declineReason')} value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
@@ -380,6 +463,7 @@ export default function SignPage() {
   const [error, setError] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
   const [locale, setLocale] = useState<string | null>(null);
+  const [reassignedTo, setReassignedTo] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api<SigningSession>(`/signing/${token}`)
@@ -393,7 +477,17 @@ export default function SignPage() {
 
   const lang = locale ?? 'en';
   const tr: Translate = useCallback((key, vars) => signerT(lang, key, vars), [lang]);
-  const shell = { locale: lang, onLocale: setLocale, tr };
+  const shell = { locale: lang, onLocale: setLocale, tr, branding: session?.branding };
+
+  if (reassignedTo) {
+    return (
+      <Shell {...shell}>
+        <Card className="mx-auto max-w-md p-8 text-center">
+          <p className="text-sm text-gray-600">{tr('reassignDone', { name: reassignedTo })}</p>
+        </Card>
+      </Shell>
+    );
+  }
 
   if (error) {
     return (
@@ -437,7 +531,7 @@ export default function SignPage() {
       ) : !consented ? (
         <Consent session={session} onAccept={() => setConsented(true)} tr={tr} />
       ) : (
-        <SignDocument session={session} token={token} onDone={load} tr={tr} />
+        <SignDocument session={session} token={token} onDone={load} onReassigned={setReassignedTo} tr={tr} />
       )}
     </Shell>
   );
