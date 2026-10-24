@@ -446,18 +446,36 @@ function SignDocument({
 
   return (
     <>
-      <div className="sticky top-14 z-20 -mx-4 mb-6 flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="sticky top-14 z-20 -mx-4 mb-6 flex items-center gap-2 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:gap-3">
         <div className="min-w-0 flex-1 text-sm">
           {remaining.length > 0 ? <span>{tr('fieldsLeft', { n: remaining.length })}</span> : <span className="font-medium text-green-700">{tr('allDone')}</span>}
         </div>
-        {session.recipient.canReassign && (
-          <Button variant="ghost" size="sm" onClick={() => setReassignOpen(true)}>
-            {tr('reassign')}
+        {/* Secondary actions: inline on wider screens, in a menu on phones */}
+        <div className="hidden items-center gap-1 sm:flex">
+          {session.recipient.canReassign && (
+            <Button variant="ghost" size="sm" onClick={() => setReassignOpen(true)}>
+              {tr('reassign')}
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setDeclineOpen(true)}>
+            {tr('decline')}
           </Button>
-        )}
-        <Button variant="ghost" size="sm" onClick={() => setDeclineOpen(true)}>
-          {tr('decline')}
-        </Button>
+        </div>
+        <details className="relative sm:hidden">
+          <summary className="cursor-pointer list-none rounded-md px-2 py-1.5 text-lg leading-none text-gray-500 hover:bg-gray-100" aria-label="More actions">
+            ⋯
+          </summary>
+          <div className="absolute right-0 z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            {session.recipient.canReassign && (
+              <button className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50" onClick={() => setReassignOpen(true)}>
+                {tr('reassign')}
+              </button>
+            )}
+            <button className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50" onClick={() => setDeclineOpen(true)}>
+              {tr('decline')}
+            </button>
+          </div>
+        </details>
         {remaining.length > 0 ? (
           <Button size="sm" onClick={next}>
             {tr('nextField')} ↓
