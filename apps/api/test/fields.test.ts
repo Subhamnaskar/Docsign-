@@ -174,3 +174,28 @@ describe('self-serve signing links', () => {
     expect(list[0].uses).toBe(1);
   });
 });
+
+describe('reports', () => {
+  it('summarises volume, turnaround and the signer funnel', async () => {
+    const { c } = await registerSender(app);
+    const email = `rep-${uid()}@example.test`;
+    let env = await c.json('POST', '/envelopes', { json: { title: 'Report me' } });
+    const { payload, headers } = multipart('a.pdf', await makePdf());
+    const doc = await c.json('POST', `/envelopes/${env.id}/documents`, { payload, headers });
+    env = await c.json('PUT', `/envelopes/${env.id}/recipients`, { json: [{ name: 'R', email }] });
+    await c.json('PUT', `/envelopes/${env.id}/fields`, {
+      json: [{ documentId: doc.id, recipientId: env.recipients[0].id, type: 'SIGNATURE', page: 0, x: 0.1, y: 0.1, width: 0.3, height: 0.06 }],
+    });
+    await c.json('POST', `/envelopes/${env.id}/send`);
+    const { s, link, session } = await openAs(email);
+    await s.json('POST', `/signing/${link}/complete`, { json: { consent: true, values: { [session.fields[0].id]: signaturePng() } } });
+    await waitFor(() => c.json('GET', `/envelopes/${env.id}`), (e) => e.status === 'COMPLETED');
+
+    const r = await c.json('GET', '/reports?days=30');
+    expect(r.totals).toMatchObject({ sent: 1, completed: 1, completionRate: 1, outstanding: 0 });
+    expect(r.totals.medianHours).toBeGreaterThanOrEqual(0);
+    expect(r.funnel).toEqual({ invited: 1, opened: 1, verified: 1, signed: 1 });
+    expect(r.weekly.reduce((n: number, w: { sent: number }) => n + w.sent, 0)).toBe(1);
+    expect(r.bySender[0]).toMatchObject({ sent: 1, completed: 1 });
+  });
+});

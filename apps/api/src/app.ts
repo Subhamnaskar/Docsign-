@@ -9,6 +9,7 @@ import { prisma } from './db.js';
 import { developerRoutes } from './developers/routes.js';
 import { envelopeRoutes } from './envelopes/routes.js';
 import { HttpError } from './lib/errors.js';
+import { reportRoutes } from './reports/routes.js';
 import { signingRoutes } from './signing/routes.js';
 import { envelopeManageRoutes } from './envelopes/manage.js';
 import { organizationRoutes } from './organization/routes.js';
@@ -57,6 +58,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(envelopeRoutes);
       await v1.register(templateRoutes);
       await v1.register(formRoutes);
+      await v1.register(reportRoutes);
       await v1.register(envelopeManageRoutes);
       await v1.register(teamRoutes);
       await v1.register(organizationRoutes);
