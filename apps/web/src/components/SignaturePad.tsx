@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { signerT, type Translate } from '@/lib/i18n';
 import { Button, cx, Input } from './ui';
 
 type Mode = 'draw' | 'type' | 'upload';
@@ -34,7 +35,7 @@ function trimCanvas(src: HTMLCanvasElement): string | null {
   return out.toDataURL('image/png');
 }
 
-function DrawPad({ onChange }: { onChange: (png: string | null) => void }) {
+function DrawPad({ onChange, tr }: { onChange: (png: string | null) => void; tr: Translate }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -87,7 +88,7 @@ function DrawPad({ onChange }: { onChange: (png: string | null) => void }) {
           }}
         />
         <div className="pointer-events-none absolute inset-x-6 bottom-10 border-b border-dashed border-gray-300" />
-        {empty && <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-gray-400">Draw your signature here</div>}
+        {empty && <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-gray-400">{tr('padDrawHere')}</div>}
       </div>
       <button
         type="button"
@@ -99,7 +100,7 @@ function DrawPad({ onChange }: { onChange: (png: string | null) => void }) {
           onChange(null);
         }}
       >
-        Clear
+        {tr('padClear')}
       </button>
     </div>
   );
@@ -146,12 +147,15 @@ export function SignaturePad({
   kind,
   onAdopt,
   onCancel,
+  tr = (k, v) => signerT('en', k, v),
 }: {
   defaultText: string;
   kind: 'signature' | 'initials';
   onAdopt: (png: string) => void;
   onCancel: () => void;
+  tr?: Translate;
 }) {
+  const modeLabel = { type: tr('padType'), draw: tr('padDraw'), upload: tr('padUpload') };
   const [mode, setMode] = useState<Mode>('type');
   const [typed, setTyped] = useState(defaultText);
   const [drawn, setDrawn] = useState<string | null>(null);
@@ -169,9 +173,9 @@ export function SignaturePad({
             key={m}
             type="button"
             onClick={() => setMode(m)}
-            className={cx('flex-1 rounded-md px-3 py-1.5 font-medium capitalize', mode === m ? 'bg-white shadow-sm' : 'text-gray-600')}
+            className={cx('flex-1 rounded-md px-3 py-1.5 font-medium', mode === m ? 'bg-white shadow-sm' : 'text-gray-600')}
           >
-            {m}
+            {modeLabel[m]}
           </button>
         ))}
       </div>
@@ -180,11 +184,11 @@ export function SignaturePad({
         <div>
           <Input value={typed} onChange={(e) => setTyped(e.target.value)} maxLength={kind === 'initials' ? 6 : 60} aria-label={`Type your ${kind}`} />
           <div className="mt-3 flex h-28 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white">
-            {typedPng ? <img src={typedPng} alt="Signature preview" className="max-h-24 max-w-full" /> : <span className="text-sm text-gray-400">Preview</span>}
+            {typedPng ? <img src={typedPng} alt="Signature preview" className="max-h-24 max-w-full" /> : <span className="text-sm text-gray-400">{tr('padPreview')}</span>}
           </div>
         </div>
       )}
-      {mode === 'draw' && <DrawPad onChange={setDrawn} />}
+      {mode === 'draw' && <DrawPad onChange={setDrawn} tr={tr} />}
       {mode === 'upload' && (
         <div>
           <input
@@ -211,15 +215,13 @@ export function SignaturePad({
         </div>
       )}
 
-      <p className="mt-4 text-xs text-gray-500">
-        By selecting Adopt, I agree that this {kind} is the electronic representation of my {kind} for all purposes when I use it on documents.
-      </p>
+      <p className="mt-4 text-xs text-gray-500">{tr('padAdoptText')}</p>
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>
-          Cancel
+          {tr('cancel')}
         </Button>
         <Button disabled={!result} onClick={() => result && onAdopt(result)}>
-          Adopt and sign
+          {tr('padAdopt')}
         </Button>
       </div>
     </div>

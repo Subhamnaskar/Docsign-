@@ -7,35 +7,48 @@ import { SignaturePad } from '@/components/SignaturePad';
 import { Alert, Button, Card, cx, Input, Logo, Modal, PageLoader, Textarea } from '@/components/ui';
 import { api, fileUrl } from '@/lib/api';
 import { FIELD_LABELS } from '@/lib/format';
+import { isRtl, LANGUAGES, signerT, type SignerKey, type Translate } from '@/lib/i18n';
 import type { Field, PageInfo } from '@/lib/types';
 
 interface SigningSession {
   state: 'ready' | 'waiting' | 'signed' | 'completed' | 'declined' | 'voided' | 'expired' | 'unavailable';
   verified: boolean;
   envelope: { id: string; title: string; message: string | null; sender: { name: string; email: string }; organization: string; expiresAt: string | null };
-  recipient: { id: string; name: string; email: string; maskedEmail: string; status: string };
+  recipient: { id: string; name: string; email: string; maskedEmail: string; status: string; locale: string };
   compliance: { jurisdiction: string; laws: string[]; signatureLevel: string; consentText: string };
   documents: { id: string; name: string; pageCount: number; pages: PageInfo[] }[];
   fields: Field[];
 }
 
-const STATE_MESSAGES: Record<string, { title: string; body: string }> = {
-  waiting: { title: 'Not your turn yet', body: 'Other people need to sign first. We will email you when it is your turn.' },
-  signed: { title: 'You have signed this document', body: 'We will email you a copy of the completed document once everyone has signed.' },
-  completed: { title: 'This document is complete', body: 'Everyone has signed. Check your email for the completed copy.' },
-  declined: { title: 'This request was declined', body: 'Signing is closed because a recipient declined.' },
-  voided: { title: 'This request was cancelled', body: 'The sender voided this document. No action is needed.' },
-  expired: { title: 'This request has expired', body: 'Contact the sender if you still need to sign.' },
-  unavailable: { title: 'This request is not available', body: 'The link may be out of date.' },
+const STATE_KEYS: Record<string, [SignerKey, SignerKey]> = {
+  waiting: ['waitingTitle', 'waitingBody'],
+  signed: ['signedTitle', 'signedBody'],
+  completed: ['completedTitle', 'completedBody'],
+  declined: ['declinedTitle', 'declinedBody'],
+  voided: ['voidedTitle', 'voidedBody'],
+  expired: ['expiredTitle', 'expiredBody'],
+  unavailable: ['unavailableTitle', 'unavailableBody'],
 };
 
-function Shell({ children, title }: { children: React.ReactNode; title?: string }) {
+function Shell({ children, title, locale, onLocale, tr }: { children: React.ReactNode; title?: string; locale: string; onLocale: (l: string) => void; tr: Translate }) {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" dir={isRtl(locale) ? 'rtl' : 'ltr'} lang={locale}>
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
           <Logo className="text-gray-900" />
-          {title && <span className="truncate text-sm text-gray-500">{title}</span>}
+          {title && <span className="min-w-0 flex-1 truncate text-sm text-gray-500">{title}</span>}
+          <select
+            aria-label={tr('language')}
+            value={locale}
+            onChange={(e) => onLocale(e.target.value)}
+            className="ms-auto rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700"
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.name}
+              </option>
+            ))}
+          </select>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
@@ -43,7 +56,7 @@ function Shell({ children, title }: { children: React.ReactNode; title?: string 
   );
 }
 
-function Verify({ session, token, onVerified }: { session: SigningSession; token: string; onVerified: () => void }) {
+function Verify({ session, token, onVerified, tr }: { session: SigningSession; token: string; onVerified: () => void; tr: Translate }) {
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -75,15 +88,14 @@ function Verify({ session, token, onVerified }: { session: SigningSession; token
     }
   }
 
+  const email = session.recipient.maskedEmail;
   return (
     <Card className="mx-auto max-w-md p-7">
-      <p className="text-sm text-gray-500">
-        {session.envelope.sender.name} ({session.envelope.organization}) sent you
-      </p>
+      <p className="text-sm text-gray-500">{tr('sentYou', { sender: session.envelope.sender.name, org: session.envelope.organization })}</p>
       <h1 className="mt-1 text-xl font-semibold">{session.envelope.title}</h1>
       {session.envelope.message && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-sm text-gray-700">{session.envelope.message}</p>}
       <div className="mt-6 border-t border-gray-100 pt-6">
-        <h2 className="font-medium">Verify it&apos;s you</h2>
+        <h2 className="font-medium">{tr('verifyTitle')}</h2>
         {error && (
           <div className="mt-3">
             <Alert>{error}</Alert>
@@ -91,29 +103,30 @@ function Verify({ session, token, onVerified }: { session: SigningSession; token
         )}
         {!sent ? (
           <>
-            <p className="mt-1 text-sm text-gray-500">We&apos;ll email a 6-digit code to {session.recipient.maskedEmail}.</p>
+            <p className="mt-1 text-sm text-gray-500">{tr('verifyIntro', { email })}</p>
             <Button className="mt-4 w-full" onClick={send} loading={loading}>
-              Email me a code
+              {tr('emailCode')}
             </Button>
           </>
         ) : (
           <form onSubmit={verify}>
-            <p className="mt-1 text-sm text-gray-500">Enter the code we sent to {session.recipient.maskedEmail}. It expires in 10 minutes.</p>
+            <p className="mt-1 text-sm text-gray-500">{tr('enterCode', { email })}</p>
             <Input
               className="mt-4 text-center font-mono text-2xl tracking-[0.5em]"
+              dir="ltr"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
               autoFocus
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              aria-label="Verification code"
+              aria-label={tr('codeLabel')}
             />
             <Button type="submit" className="mt-4 w-full" loading={loading} disabled={code.length !== 6}>
-              Verify and continue
+              {tr('verifyContinue')}
             </Button>
             <button type="button" onClick={send} className="mt-3 w-full text-sm text-gray-500 hover:text-gray-800">
-              Send a new code
+              {tr('newCode')}
             </button>
           </form>
         )}
@@ -122,27 +135,30 @@ function Verify({ session, token, onVerified }: { session: SigningSession; token
   );
 }
 
-function Consent({ session, onAccept }: { session: SigningSession; onAccept: () => void }) {
+function Consent({ session, onAccept, tr }: { session: SigningSession; onAccept: () => void; tr: Translate }) {
   const [checked, setChecked] = useState(false);
   return (
     <Card className="mx-auto max-w-lg p-7">
-      <h1 className="text-xl font-semibold">Electronic signature disclosure</h1>
+      <h1 className="text-xl font-semibold">{tr('consentTitle')}</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Governing law: {session.compliance.jurisdiction} ({session.compliance.laws.join('; ')})
+        {tr('governingLaw')}: {session.compliance.jurisdiction} ({session.compliance.laws.join('; ')})
       </p>
-      <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm leading-relaxed text-gray-700">{session.compliance.consentText}</p>
+      {/* The legal disclosure is shown in the governing jurisdiction's wording */}
+      <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm leading-relaxed text-gray-700" dir="ltr" lang="en">
+        {session.compliance.consentText}
+      </p>
       <label className="mt-5 flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-0.5" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
-        <span>I agree to use electronic records and signatures.</span>
+        <span>{tr('consentAgree')}</span>
       </label>
       <Button className="mt-5 w-full" disabled={!checked} onClick={onAccept}>
-        Continue
+        {tr('continue')}
       </Button>
     </Card>
   );
 }
 
-function SignDocument({ session, token, onDone }: { session: SigningSession; token: string; onDone: () => void }) {
+function SignDocument({ session, token, onDone, tr }: { session: SigningSession; token: string; onDone: () => void; tr: Translate }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(session.fields.filter((f) => f.value).map((f) => [f.id, f.value!])),
   );
@@ -153,18 +169,15 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const autoFilled: Record<string, string> = {
-    NAME: session.recipient.name,
-    EMAIL: session.recipient.email,
-    DATE_SIGNED: new Date().toISOString().slice(0, 10),
-  };
+  const autoFilled: Record<string, string> = useMemo(
+    () => ({ NAME: session.recipient.name, EMAIL: session.recipient.email, DATE_SIGNED: new Date().toISOString().slice(0, 10) }),
+    [session],
+  );
   const isDone = useCallback(
     (f: Field) => f.type in autoFilled || (f.type === 'CHECKBOX' ? values[f.id] === 'true' : Boolean(values[f.id]?.trim())),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [values],
+    [values, autoFilled],
   );
-  const required = session.fields.filter((f) => f.required);
-  const remaining = required.filter((f) => !isDone(f));
+  const remaining = session.fields.filter((f) => f.required && !isDone(f));
   const ordered = useMemo(
     () =>
       [...session.fields].sort(
@@ -224,24 +237,18 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
     <>
       <div className="sticky top-14 z-20 -mx-4 mb-6 flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur">
         <div className="min-w-0 flex-1 text-sm">
-          {remaining.length > 0 ? (
-            <span>
-              <strong>{remaining.length}</strong> required field{remaining.length === 1 ? '' : 's'} left
-            </span>
-          ) : (
-            <span className="font-medium text-green-700">All required fields complete</span>
-          )}
+          {remaining.length > 0 ? <span>{tr('fieldsLeft', { n: remaining.length })}</span> : <span className="font-medium text-green-700">{tr('allDone')}</span>}
         </div>
         <Button variant="ghost" size="sm" onClick={() => setDeclineOpen(true)}>
-          Decline
+          {tr('decline')}
         </Button>
         {remaining.length > 0 ? (
           <Button size="sm" onClick={next}>
-            Next field ↓
+            {tr('nextField')} ↓
           </Button>
         ) : (
           <Button size="sm" onClick={finish} loading={submitting}>
-            Finish signing
+            {tr('finish')}
           </Button>
         )}
       </div>
@@ -252,7 +259,8 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
         </div>
       )}
 
-      <div className="space-y-10">
+      {/* Documents keep their own left-to-right geometry regardless of UI language */}
+      <div className="space-y-10" dir="ltr">
         {session.documents.map((doc) => (
           <section key={doc.id}>
             <h2 className="mb-3 text-sm font-semibold text-gray-700">{doc.name}</h2>
@@ -271,7 +279,7 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
                           key={f.id}
                           id={`field-${f.id}`}
                           style={style}
-                          placeholder={f.label ?? 'Text'}
+                          placeholder={f.label ?? FIELD_LABELS.TEXT}
                           value={values[f.id] ?? ''}
                           maxLength={500}
                           onChange={(e) => setValues((v) => ({ ...v, [f.id]: e.target.value }))}
@@ -301,7 +309,7 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
                           'absolute flex items-center justify-center overflow-hidden rounded border-2 text-[clamp(8px,1.3vw,12px)] font-semibold',
                           done ? 'border-transparent bg-transparent hover:border-green-500/50' : 'animate-pulse border-amber-400 bg-amber-100/90 text-amber-900 hover:animate-none',
                         )}
-                        title={done && f.type !== 'CHECKBOX' ? 'Click to change' : undefined}
+                        title={done && f.type !== 'CHECKBOX' ? tr('clickToChange') : f.label ?? undefined}
                       >
                         {f.type === 'CHECKBOX' ? (
                           values[f.id] === 'true' ? '✕' : ''
@@ -309,8 +317,8 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
                           <img src={img} alt={FIELD_LABELS[f.type]} className="h-full w-full object-contain object-left" />
                         ) : (
                           <span>
-                            {f.type === 'SIGNATURE' ? 'Sign' : 'Initial'}
-                            {!f.required && ' (optional)'}
+                            {f.type === 'SIGNATURE' ? tr('sign') : tr('initial')}
+                            {!f.required && ` ${tr('optional')}`}
                           </span>
                         )}
                       </button>
@@ -324,20 +332,21 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
 
       <div className="mt-10 flex justify-center">
         <Button onClick={finish} loading={submitting} disabled={remaining.length > 0}>
-          Finish signing
+          {tr('finish')}
         </Button>
       </div>
 
-      <Modal open={!!padFor} onClose={() => setPadFor(null)} title={padFor?.type === 'INITIALS' ? 'Adopt your initials' : 'Adopt your signature'}>
+      <Modal open={!!padFor} onClose={() => setPadFor(null)} title={padFor?.type === 'INITIALS' ? tr('adoptInitials') : tr('adoptSignature')}>
         {padFor && (
           <SignaturePad
+            tr={tr}
             kind={padFor.type === 'INITIALS' ? 'initials' : 'signature'}
             defaultText={padFor.type === 'INITIALS' ? initials : session.recipient.name}
             onCancel={() => setPadFor(null)}
             onAdopt={(png) => {
               const kind = padFor.type === 'INITIALS' ? 'initials' : 'signature';
               setAdopted((a) => ({ ...a, [kind]: png }));
-              // Apply the adopted mark to this field and any other empty fields of the same kind
+              // Apply the adopted mark to this field and any other empty required fields of the same kind
               setValues((v) => {
                 const nextValues = { ...v, [padFor.id]: png };
                 for (const f of session.fields) if (f.type === padFor.type && !nextValues[f.id] && f.required) nextValues[f.id] = png;
@@ -349,15 +358,15 @@ function SignDocument({ session, token, onDone }: { session: SigningSession; tok
         )}
       </Modal>
 
-      <Modal open={declineOpen} onClose={() => setDeclineOpen(false)} title="Decline to sign?">
-        <p className="text-sm text-gray-600">The sender will be notified and the document will be closed for everyone.</p>
-        <Textarea className="mt-4" rows={3} placeholder="Reason for declining" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
+      <Modal open={declineOpen} onClose={() => setDeclineOpen(false)} title={tr('declineTitle')}>
+        <p className="text-sm text-gray-600">{tr('declineBody')}</p>
+        <Textarea className="mt-4" rows={3} placeholder={tr('declineReason')} value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setDeclineOpen(false)}>
-            Cancel
+            {tr('cancel')}
           </Button>
           <Button variant="danger" disabled={!declineReason.trim()} loading={submitting} onClick={decline}>
-            Decline
+            {tr('decline')}
           </Button>
         </div>
       </Modal>
@@ -370,19 +379,27 @@ export default function SignPage() {
   const [session, setSession] = useState<SigningSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
+  const [locale, setLocale] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api<SigningSession>(`/signing/${token}`)
-      .then(setSession)
+      .then((s) => {
+        setSession(s);
+        setLocale((l) => l ?? s.recipient.locale ?? 'en');
+      })
       .catch((err) => setError(err.message));
   }, [token]);
   useEffect(load, [load]);
 
+  const lang = locale ?? 'en';
+  const tr: Translate = useCallback((key, vars) => signerT(lang, key, vars), [lang]);
+  const shell = { locale: lang, onLocale: setLocale, tr };
+
   if (error) {
     return (
-      <Shell>
+      <Shell {...shell}>
         <Card className="mx-auto max-w-md p-7 text-center">
-          <h1 className="text-lg font-semibold">This link isn&apos;t valid</h1>
+          <h1 className="text-lg font-semibold">{tr('invalidLink')}</h1>
           <p className="mt-2 text-sm text-gray-500">{error}</p>
         </Card>
       </Shell>
@@ -390,22 +407,23 @@ export default function SignPage() {
   }
   if (!session) {
     return (
-      <Shell>
+      <Shell {...shell}>
         <PageLoader />
       </Shell>
     );
   }
 
   if (session.state !== 'ready') {
-    const msg = STATE_MESSAGES[session.state];
+    const [titleKey, bodyKey] = STATE_KEYS[session.state];
+    const good = session.state === 'signed' || session.state === 'completed';
     return (
-      <Shell title={session.envelope.title}>
+      <Shell {...shell} title={session.envelope.title}>
         <Card className="mx-auto max-w-md p-8 text-center">
-          <div className={cx('mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-xl', session.state === 'signed' || session.state === 'completed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
-            {session.state === 'signed' || session.state === 'completed' ? '✓' : 'i'}
+          <div className={cx('mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-xl', good ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
+            {good ? '✓' : 'i'}
           </div>
-          <h1 className="text-lg font-semibold">{msg.title}</h1>
-          <p className="mt-2 text-sm text-gray-500">{msg.body}</p>
+          <h1 className="text-lg font-semibold">{tr(titleKey)}</h1>
+          <p className="mt-2 text-sm text-gray-500">{tr(bodyKey)}</p>
           <p className="mt-6 text-xs text-gray-400">{session.envelope.title}</p>
         </Card>
       </Shell>
@@ -413,13 +431,13 @@ export default function SignPage() {
   }
 
   return (
-    <Shell title={session.envelope.title}>
+    <Shell {...shell} title={session.envelope.title}>
       {!session.verified ? (
-        <Verify session={session} token={token} onVerified={load} />
+        <Verify session={session} token={token} onVerified={load} tr={tr} />
       ) : !consented ? (
-        <Consent session={session} onAccept={() => setConsented(true)} />
+        <Consent session={session} onAccept={() => setConsented(true)} tr={tr} />
       ) : (
-        <SignDocument session={session} token={token} onDone={load} />
+        <SignDocument session={session} token={token} onDone={load} tr={tr} />
       )}
     </Shell>
   );

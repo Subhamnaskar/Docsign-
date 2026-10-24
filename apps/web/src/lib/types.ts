@@ -25,6 +25,7 @@ export interface Recipient {
   email: string;
   role: 'SIGNER' | 'CC';
   routingOrder: number;
+  locale: string;
   status: RecipientStatus;
   viewedAt: string | null;
   verifiedAt: string | null;
@@ -126,4 +127,35 @@ export interface Me {
 export interface Option {
   code: string;
   name: string;
+}
+
+export interface TemplateRole {
+  id: string;
+  name: string;
+  role: 'SIGNER' | 'CC';
+  routingOrder: number;
+  fieldCount?: number;
+}
+
+export interface TemplateSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  jurisdiction: string;
+  updatedAt: string;
+  documentCount: number;
+  roles: Pick<TemplateRole, 'id' | 'name' | 'role'>[];
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string | null;
+  title: string;
+  message: string | null;
+  jurisdiction: string;
+  documentType: string;
+  routing: 'SEQUENTIAL' | 'PARALLEL';
+  documents: { id: string; name: string; pageCount: number; pages: PageInfo[] }[];
+  roles: TemplateRole[];
 }

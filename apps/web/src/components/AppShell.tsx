@@ -12,6 +12,7 @@ export const useMe = () => useContext(MeContext);
 
 const NAV = [
   { href: '/dashboard', label: 'Agreements' },
+  { href: '/templates', label: 'Templates' },
   { href: '/verify', label: 'Verify' },
   { href: '/settings', label: 'Settings' },
 ];

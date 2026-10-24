@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { CompliancePanel } from '@/components/CompliancePanel';
+import { SaveTemplateModal } from '@/components/SaveTemplateModal';
 import { Alert, Button, Card, cx, Modal, PageLoader, StatusBadge, Textarea } from '@/components/ui';
 import { api, fileUrl } from '@/lib/api';
 import { AUDIT_LABELS, formatDate } from '@/lib/format';
@@ -58,6 +59,7 @@ function Detail() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(params.get('sent') ? 'Sent! Signers will receive an email with their signing link.' : null);
   const [voidOpen, setVoidOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -137,6 +139,9 @@ function Detail() {
             }
           >
             Duplicate
+          </Button>
+          <Button variant="secondary" onClick={() => setTemplateOpen(true)}>
+            Save as template
           </Button>
         </div>
       </div>
@@ -251,6 +256,8 @@ function Detail() {
           </Card>
         </div>
       </div>
+
+      {templateOpen && <SaveTemplateModal env={env} open onClose={() => setTemplateOpen(false)} />}
 
       <Modal open={voidOpen} onClose={() => setVoidOpen(false)} title="Void this envelope?">
         <p className="text-sm text-gray-600">Signers can no longer open or sign it. Everyone who received it gets an email.</p>

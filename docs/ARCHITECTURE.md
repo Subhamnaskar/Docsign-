@@ -26,16 +26,19 @@ This repository implements **Phase 1 (Core, months 0–6)** of the blueprint and
 
 | Phase | Adds | Seams already in place |
 |---|---|---|
-| 2. Trust | AES/QES via QTSP partners (CSC API), Aadhaar eSign ESP adapter, ID verification, mobile apps, bulk send, Salesforce/M365/Google | `registerSignatureProvider` / `registerIdentityProvider`; policy rules already require AES for EU/IN loan agreements and block until an adapter exists |
+| 2. Trust | AES/QES via QTSP partners (CSC API), Aadhaar eSign ESP adapter, ID verification, mobile apps, Salesforce/M365/Google | `registerSignatureProvider` / `registerIdentityProvider`; policy rules already require AES for EU/IN loan agreements and block until an adapter exists |
 | 3. Enterprise | Workflow builder (Temporal), CLM repository, AI extraction, BYOK, dedicated cells, SOC 2 | `KeyProvider` interface for BYOK/HSM; outbox → Kafka |
 | 4. Regulated | RON, e-stamping, FedRAMP cell, on-prem, ICP-Brasil, national eIDs | Jurisdiction packs + adapters; cell config |
 | 5. Full suite | Negotiation/redlining, marketplace, advanced AI, EUDI Wallet, China stack | — |
 
-## Known Phase 1 limitations
+## Phase 1 status
 
-- **Single key provider**: `LocalKeyProvider` keeps a dev key on disk. Production must use an HSM/KMS-backed provider and a publicly trusted (AATL/EUTL) certificate.
+Done since the first cut: automated tests + CI, standalone worker (`WORKER_MODE=off` + `npm run worker`), ClamAV upload scanning, templates and bulk send, 10 signer languages.
+
+Still open:
+
+- **HSM/KMS key provider**: `LocalKeyProvider` keeps a dev key on disk. Production needs a cloud KMS or HSM implementation of `KeyProvider` and a publicly trusted (AATL/EUTL) seal certificate. Needs a cloud account and a CA to complete.
 - **LTV**: seals are B-T. B-LT/B-LTA (embedded revocation data, re-timestamping) come with the Phase 2 trust work.
-- **Worker in-process**: reminders, expiry, webhook delivery and sealing retries run on a 10 s interval inside the API process. Split them into a separate worker (or Temporal) before running more than one API replica.
-- **No malware scan on upload**: the ClamAV step from the blueprint is not wired in yet.
-- **No i18n**: the UI is English only; the blueprint's Phase 1 calls for 10 languages.
-- **SSO/SCIM**: email + password sessions only.
+- **SSO/SCIM**: email + password sessions only. Needs an identity provider (Google/Microsoft/Okta) to configure and test against.
+- **Sender UI language**: the sender app is English; signers get their language.
+- **Bulk send scale**: batches run synchronously, capped at 100 rows. Move to a queued job for larger batches.

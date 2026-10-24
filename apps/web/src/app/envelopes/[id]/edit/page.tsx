@@ -5,9 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppShell, useMe } from '@/components/AppShell';
 import { CompliancePanel } from '@/components/CompliancePanel';
 import { FieldEditor } from '@/components/FieldEditor';
+import { SaveTemplateModal } from '@/components/SaveTemplateModal';
 import { Alert, Button, Card, cx, Input, Label, PageLoader, Select, Spinner, Textarea } from '@/components/ui';
 import { api, ApiError, upload } from '@/lib/api';
 import { FIELD_LABELS } from '@/lib/format';
+import { LANGUAGES } from '@/lib/i18n';
 import type { Envelope, Field, Option } from '@/lib/types';
 
 const STEPS = ['Documents', 'Recipients', 'Fields', 'Review & send'] as const;
@@ -19,6 +21,7 @@ interface RecipientDraft {
   email: string;
   role: 'SIGNER' | 'CC';
   routingOrder: number;
+  locale: string;
 }
 
 let keySeq = 0;
@@ -227,7 +230,7 @@ function RecipientsStep({
   const add = (r?: Partial<RecipientDraft>) =>
     setDrafts([
       ...drafts,
-      { key: newKey(), name: '', email: '', role: 'SIGNER', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
+      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
     ]);
 
   return (
@@ -268,6 +271,16 @@ function RecipientsStep({
               <Select value={d.role} onChange={(e) => update(d.key, { role: e.target.value as 'SIGNER' | 'CC' })}>
                 <option value="SIGNER">Needs to sign</option>
                 <option value="CC">Receives a copy</option>
+              </Select>
+            </div>
+            <div className="w-32">
+              <Label>Language</Label>
+              <Select value={d.locale} onChange={(e) => update(d.key, { locale: e.target.value })}>
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name}
+                  </option>
+                ))}
               </Select>
             </div>
             <button onClick={() => setDrafts(drafts.filter((x) => x.key !== d.key))} className="mb-2 text-sm text-gray-400 hover:text-red-600" aria-label="Remove recipient">
@@ -354,10 +367,11 @@ function Builder() {
   const [fields, setFields] = useState<Field[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ message: string; problems: string[] } | null>(null);
+  const [templateOpen, setTemplateOpen] = useState(false);
 
   const adopt = useCallback((e: Envelope) => {
     setEnv(e);
-    setDrafts(e.recipients.map((r) => ({ key: newKey(), id: r.id, name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder })));
+    setDrafts(e.recipients.map((r) => ({ key: newKey(), id: r.id, name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder, locale: r.locale })));
     setFields(e.fields);
   }, []);
 
@@ -387,7 +401,7 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/recipients`, {
             method: 'PUT',
-            json: drafts.map(({ id: rid, name, email, role, routingOrder }) => ({ id: rid, name: name.trim(), email: email.trim(), role, routingOrder })),
+            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale }) => ({ id: rid, name: name.trim(), email: email.trim(), role, routingOrder, locale })),
           }),
         );
       } else if (step === 2) {
@@ -484,11 +498,18 @@ function Builder() {
       {step === 2 && <FieldEditor envelopeId={env.id} documents={env.documents} recipients={env.recipients} fields={fields} onChange={setFields} />}
       {step === 3 && <ReviewStep env={env} />}
 
+      {templateOpen && <SaveTemplateModal env={env} open onClose={() => setTemplateOpen(false)} />}
+
       <div className="sticky bottom-0 z-20 -mx-4 mt-8 flex items-center gap-3 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
         <Button variant="ghost" className="text-red-600" onClick={discard}>
           Delete draft
         </Button>
         <div className="ml-auto flex gap-2">
+          {step === 3 && (
+            <Button variant="secondary" onClick={() => setTemplateOpen(true)}>
+              Save as template
+            </Button>
+          )}
           {step > 0 && (
             <Button variant="secondary" onClick={() => go(step - 1)} disabled={saving}>
               Back
