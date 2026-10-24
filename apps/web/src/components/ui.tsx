@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { brand } from '@/lib/brand';
 import type { EnvelopeStatus, RecipientStatus } from '@/lib/types';
 
-const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
+import { cx } from '@/lib/cx';
 export { cx };
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -172,7 +173,7 @@ export function Logo({ className }: { className?: string }) {
         <rect width="32" height="32" rx="8" fill="#4f46e5" />
         <path d="M8 21c3-1 4.5-9 7-9s1 7 3 7 2.5-4 6-4" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      DocSign
+      {brand.name}
     </span>
   );
 }

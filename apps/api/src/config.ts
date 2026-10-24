@@ -27,6 +27,7 @@ export const config = {
   tsaUrl: process.env.TSA_URL ?? '',
   keysDir: env('KEYS_DIR', '.keys'),
   appSecret: env('APP_SECRET', 'change-me-to-a-long-random-string-at-least-32-chars'),
+  salesEmail: env('SALES_EMAIL', 'sales@docsign.local'),
   /** 'inline' runs background jobs inside the API process; 'off' expects `npm run worker`. */
   workerMode: env('WORKER_MODE', 'inline') as 'inline' | 'off',
   clamav: {

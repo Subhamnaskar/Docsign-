@@ -12,6 +12,7 @@ import { HttpError } from './lib/errors.js';
 import { signingRoutes } from './signing/routes.js';
 import { templateRoutes } from './templates/routes.js';
 import { verifyRoutes } from './verify/routes.js';
+import { websiteRoutes } from './website/routes.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
 export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] } = {}) {
@@ -48,6 +49,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(authRoutes);
       await v1.register(signingRoutes);
       await v1.register(verifyRoutes);
+      await v1.register(websiteRoutes);
       await v1.register(envelopeRoutes);
       await v1.register(templateRoutes);
       await v1.register(developerRoutes);

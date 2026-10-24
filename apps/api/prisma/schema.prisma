@@ -349,3 +349,23 @@ model TemplateField {
   required   Boolean          @default(true)
   label      String?
 }
+
+// ---------------------------------------------------------------------------
+// Website
+// ---------------------------------------------------------------------------
+
+// Demo / contact requests from the public website
+model Lead {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String
+  role      String?
+  country   String?
+  interest  String
+  message   String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

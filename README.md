@@ -20,6 +20,12 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 | Verification portal | Public `/verify`: fingerprint lookup, CMS signature check, timestamp check, tamper detection, audit chain status |
 | API & webhooks | REST API (`/api/v1`) used by the web app itself, API keys, HMAC-signed webhooks with retries (transactional outbox) |
 
+## Website
+
+Public pages live in the same Next.js app (`apps/web/src/app/(marketing)`): home, product, compliance & security, developers (API reference), pricing, partners, contact (demo requests, stored and emailed to `SALES_EMAIL`), and legal outlines, plus `sitemap.xml` and `robots.txt`.
+
+Brand name, domain, contact emails and plan prices are in `apps/web/src/lib/brand.ts`. Plans show "Contact us" until a price is set. Before launch: pick the final name (the working name "DocSign" is close to an existing trademark), set the domain, and replace the legal outlines with lawyer-approved text.
+
 ## Running locally
 
 Requirements: Node 20+ and Docker Desktop.
