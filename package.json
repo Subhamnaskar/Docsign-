@@ -12,7 +12,9 @@
     "db:migrate": "npm run db:migrate -w @docsign/api",
     "dev": "concurrently -k -n api,web -c blue,magenta \"npm run dev -w @docsign/api\" \"npm run dev -w @docsign/web\"",
     "typecheck": "npm run typecheck -w @docsign/api && npm run typecheck -w @docsign/web",
-    "build": "npm run build -w @docsign/api && npm run build -w @docsign/web"
+    "build": "npm run build -w @docsign/api && npm run build -w @docsign/web",
+    "test": "npm test -w @docsign/api",
+    "worker": "npm run worker -w @docsign/api"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

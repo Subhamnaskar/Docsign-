@@ -27,5 +27,11 @@ export const config = {
   tsaUrl: process.env.TSA_URL ?? '',
   keysDir: env('KEYS_DIR', '.keys'),
   appSecret: env('APP_SECRET', 'change-me-to-a-long-random-string-at-least-32-chars'),
+  /** 'inline' runs background jobs inside the API process; 'off' expects `npm run worker`. */
+  workerMode: env('WORKER_MODE', 'inline') as 'inline' | 'off',
+  clamav: {
+    host: process.env.CLAMAV_HOST ?? '',
+    port: Number(env('CLAMAV_PORT', '3310')),
+  },
   isProduction: process.env.NODE_ENV === 'production',
 };

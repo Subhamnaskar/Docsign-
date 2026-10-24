@@ -6,6 +6,7 @@ import { renderCompletedPdf } from '../documents/render.js';
 import { signingUrl } from '../lib/auth.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { conflict, notFound, unprocessable } from '../lib/errors.js';
+import { formatDateFor, t } from '../i18n/messages.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { getObject, putObject } from '../lib/storage.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
@@ -90,19 +91,21 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
 export async function notifySigners(env: Envelope, recipients: Recipient[], kind: 'invite' | 'reminder') {
   const sender = await prisma.user.findUnique({ where: { id: env.createdById } });
   for (const r of recipients) {
+    const vars = { title: env.title, sender: sender?.name ?? 'DocSign', name: r.name };
     const { html, text } = layout({
-      heading: kind === 'invite' ? `${sender?.name ?? 'Someone'} sent you a document to sign` : `Reminder: please sign "${env.title}"`,
+      locale: r.locale,
+      heading: t(r.locale, kind === 'invite' ? 'inviteHeading' : 'reminderHeading', vars),
       paragraphs: [
-        `Hello ${r.name},`,
-        `"${env.title}" is waiting for your signature.`,
-        ...(env.message ? [`Message from ${sender?.name ?? 'the sender'}: ${env.message}`] : []),
-        ...(env.expiresAt ? [`This request expires on ${env.expiresAt.toISOString().slice(0, 10)}.`] : []),
+        t(r.locale, 'hello', vars),
+        t(r.locale, 'waiting', vars),
+        ...(env.message ? [t(r.locale, 'senderMessage', { ...vars, message: env.message })] : []),
+        ...(env.expiresAt ? [t(r.locale, 'expires', { date: formatDateFor(r.locale, env.expiresAt) })] : []),
       ],
-      button: { label: 'Review and sign', url: signingUrl(r.id) },
+      button: { label: t(r.locale, 'reviewAndSign'), url: signingUrl(r.id) },
     });
     await sendMail({
       to: r.email,
-      subject: kind === 'invite' ? `Please sign: ${env.title}` : `Reminder: ${env.title}`,
+      subject: t(r.locale, kind === 'invite' ? 'inviteSubject' : 'reminderSubject', vars),
       html,
       text,
     });
@@ -254,23 +257,29 @@ async function sendCompletionEmails(envelopeId: string) {
   const attach = total + cert.length < 15 * 1024 * 1024;
 
   const to = [
-    ...env.recipients.map((r) => ({ name: r.name, email: r.email })),
-    { name: env.createdBy.name, email: env.createdBy.email },
+    ...env.recipients.map((r) => ({ name: r.name, email: r.email, locale: r.locale })),
+    { name: env.createdBy.name, email: env.createdBy.email, locale: 'en' },
   ].filter((v, i, a) => a.findIndex((x) => x.email.toLowerCase() === v.email.toLowerCase()) === i);
 
   for (const person of to) {
+    const vars = { title: env.title, name: person.name };
     const { html, text } = layout({
-      heading: `Completed: ${env.title}`,
+      locale: person.locale,
+      heading: t(person.locale, 'completedSubject', vars),
       paragraphs: [
-        `Hello ${person.name},`,
-        `All parties have signed "${env.title}".`,
-        attach
-          ? 'The signed documents and the certificate of completion are attached. Keep them for your records.'
-          : 'The signed documents are too large to attach. The sender can share them from DocSign.',
+        t(person.locale, 'hello', vars),
+        t(person.locale, 'completedBody', vars),
+        t(person.locale, attach ? 'completedAttached' : 'completedTooLarge'),
       ],
       footer: `Envelope ID: ${env.id}`,
     });
-    await sendMail({ to: person.email, subject: `Completed: ${env.title}`, html, text, attachments: attach ? attachments : undefined });
+    await sendMail({
+      to: person.email,
+      subject: t(person.locale, 'completedSubject', vars),
+      html,
+      text,
+      attachments: attach ? attachments : undefined,
+    });
   }
 }
 
@@ -284,11 +293,13 @@ export async function voidEnvelope(orgId: string, id: string, reason: string, ac
   });
   const notified = env.recipients.filter((r) => r.status !== 'CREATED');
   for (const r of notified) {
+    const vars = { title: env.title, name: r.name, reason };
     const { html, text } = layout({
-      heading: `Voided: ${env.title}`,
-      paragraphs: [`Hello ${r.name},`, `The sender has voided "${env.title}". No further action is needed.`, `Reason: ${reason}`],
+      locale: r.locale,
+      heading: t(r.locale, 'voidedSubject', vars),
+      paragraphs: [t(r.locale, 'hello', vars), t(r.locale, 'voidedBody', vars), t(r.locale, 'reason', vars)],
     });
-    await sendMail({ to: r.email, subject: `Voided: ${env.title}`, html, text }).catch(() => {});
+    await sendMail({ to: r.email, subject: t(r.locale, 'voidedSubject', vars), html, text }).catch(() => {});
   }
   return getEnvelope(orgId, id);
 }

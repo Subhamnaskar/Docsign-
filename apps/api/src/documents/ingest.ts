@@ -2,6 +2,7 @@ import { PDFDocument } from 'pdf-lib';
 import { convertToPdf } from '../lib/convert.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { badRequest } from '../lib/errors.js';
+import { assertClean } from '../lib/malware.js';
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_PAGES = 200;
@@ -15,6 +16,7 @@ export interface IngestedDocument {
 
 /** Normalises an upload into a PDF, fingerprints it and records page geometry. */
 export async function ingestDocument(filename: string, data: Buffer): Promise<IngestedDocument> {
+  await assertClean(filename, data);
   const isPdf = data.subarray(0, 5).toString('latin1') === '%PDF-';
   const pdf = isPdf ? data : await convertToPdf(filename, data);
 

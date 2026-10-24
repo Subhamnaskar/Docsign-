@@ -23,6 +23,7 @@ model Organization {
   envelopes    Envelope[]
   apiKeys      ApiKey[]
   webhooks     WebhookEndpoint[]
+  templates    Template[]
 }
 
 enum UserRole {
@@ -159,6 +160,8 @@ model Recipient {
   email              String
   role               RecipientRole   @default(SIGNER)
   routingOrder       Int             @default(1)
+  // Language for emails and the signing page (BCP 47 code, e.g. "hi", "es")
+  locale             String          @default("en")
   status             RecipientStatus @default(CREATED)
   // One-time passcode for signer authentication (hashed)
   otpHash            String?
@@ -275,4 +278,74 @@ model WebhookDelivery {
   createdAt     DateTime        @default(now())
 
   @@index([status, nextAttemptAt])
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+// A reusable envelope: documents, placeholder roles and field layout.
+// Recipients are bound to roles when an envelope is created from it.
+model Template {
+  id           String             @id @default(cuid())
+  orgId        String
+  org          Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdById  String
+  name         String
+  description  String?
+  title        String
+  message      String?
+  jurisdiction String
+  documentType String             @default("general")
+  routing      RoutingMode        @default(SEQUENTIAL)
+  reminderDays Int                @default(2)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  documents    TemplateDocument[]
+  roles        TemplateRole[]
+  fields       TemplateField[]
+
+  @@index([orgId])
+}
+
+model TemplateDocument {
+  id         String          @id @default(cuid())
+  templateId String
+  template   Template        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name       String
+  order      Int             @default(0)
+  storageKey String
+  sha256     String
+  pageCount  Int
+  pages      Json
+  fields     TemplateField[]
+}
+
+model TemplateRole {
+  id           String          @id @default(cuid())
+  templateId   String
+  template     Template        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  // e.g. "Employee", "Manager"
+  name         String
+  role         RecipientRole   @default(SIGNER)
+  routingOrder Int             @default(1)
+  fields       TemplateField[]
+}
+
+model TemplateField {
+  id         String           @id @default(cuid())
+  templateId String
+  template   Template         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  documentId String
+  document   TemplateDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       TemplateRole     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  type       FieldType
+  page       Int
+  x          Float
+  y          Float
+  width      Float
+  height     Float
+  required   Boolean          @default(true)
+  label      String?
 }

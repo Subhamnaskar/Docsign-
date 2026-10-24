@@ -8,6 +8,7 @@ import { clientInfo, parseSigningToken } from '../lib/auth.js';
 import { numericCode, randomToken, safeEqualHex, sha256Hex } from '../lib/crypto.js';
 import { badRequest, conflict, forbidden, HttpError, notFound, unauthorized } from '../lib/errors.js';
 import { normalizeSignaturePng } from '../lib/image.js';
+import { t } from '../i18n/messages.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { getObject } from '../lib/storage.js';
 import { parse } from '../lib/validate.js';
@@ -111,7 +112,7 @@ export async function signingRoutes(app: FastifyInstance) {
         organization: env.org.name,
         expiresAt: env.expiresAt,
       },
-      recipient: { id: r.id, name: r.name, email: r.email, maskedEmail: maskEmail(r.email), status: r.status },
+      recipient: { id: r.id, name: r.name, email: r.email, maskedEmail: maskEmail(r.email), status: r.status, locale: r.locale },
       compliance: {
         jurisdiction: policy.jurisdictionName,
         laws: policy.laws,
@@ -162,14 +163,11 @@ export async function signingRoutes(app: FastifyInstance) {
         });
       });
       const { html, text } = layout({
-        heading: 'Your signing code',
-        paragraphs: [
-          `Use this code to verify your identity and open "${r.envelope.title}":`,
-          code,
-          'The code expires in 10 minutes. If you did not request it, ignore this email.',
-        ],
+        locale: r.locale,
+        heading: t(r.locale, 'otpHeading'),
+        paragraphs: [t(r.locale, 'otpIntro', { title: r.envelope.title }), code, t(r.locale, 'otpExpiry')],
       });
-      await sendMail({ to: r.email, subject: `${code} is your DocSign verification code`, html, text });
+      await sendMail({ to: r.email, subject: t(r.locale, 'otpSubject', { code }), html, text });
       return { sentTo: maskEmail(r.email), expiresInSeconds: OTP_TTL_MS / 1000 };
     },
   );

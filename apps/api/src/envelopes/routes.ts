@@ -9,6 +9,7 @@ import { getObject, putObject } from '../lib/storage.js';
 import { parse } from '../lib/validate.js';
 import { listDocumentTypes, listJurisdictions, resolvePolicy } from '../policy/engine.js';
 import { JURISDICTIONS, DOCUMENT_TYPES } from '../policy/jurisdictions.js';
+import { SUPPORTED_LOCALES } from '../i18n/messages.js';
 import {
   assertDraft,
   getEnvelope,
@@ -40,6 +41,7 @@ const recipientsInput = z
       email: z.string().trim().toLowerCase().email(),
       role: z.enum(['SIGNER', 'CC']).default('SIGNER'),
       routingOrder: z.number().int().min(1).max(50).default(1),
+      locale: z.enum(SUPPORTED_LOCALES as [string, ...string[]]).default('en'),
     }),
   )
   .max(50);
@@ -99,6 +101,7 @@ export function serializeEnvelope(env: FullEnvelope) {
       email: r.email,
       role: r.role,
       routingOrder: r.routingOrder,
+      locale: r.locale,
       status: r.status,
       viewedAt: r.viewedAt,
       verifiedAt: r.verifiedAt,
@@ -349,7 +352,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
       const keep = list.filter((r) => r.id && existingIds.has(r.id)).map((r) => r.id!);
       await tx.recipient.deleteMany({ where: { envelopeId: id, id: { notIn: keep } } });
       for (const r of list) {
-        const data = { name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder };
+        const data = { name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder, locale: r.locale };
         if (r.id && existingIds.has(r.id)) await tx.recipient.update({ where: { id: r.id }, data });
         else await tx.recipient.create({ data: { ...data, envelopeId: id } });
       }
@@ -450,7 +453,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
       const recMap = new Map<string, string>();
       for (const r of src.recipients) {
         const nr = await tx.recipient.create({
-          data: { envelopeId: env.id, name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder },
+          data: { envelopeId: env.id, name: r.name, email: r.email, role: r.role, routingOrder: r.routingOrder, locale: r.locale },
         });
         recMap.set(r.id, nr.id);
       }

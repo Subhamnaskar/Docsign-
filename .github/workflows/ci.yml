@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: docsign
+          POSTGRES_PASSWORD: docsign
+          POSTGRES_DB: docsign
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U docsign" --health-interval 5s --health-retries 10
+      objectstore:
+        image: rustfs/rustfs:latest
+        env:
+          RUSTFS_ACCESS_KEY: docsign
+          RUSTFS_SECRET_KEY: docsign-secret
+        ports: ["9000:9000"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: API tests
+        run: npm test -w @docsign/api
+        env:
+          TEST_DATABASE_URL: postgresql://docsign:docsign@localhost:5432/docsign_test?schema=public
+      - name: Build web app
+        run: npm run build -w @docsign/web

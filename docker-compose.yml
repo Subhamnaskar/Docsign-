@@ -45,6 +45,16 @@ services:
     ports:
       - "3100:3000"
 
+  # Malware scanning for uploads. Loads its signature database on start
+  # (1-2 minutes) and needs about 1.5 GB of RAM.
+  clamav:
+    image: clamav/clamav:stable
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamdb:/var/lib/clamav
+
 volumes:
+  clamdb:
   pgdata:
   objectdata:
