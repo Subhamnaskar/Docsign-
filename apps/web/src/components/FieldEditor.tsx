@@ -21,6 +21,7 @@ const DEFAULT_SIZE: Record<FieldType, [number, number]> = {
   NUMBER: [90, 20],
   FORMULA: [90, 20],
   ATTACHMENT: [160, 22],
+  PAYMENT: [150, 24],
 };
 const MIN_SIZE_PT = 12;
 
@@ -37,10 +38,13 @@ const PALETTE: { type: FieldType; icon: string }[] = [
   { type: 'NUMBER', icon: 'M7 4 5 16m8-12-2 12M4 8h12M3 12h12' },
   { type: 'FORMULA', icon: 'M5 15c2 0 2-10 5-10M5 9h6m2 2 4 4m0-4-4 4' },
   { type: 'ATTACHMENT', icon: 'M14 9l-5 5a2.5 2.5 0 0 1-3.5-3.5L11 5a1.7 1.7 0 0 1 2.4 2.4L8 12.8' },
+  { type: 'PAYMENT', icon: 'M3 6h14v9H3zM3 9h14M6 12h3' },
 ];
 
+const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'BRL', 'JPY'];
+
 /** Types whose label others can reference in formulas and conditions. */
-const NEEDS_LABEL: FieldType[] = ['TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT'];
+const NEEDS_LABEL: FieldType[] = ['TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT', 'PAYMENT'];
 
 function uniqueLabel(fields: Field[], base: string): string {
   const taken = new Set(fields.map((f) => f.label));
@@ -127,6 +131,8 @@ export function FieldEditor({
       options: placing === 'DROPDOWN' || placing === 'RADIO' ? ['Option 1', 'Option 2'] : [],
       formula: placing === 'FORMULA' ? '' : null,
       condition: null,
+      amount: placing === 'PAYMENT' ? 100_00 : null,
+      currency: placing === 'PAYMENT' ? 'INR' : null,
     };
     onChange([...fieldsRef.current, field]);
     setSelected(field.id);
@@ -248,6 +254,29 @@ export function FieldEditor({
                     value={(selectedField.options ?? []).join('\n')}
                     onChange={(e) => update(selectedField.id, { options: e.target.value.split('\n').map((o) => o.trimStart()).slice(0, 50) })}
                   />
+                </div>
+              )}
+              {selectedField.type === 'PAYMENT' && (
+                <div className="grid grid-cols-[1fr_90px] gap-2">
+                  <div>
+                    <Label htmlFor="field-amount">Amount</Label>
+                    <Input
+                      id="field-amount"
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      value={selectedField.amount ? selectedField.amount / 100 : ''}
+                      onChange={(e) => update(selectedField.id, { amount: Math.round(Number(e.target.value) * 100) || null })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="field-currency">Currency</Label>
+                    <Select id="field-currency" value={selectedField.currency ?? 'INR'} onChange={(e) => update(selectedField.id, { currency: e.target.value })}>
+                      {CURRENCIES.map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </Select>
+                  </div>
                 </div>
               )}
               {selectedField.type === 'FORMULA' && (

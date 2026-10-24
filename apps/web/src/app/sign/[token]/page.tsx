@@ -8,7 +8,7 @@ import { SignaturePad } from '@/components/SignaturePad';
 import { Alert, Button, Card, cx, Input, Logo, Modal, PageLoader, Textarea } from '@/components/ui';
 import { api, fileUrl, upload } from '@/lib/api';
 import { evaluateFormula } from '@/lib/formula';
-import { FIELD_LABELS } from '@/lib/format';
+import { FIELD_LABELS, formatMoney } from '@/lib/format';
 import { isRtl, LANGUAGES, signerT, type SignerKey, type Translate } from '@/lib/i18n';
 import type { Field, PageInfo } from '@/lib/types';
 
@@ -308,6 +308,19 @@ function SignDocument({
   const remaining = shown.filter((f) => f.required && !isDone(f));
   const approving = session.recipient.role === 'APPROVER';
 
+  const [paying, setPaying] = useState(false);
+  async function startPayment(f: Field) {
+    setPaying(true);
+    setError(null);
+    try {
+      const { url } = await api<{ url: string }>(`/signing/${token}/payments/${f.id}/checkout`, { method: 'POST' });
+      window.location.assign(url);
+    } catch (err) {
+      setError((err as Error).message);
+      setPaying(false);
+    }
+  }
+
   async function uploadAttachment(f: Field, file: File) {
     setUploading(f.id);
     setError(null);
@@ -557,6 +570,22 @@ function SignDocument({
                         </div>
                       );
                     }
+                    if (f.type === 'PAYMENT') {
+                      const isPaid = Boolean(values[f.id]);
+                      return (
+                        <button
+                          key={f.id}
+                          id={`field-${f.id}`}
+                          type="button"
+                          style={style}
+                          disabled={isPaid || paying}
+                          onClick={() => startPayment(f)}
+                          className={cx(boxClass, 'flex items-center justify-center truncate px-1 font-semibold', isPaid ? 'text-green-700' : 'text-amber-900')}
+                        >
+                          {isPaid ? `✓ ${tr('paid')}` : tr('pay', { amount: formatMoney(f.amount ?? 0, f.currency ?? 'INR') })}
+                        </button>
+                      );
+                    }
                     if (f.type === 'ATTACHMENT') {
                       return (
                         <label key={f.id} id={`field-${f.id}`} style={style} className={cx(boxClass, 'flex cursor-pointer items-center justify-center truncate px-1 font-medium')}>
@@ -719,7 +748,28 @@ export default function SignPage() {
   const { token } = useParams<{ token: string }>();
   const [session, setSession] = useState<SigningSession | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [consented, setConsented] = useState(false);
+  const [consented, setConsentedState] = useState(false);
+  // Remember consent for this tab so a payment round trip doesn't ask again
+  const consentKey = `ds_consent_${token}`;
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(consentKey) === '1') setConsentedState(true);
+    } catch {
+      // storage unavailable: consent is asked again, which is safe
+    }
+  }, [consentKey]);
+  const setConsented = (v: boolean) => {
+    setConsentedState(v);
+    try {
+      if (v) sessionStorage.setItem(consentKey, '1');
+    } catch {
+      // ignore
+    }
+  };
+  const [paymentCancelled, setPaymentCancelled] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('payment') === 'cancelled') setPaymentCancelled(true);
+  }, []);
   const [locale, setLocale] = useState<string | null>(null);
   const [reassignedTo, setReassignedTo] = useState<string | null>(null);
   const [esignError, setEsignError] = useState<string | null>(null);
@@ -799,6 +849,11 @@ export default function SignPage() {
 
   return (
     <Shell {...shell} title={session.envelope.title}>
+      {paymentCancelled && (
+        <div className="mx-auto mb-4 max-w-3xl">
+          <Alert tone="warning">{tr('paymentCancelled')}</Alert>
+        </div>
+      )}
       {esignError && (
         <div className="mx-auto mb-4 max-w-3xl">
           <Alert>{tr('esignFailed', { reason: esignError })}</Alert>

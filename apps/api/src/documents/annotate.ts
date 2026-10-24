@@ -12,7 +12,7 @@ import { boxToPdf, fitText, winAnsiSafe } from './render.js';
 export async function addFieldAnnotations(
   doc: PDFDocument,
   fields: Field[],
-  opts: { signedAt: Date; attachmentNames?: Map<string, string> },
+  opts: { signedAt: Date; attachmentNames?: Map<string, string>; paymentLabels?: Map<string, string> },
 ): Promise<void> {
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const pages = doc.getPages();
@@ -38,7 +38,12 @@ export async function addFieldAnnotations(
       resources.XObject = { Im1: img.ref };
       ops = `q ${(img.width * scale).toFixed(2)} 0 0 ${(img.height * scale).toFixed(2)} 0 ${((h - img.height * scale) / 2).toFixed(2)} cm /Im1 Do Q`;
     } else {
-      const shown = f.type === 'ATTACHMENT' ? `Attached: ${opts.attachmentNames?.get(value) ?? 'file'}` : value;
+      const shown =
+        f.type === 'ATTACHMENT'
+          ? `Attached: ${opts.attachmentNames?.get(value) ?? 'file'}`
+          : f.type === 'PAYMENT'
+            ? (opts.paymentLabels?.get(value) ?? 'Paid')
+            : value;
       const text = winAnsiSafe(shown);
       const size = fitText(font, text, w, h);
       resources.Font = { F1: font.ref };

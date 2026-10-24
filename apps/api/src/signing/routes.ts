@@ -232,6 +232,8 @@ export async function signingRoutes(app: FastifyInstance) {
         options: f.options,
         formula: f.formula,
         condition: f.condition,
+        amount: f.amount,
+        currency: f.currency,
         value: f.value,
       })),
       // Values from earlier signers that this signer's conditions/formulas may refer to

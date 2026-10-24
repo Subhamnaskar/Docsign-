@@ -59,6 +59,12 @@ export const config = {
     /** Directory of trusted root/intermediate PEMs for DSC certificates (e.g. CCA India). Empty = chain not checked. */
     dscTrustDir: process.env.DSC_TRUST_DIR ?? '',
   },
+  payments: {
+    /** sandbox (built-in test checkout) | stripe | razorpay */
+    provider: env('PAYMENT_PROVIDER', 'sandbox') as 'sandbox' | 'stripe' | 'razorpay',
+    stripe: { secretKey: process.env.STRIPE_SECRET_KEY ?? '', webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '' },
+    razorpay: { keyId: process.env.RAZORPAY_KEY_ID ?? '', keySecret: process.env.RAZORPAY_KEY_SECRET ?? '' },
+  },
   ai: {
     /**
      * AI features call the Claude API. Enabled when ANTHROPIC_API_KEY is set (or

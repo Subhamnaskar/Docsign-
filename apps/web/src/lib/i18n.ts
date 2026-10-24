@@ -99,6 +99,9 @@ const en = {
   dscNoUtility: 'We could not reach a DSC signing utility on this computer. Start it and try again.',
   dscSigning: 'Waiting for your DSC token…',
   summarize: 'Summarise this document',
+  pay: 'Pay {amount}',
+  paid: 'Paid',
+  paymentCancelled: 'The payment was not completed. You can try again.',
 };
 
 export type SignerKey = keyof typeof en;

@@ -12,7 +12,8 @@ export type FieldType =
   | 'RADIO'
   | 'NUMBER'
   | 'FORMULA'
-  | 'ATTACHMENT';
+  | 'ATTACHMENT'
+  | 'PAYMENT';
 
 export interface FieldCondition {
   fieldLabel: string;
@@ -74,6 +75,9 @@ export interface Field {
   options?: string[];
   formula?: string | null;
   condition?: FieldCondition | null;
+  /** PAYMENT: minor units (paise, cents) */
+  amount?: number | null;
+  currency?: string | null;
   filled?: boolean;
   value?: string | null;
 }

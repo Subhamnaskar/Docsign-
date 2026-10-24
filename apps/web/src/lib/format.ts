@@ -32,7 +32,10 @@ export const FIELD_LABELS: Record<string, string> = {
   NUMBER: 'Number',
   FORMULA: 'Formula',
   ATTACHMENT: 'Attachment',
+  PAYMENT: 'Payment',
 };
+
+export const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(minor / 100);
 
 export const AUDIT_LABELS: Record<string, string> = {
   'envelope.created': 'Envelope created',
@@ -50,6 +53,9 @@ export const AUDIT_LABELS: Record<string, string> = {
   'recipient.approved': 'Approved',
   'recipient.corrected': 'Recipient corrected',
   'recipient.reassigned': 'Reassigned by signer',
+  'payment.completed': 'Payment received',
+  'document.stamped': 'e-Stamp attached',
+  'recipient.esign_failed': 'Aadhaar eSign / DSC attempt failed',
   'recipient.declined': 'Declined to sign',
   'document.sealed': 'Document sealed',
   'envelope.completed': 'Envelope completed',

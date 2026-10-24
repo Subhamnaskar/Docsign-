@@ -12,6 +12,7 @@ import { envelopeRoutes } from './envelopes/routes.js';
 import { integrationRoutes } from './integrations/routes.js';
 import { HttpError } from './lib/errors.js';
 import { mcpRoutes } from './mcp/routes.js';
+import { paymentRoutes } from './payments/routes.js';
 import { reportRoutes } from './reports/routes.js';
 import { signingRoutes } from './signing/routes.js';
 import { scimRoutes } from './sso/scim.js';
@@ -71,6 +72,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(integrationRoutes);
       await v1.register(aiRoutes);
       await v1.register(mcpRoutes);
+      await v1.register(paymentRoutes);
       await v1.register(envelopeManageRoutes);
       await v1.register(teamRoutes);
       await v1.register(organizationRoutes);

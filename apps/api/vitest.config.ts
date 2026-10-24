@@ -24,6 +24,9 @@ export default defineConfig({
       CLAMAV_HOST: process.env.CLAMAV_HOST ?? '',
       // AI tests use a fake client (setAiClientForTests); no requests leave the machine
       AI_ENABLED: 'true',
+      // Payment signature checks are exercised with known test secrets
+      STRIPE_WEBHOOK_SECRET: 'whsec_test_secret',
+      RAZORPAY_KEY_SECRET: 'rzp_test_secret',
       ANTHROPIC_API_KEY: '',
     },
   },

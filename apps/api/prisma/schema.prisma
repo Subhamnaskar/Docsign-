@@ -310,6 +310,8 @@ enum FieldType {
   FORMULA
   // Signer uploads a supporting file
   ATTACHMENT
+  // Signer pays an amount before finishing
+  PAYMENT
 }
 
 model Field {
@@ -334,6 +336,9 @@ model Field {
   options     String[]  @default([])
   // Expression for FORMULA fields, referencing NUMBER fields by label: "{Qty} * {Price}"
   formula     String?
+  // PAYMENT fields: amount in minor units (paise, cents) and ISO currency
+  amount      Int?
+  currency    String?
   // Show this field only when another field has a value: { "fieldLabel": "Has guarantor", "equals": "true" }
   condition   Json?
   // Filled in by the signer. Signatures/initials are PNG data URLs.
@@ -476,6 +481,9 @@ model TemplateField {
   label      String?
   options    String[]         @default([])
   formula    String?
+  // PAYMENT fields: amount in minor units (paise, cents) and ISO currency
+  amount     Int?
+  currency   String?
   condition  Json?
 }
 
@@ -555,4 +563,31 @@ model AiResult {
   createdAt  DateTime @default(now())
 
   @@index([envelopeId])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+// A signer's payment for a PAYMENT field
+model Payment {
+  id          String        @id @default(cuid())
+  envelopeId  String
+  recipientId String
+  fieldId     String
+  provider    String
+  // Checkout session / payment link id at the provider
+  providerRef String?
+  amount      Int
+  currency    String
+  status      PaymentStatus @default(PENDING)
+  paidAt      DateTime?
+  // Provider's payment id once paid
+  receipt     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([recipientId])
+  @@index([providerRef])
 }

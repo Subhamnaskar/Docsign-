@@ -12,6 +12,7 @@ import { layout, sendMail } from '../lib/mailer.js';
 import { getObject, putObject } from '../lib/storage.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
 import { isIncremental, prepareForSend } from '../esign/service.js';
+import { formatAmount } from '../payments/providers.js';
 import { sealPdf, sealPdfIncremental } from '../trust/pades.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 
@@ -185,6 +186,12 @@ export async function advanceEnvelope(envelopeId: string) {
 
 const STALE_CLAIM_MS = 5 * 60 * 1000;
 
+/** "Paid ₹500.00 · receipt pay_123" for each confirmed payment of the envelope. */
+export async function paidLabels(envelopeId: string): Promise<Map<string, string>> {
+  const payments = await prisma.payment.findMany({ where: { envelopeId, status: 'PAID' } });
+  return new Map(payments.map((p) => [p.id, `Paid ${formatAmount(p.amount, p.currency)} · ${p.receipt ?? p.id}`]));
+}
+
 /**
  * Burns field values into each document, applies the PAdES platform seal,
  * stores results write-once and issues the certificate of completion.
@@ -213,6 +220,7 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
     where: { envelopeId: env.id, id: { in: env.fields.filter((f) => f.type === 'ATTACHMENT' && f.value).map((f) => f.value!) } },
   });
   const attachmentNames = new Map(attachments.map((a) => [a.id, a.name]));
+  const paymentLabels = await paidLabels(env.id);
   const byRecipient = new Map(env.recipients.map((r) => [r.id, r.name]));
 
   const incremental = isIncremental(env.recipients);
@@ -251,7 +259,7 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
     const rendered = await renderCompletedPdf(
       original,
       env.fields.filter((f) => f.documentId === doc.id),
-      { envelopeId: env.id, signedAt, attachmentNames, embed },
+      { envelopeId: env.id, signedAt, attachmentNames, paymentLabels, embed },
     );
     const sealed = await sealPdf(Buffer.from(rendered), { reason });
     sealFormat = sealed.format;

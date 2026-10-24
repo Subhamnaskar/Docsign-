@@ -15,6 +15,7 @@ import { sha256Hex } from '../lib/crypto.js';
 import { badRequest, conflict, HttpError, notFound } from '../lib/errors.js';
 import { getObject, putObject } from '../lib/storage.js';
 import { addSignatureField, embedCms, incrementalUpdate, prepareByteRange, type PreparedSignature } from '../trust/incremental.js';
+import { paidLabels } from '../envelopes/service.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 
 export type CryptoMethod = 'AADHAAR_ESIGN' | 'DSC';
@@ -102,10 +103,13 @@ export async function applyElectronicIncrement(envelopeId: string, recipientId: 
   const docs = await prisma.document.findMany({ where: { envelopeId } });
   const fields = await prisma.field.findMany({ where: { recipientId } });
   const attachmentNames = new Map<string, string>();
+  const paymentLabels = await paidLabels(envelopeId);
   for (const d of docs) {
     const mine = fields.filter((f) => f.documentId === d.id && f.value);
     if (mine.length === 0 || !d.workingKey) continue;
-    const next = await incrementalUpdate(await getObject(d.workingKey), (doc) => addFieldAnnotations(doc, mine, { signedAt: r.signedAt ?? new Date(), attachmentNames }));
+    const next = await incrementalUpdate(await getObject(d.workingKey), (doc) =>
+      addFieldAnnotations(doc, mine, { signedAt: r.signedAt ?? new Date(), attachmentNames, paymentLabels }),
+    );
     const key = `envelopes/${envelopeId}/working/${d.id}-${Date.now()}.pdf`;
     await putObject(key, next, 'application/pdf');
     await prisma.document.update({ where: { id: d.id }, data: { workingKey: key } });
@@ -145,7 +149,7 @@ export async function createSigningTransaction(r: Recipient, method: CryptoMetho
       await addFieldAnnotations(
         doc,
         mine.filter((f) => f.value && f.type !== 'SIGNATURE' && f.type !== 'INITIALS'),
-        { signedAt },
+        { signedAt, paymentLabels: await paidLabels(r.envelopeId) },
       );
       await addSignatureField(doc, {
         fieldName: `${r.name} (${r.id.slice(-6)})`,

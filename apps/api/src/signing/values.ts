@@ -93,6 +93,11 @@ export function resolveFieldValues(
         value = result === null ? null : String(result);
         break;
       }
+      case 'PAYMENT':
+        // Set only by a confirmed payment; whatever the client sends is ignored
+        value = f.value;
+        if (f.required && !value) throw badRequest(`Complete the payment (${describe(f)}).`);
+        break;
       case 'ATTACHMENT':
         if (value && !attachments.some((a) => a.id === value && a.fieldId === f.id)) throw badRequest(`Upload the file again for ${describe(f)}.`);
         break;

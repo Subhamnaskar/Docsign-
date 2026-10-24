@@ -88,6 +88,8 @@ export async function createTemplateFromEnvelope(
           options: f.options,
           formula: f.formula,
           condition: f.condition ?? undefined,
+          amount: f.amount,
+          currency: f.currency,
         })),
       });
       return t;
@@ -185,6 +187,8 @@ export async function createEnvelopeFromTemplate(
           options: f.options,
           formula: f.formula,
           condition: f.condition ?? undefined,
+          amount: f.amount,
+          currency: f.currency,
         })),
       });
       await appendAudit(tx, {

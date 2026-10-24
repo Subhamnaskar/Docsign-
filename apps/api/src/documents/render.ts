@@ -48,6 +48,8 @@ export interface RenderOptions {
   signedAt: Map<string, Date>;
   /** attachment id → display name, for ATTACHMENT fields */
   attachmentNames?: Map<string, string>;
+  /** payment id → display text, for PAYMENT fields */
+  paymentLabels?: Map<string, string>;
   /** Files embedded in the PDF before sealing, so the seal covers them too */
   embed?: { name: string; data: Buffer; mimeType: string; description: string }[];
 }
@@ -89,7 +91,12 @@ export async function renderCompletedPdf(
         page.drawText('X', { x: box.x + size * 0.2, y: box.y + size * 0.15, size, font, color: INK, rotate });
       }
     } else {
-      const shown = f.type === 'ATTACHMENT' ? `Attached: ${opts.attachmentNames?.get(value) ?? 'file'}` : value;
+      const shown =
+        f.type === 'ATTACHMENT'
+          ? `Attached: ${opts.attachmentNames?.get(value) ?? 'file'}`
+          : f.type === 'PAYMENT'
+            ? (opts.paymentLabels?.get(value) ?? 'Paid')
+            : value;
       const text = winAnsiSafe(shown);
       const size = fitText(font, text, box.w, box.h);
       page.drawText(text, { x: box.x + 2, y: box.y + (box.h - size) / 2 + size * 0.2, size, font, color: INK, rotate });

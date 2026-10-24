@@ -627,7 +627,7 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/fields`, {
             method: 'PUT',
-            json: fields.map(({ documentId, recipientId, type, page, x, y, width, height, required, label, options, formula, condition }) => ({
+            json: fields.map(({ documentId, recipientId, type, page, x, y, width, height, required, label, options, formula, condition, amount, currency }) => ({
               documentId,
               recipientId,
               type,
@@ -641,6 +641,8 @@ function Builder() {
               options: (options ?? []).map((o) => o.trim()).filter(Boolean),
               formula,
               condition,
+              amount,
+              currency,
             })),
           }),
         );

@@ -81,7 +81,7 @@ const fieldsInput = z
     z.object({
       documentId: z.string(),
       recipientId: z.string(),
-      type: z.enum(['SIGNATURE', 'INITIALS', 'DATE_SIGNED', 'NAME', 'EMAIL', 'TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT']),
+      type: z.enum(['SIGNATURE', 'INITIALS', 'DATE_SIGNED', 'NAME', 'EMAIL', 'TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT', 'PAYMENT']),
       page: z.number().int().min(0),
       x: fraction,
       y: fraction,
@@ -92,6 +92,8 @@ const fieldsInput = z
       options: z.array(z.string().trim().min(1).max(100)).max(50).default([]),
       formula: z.string().max(300).nullish(),
       condition: z.object({ fieldLabel: z.string().min(1).max(100), equals: z.string().max(100) }).nullish(),
+      amount: z.number().int().min(1).max(100_000_000).nullish(),
+      currency: z.string().regex(/^[A-Z]{3}$/, 'Use an ISO currency code like INR').nullish(),
     }),
   )
   .max(500);
@@ -166,6 +168,8 @@ export function serializeEnvelope(env: FullEnvelope) {
       options: f.options,
       formula: f.formula,
       condition: f.condition,
+      amount: f.amount,
+      currency: f.currency,
       filled: f.value !== null,
     })),
   };
@@ -448,6 +452,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
           throw badRequest(`Formula "${f.formula}": ${(err as Error).message}`);
         }
       }
+      if (f.type === 'PAYMENT' && (!f.amount || !f.currency)) throw badRequest('Payment fields need an amount and a currency.');
       if (f.condition && !list.some((g) => g.label === f.condition!.fieldLabel)) {
         throw badRequest(`Condition refers to a field labelled "${f.condition.fieldLabel}" that doesn't exist.`);
       }
@@ -462,6 +467,8 @@ export async function envelopeRoutes(app: FastifyInstance) {
           label: f.label ?? null,
           formula: f.type === 'FORMULA' ? f.formula! : null,
           condition: f.condition ?? undefined,
+          amount: f.type === 'PAYMENT' ? f.amount! : null,
+          currency: f.type === 'PAYMENT' ? f.currency! : null,
           envelopeId: id,
         })),
       }),
@@ -560,6 +567,8 @@ export async function envelopeRoutes(app: FastifyInstance) {
           options: f.options,
           formula: f.formula,
           condition: f.condition ?? undefined,
+          amount: f.amount,
+          currency: f.currency,
         })),
       });
       await appendAudit(tx, {
