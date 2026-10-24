@@ -6,7 +6,8 @@ import { prisma } from '../db.js';
 import { logActivity } from '../lib/activity.js';
 import { createSession, requireAuth, requireRole, SESSION_COOKIE } from '../lib/auth.js';
 import { sha256Hex } from '../lib/crypto.js';
-import { conflict, unauthorized } from '../lib/errors.js';
+import { conflict, forbidden, unauthorized } from '../lib/errors.js';
+import { ssoOrgForEmail } from '../sso/routes.js';
 import { parse } from '../lib/validate.js';
 import { JURISDICTIONS } from '../policy/jurisdictions.js';
 
@@ -31,6 +32,9 @@ export async function authRoutes(app: FastifyInstance) {
     if (await prisma.user.findUnique({ where: { email: body.email } })) {
       throw conflict('An account with this email already exists.');
     }
+    if (await ssoOrgForEmail(body.email)) {
+      throw conflict('Your company signs in with single sign-on. Use "Sign in with SSO" instead.');
+    }
     const user = await prisma.user.create({
       data: {
         name: body.name,
@@ -52,6 +56,12 @@ export async function authRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUnique({ where: { email: body.email } });
     const ok = await bcrypt.compare(body.password, user?.passwordHash ?? DUMMY_HASH);
     if (!user || !ok) throw unauthorized('Incorrect email or password.');
+    const sso = await ssoOrgForEmail(body.email);
+    // Owners keep password access so a broken identity provider can't lock everyone out
+    if (sso?.ssoEnforced && sso.id === user.orgId && user.role !== 'OWNER') {
+      throw forbidden('Your organisation requires single sign-on. Use "Sign in with SSO".');
+    }
+    if (user.disabledAt) throw unauthorized('This account has been deactivated.');
     await createSession(reply, user.id);
     return { id: user.id, name: user.name, email: user.email };
   });

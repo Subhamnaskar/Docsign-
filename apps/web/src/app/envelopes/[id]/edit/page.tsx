@@ -68,7 +68,24 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
   const [uploading, setUploading] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [link, setLink] = useState('');
+  const [importing, setImporting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  async function importLink(e: React.FormEvent) {
+    e.preventDefault();
+    setImporting(true);
+    setError(null);
+    try {
+      await api(`/envelopes/${env.id}/documents/import`, { method: 'POST', json: { url: link.trim() } });
+      setLink('');
+      onEnvelope(await api<Envelope>(`/envelopes/${env.id}`));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function patch(data: Partial<Envelope>) {
     try {
@@ -139,6 +156,18 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
               onChange={(e) => e.target.files && addFiles(e.target.files)}
             />
           </div>
+          <form onSubmit={importLink} className="mt-3 flex gap-2">
+            <Input
+              type="url"
+              placeholder="Or paste a Google Drive, Dropbox or OneDrive share link"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              aria-label="Import from a link"
+            />
+            <Button type="submit" variant="secondary" loading={importing} disabled={!link.trim()}>
+              Import
+            </Button>
+          </form>
           <ul className="mt-4 space-y-2">
             {env.documents.map((d) => (
               <li key={d.id} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5">

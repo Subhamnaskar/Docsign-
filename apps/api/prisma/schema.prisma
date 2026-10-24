@@ -12,27 +12,38 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Organization {
-  id           String            @id @default(cuid())
-  name         String
+  id                 String            @id @default(cuid())
+  name               String
   // Default jurisdiction applied to new envelopes (US, UK, EU, IN ...)
-  jurisdiction String            @default("US")
+  jurisdiction       String            @default("US")
   // Regional cell that owns this tenant's data
-  dataRegion   String
+  dataRegion         String
   // Branding on emails and the signing page
-  brandColor   String?
-  logoKey      String?
+  brandColor         String?
+  logoKey            String?
   // Origins allowed to frame embedded signing (e.g. https://app.example.com)
-  embedOrigins String[]          @default([])
-  createdAt    DateTime          @default(now())
-  users        User[]
-  envelopes    Envelope[]
-  apiKeys      ApiKey[]
-  webhooks     WebhookEndpoint[]
-  templates    Template[]
-  invitations  Invitation[]
-  folders      Folder[]
-  activity     ActivityLog[]
-  forms        SigningForm[]
+  embedOrigins       String[]          @default([])
+  // Single sign-on (OpenID Connect)
+  ssoIssuer          String?
+  ssoClientId        String?
+  ssoClientSecretEnc String?
+  // Email domains that sign in through this organisation's identity provider
+  ssoDomains         String[]          @default([])
+  // Password sign-in is turned off for these domains (owners keep a fallback)
+  ssoEnforced        Boolean           @default(false)
+  ssoDefaultRole     UserRole          @default(MEMBER)
+  // SCIM provisioning bearer token (hashed)
+  scimTokenHash      String?           @unique
+  createdAt          DateTime          @default(now())
+  users              User[]
+  envelopes          Envelope[]
+  apiKeys            ApiKey[]
+  webhooks           WebhookEndpoint[]
+  templates          Template[]
+  invitations        Invitation[]
+  folders            Folder[]
+  activity           ActivityLog[]
+  forms              SigningForm[]
 }
 
 enum UserRole {
@@ -53,6 +64,9 @@ model User {
   envelopes    Envelope[]
   // Deactivated users can't sign in; their envelopes stay with the organisation
   disabledAt   DateTime?
+  // Identity-provider subject and SCIM externalId, when provisioned that way
+  ssoSubject   String?
+  externalId   String?
   createdAt    DateTime     @default(now())
 }
 

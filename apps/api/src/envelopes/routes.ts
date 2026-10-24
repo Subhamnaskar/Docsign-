@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { appendAudit, verifyChain } from '../audit/audit.js';
 import { prisma } from '../db.js';
-import { ingestDocument, MAX_UPLOAD_BYTES } from '../documents/ingest.js';
+import { MAX_UPLOAD_BYTES } from '../documents/ingest.js';
 import { clientInfo, requireAuth } from '../lib/auth.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { getObject, putObject } from '../lib/storage.js';
@@ -10,6 +10,7 @@ import { sha256Hex } from '../lib/crypto.js';
 import { Prisma } from '@prisma/client';
 import { INDIAN_STATES } from '../estamp/provider.js';
 import { formulaRefs } from '../lib/formula.js';
+import { addDocument } from './documents.js';
 import { E164 } from '../messaging/providers.js';
 import { config } from '../config.js';
 import { parse } from '../lib/validate.js';
@@ -321,33 +322,8 @@ export async function envelopeRoutes(app: FastifyInstance) {
     if (!file) throw badRequest('Attach a file in the "file" field.');
     const data = await file.toBuffer();
     if (file.file.truncated) throw badRequest('The file is larger than 25 MB.');
-    const ingested = await ingestDocument(file.filename, data);
-    const name = file.filename.replace(/\.[^.]+$/, '') + '.pdf';
-    const doc = await prisma.$transaction(async (tx) => {
-      const created = await tx.document.create({
-        data: {
-          envelopeId: id,
-          name,
-          order: env.documents.length,
-          storageKey: '',
-          sha256: ingested.sha256,
-          pageCount: ingested.pageCount,
-          pages: ingested.pages,
-        },
-      });
-      const storageKey = `envelopes/${id}/original/${created.id}.pdf`;
-      await putObject(storageKey, ingested.pdf, 'application/pdf');
-      await appendAudit(tx, {
-        envelopeId: id,
-        type: 'document.added',
-        actor: req.auth.actor,
-        data: { documentId: created.id, name, sha256: ingested.sha256, pages: ingested.pageCount },
-        ...clientInfo(req),
-      });
-      return tx.document.update({ where: { id: created.id }, data: { storageKey } });
-    }, { timeout: 30_000 });
     reply.code(201);
-    return { id: doc.id, name: doc.name, sha256: doc.sha256, pageCount: doc.pageCount, pages: doc.pages };
+    return addDocument(env, file.filename, data, req.auth.actor, clientInfo(req));
   });
 
   app.delete('/envelopes/:id/documents/:docId', async (req, reply) => {

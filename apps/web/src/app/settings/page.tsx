@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShell, useMe } from '@/components/AppShell';
 import { ActivityLog } from '@/components/settings/Activity';
 import { BrandingSettings } from '@/components/settings/Branding';
+import { SsoSettings } from '@/components/settings/Sso';
 import { Team } from '@/components/settings/Team';
 import { Alert, Button, Card, cx, Input, Label, Select, Textarea } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -267,6 +268,7 @@ const TABS = [
   { id: 'organization', label: 'Organization', admin: true },
   { id: 'team', label: 'Team', admin: false },
   { id: 'branding', label: 'Branding', admin: true },
+  { id: 'sso', label: 'Single sign-on', admin: true },
   { id: 'developers', label: 'API & webhooks', admin: true },
   { id: 'activity', label: 'Activity', admin: true },
 ] as const;
@@ -297,6 +299,7 @@ function Settings() {
         {tab === 'organization' && <Organization />}
         {tab === 'team' && <Team />}
         {tab === 'branding' && <BrandingSettings />}
+        {tab === 'sso' && <SsoSettings />}
         {tab === 'developers' && (
           <>
             <ApiKeys />
