@@ -11,6 +11,7 @@ import { notFound } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { WEBHOOK_EVENTS } from '../webhooks/dispatcher.js';
 import { fetchExternalFile } from './fetch.js';
+import { assertFeature } from '../billing/plans.js';
 
 /** Example payloads for Zapier/Make field mapping (what each event's `data` looks like). */
 const SAMPLES: Record<string, Record<string, unknown>> = {
@@ -45,6 +46,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     r.addHook('preHandler', requireRole('OWNER', 'ADMIN'));
 
     r.post('/hooks', async (req, reply) => {
+      await assertFeature(req.auth.orgId, 'api');
       const body = parse(
         z.object({ target_url: z.string().url().refine((u) => u.startsWith('https://'), 'Use an https URL'), event: z.enum(WEBHOOK_EVENTS) }),
         req.body,

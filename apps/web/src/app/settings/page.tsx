@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell, useMe } from '@/components/AppShell';
 import { ActivityLog } from '@/components/settings/Activity';
+import { BillingSettings } from '@/components/settings/Billing';
 import { BrandingSettings } from '@/components/settings/Branding';
 import { SsoSettings } from '@/components/settings/Sso';
 import { Team } from '@/components/settings/Team';
@@ -276,6 +277,7 @@ function Webhooks() {
 const TABS = [
   { id: 'organization', label: 'Organization', admin: true },
   { id: 'team', label: 'Team', admin: false },
+  { id: 'billing', label: 'Billing', admin: true },
   { id: 'branding', label: 'Branding', admin: true },
   { id: 'sso', label: 'Single sign-on', admin: true },
   { id: 'developers', label: 'API & webhooks', admin: true },
@@ -287,6 +289,12 @@ function Settings() {
   const admin = me?.user?.role === 'OWNER' || me?.user?.role === 'ADMIN' || !me?.user;
   const tabs = TABS.filter((t) => admin || !t.admin);
   const [tab, setTab] = useState<string>(tabs[0].id);
+  // Deep links such as /settings?tab=billing (checkout returns here)
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('tab');
+    if (wanted && tabs.some((t) => t.id === wanted)) setTab(wanted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <>
       <h1 className="text-2xl font-semibold">Settings</h1>
@@ -307,6 +315,7 @@ function Settings() {
       <div className="mt-6 space-y-6">
         {tab === 'organization' && <Organization />}
         {tab === 'team' && <Team />}
+        {tab === 'billing' && <BillingSettings />}
         {tab === 'branding' && <BrandingSettings />}
         {tab === 'sso' && <SsoSettings />}
         {tab === 'developers' && (

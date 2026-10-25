@@ -65,6 +65,21 @@ export const config = {
     stripe: { secretKey: process.env.STRIPE_SECRET_KEY ?? '', webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '' },
     razorpay: { keyId: process.env.RAZORPAY_KEY_ID ?? '', keySecret: process.env.RAZORPAY_KEY_SECRET ?? '' },
   },
+  billing: {
+    /** sandbox (built-in test checkout) | stripe | razorpay. Uses the Stripe/Razorpay keys above. */
+    provider: env('BILLING_PROVIDER', 'sandbox') as 'sandbox' | 'stripe' | 'razorpay',
+    /** Signing secret of the Stripe endpoint <APP_URL>/api/v1/billing/stripe/webhook */
+    stripeWebhookSecret: process.env.STRIPE_BILLING_WEBHOOK_SECRET ?? '',
+    /** Secret of the Razorpay webhook <APP_URL>/api/v1/billing/razorpay/webhook */
+    razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
+    /** GST percentage on INR invoices; 0 if the business is not GST-registered */
+    gstRate: Number(env('BILLING_GST_RATE', '18')),
+    seller: {
+      name: env('BILLING_SELLER_NAME', '[Company Name]'),
+      address: process.env.BILLING_SELLER_ADDRESS ?? '',
+      taxId: process.env.BILLING_SELLER_GSTIN ?? '',
+    },
+  },
   ai: {
     /**
      * AI features call the Claude API. Enabled when ANTHROPIC_API_KEY is set (or

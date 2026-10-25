@@ -36,6 +36,26 @@ model Organization {
   scimTokenHash      String?           @unique
   // AI features send document content to the model provider; admins opt in
   aiEnabled          Boolean           @default(false)
+  // --- Billing (see src/billing/plans.ts) ---
+  plan               String            @default("trial")
+  billingStatus      BillingStatus     @default(TRIALING)
+  trialEndsAt        DateTime          @default(dbgenerated("(now() + '14 days'::interval)"))
+  seats              Int               @default(5)
+  // month | year
+  billingInterval    String            @default("month")
+  billingCurrency    String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean           @default(false)
+  billingProvider    String?
+  // Subscription id at the provider (Stripe sub_..., Razorpay sub_...)
+  subscriptionRef    String?           @unique
+  // Printed on invoices
+  billingName        String?
+  billingEmail       String?
+  billingAddress     String?
+  // GSTIN (India) or VAT number
+  taxId              String?
   createdAt          DateTime          @default(now())
   users              User[]
   envelopes          Envelope[]
@@ -46,6 +66,15 @@ model Organization {
   folders            Folder[]
   activity           ActivityLog[]
   forms              SigningForm[]
+  invoices           Invoice[]
+  billingCheckouts   BillingCheckout[]
+}
+
+enum BillingStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
 }
 
 enum UserRole {
@@ -590,4 +619,59 @@ model Payment {
 
   @@index([recipientId])
   @@index([providerRef])
+}
+
+/// A started subscription purchase or plan change, completed by the provider's callback.
+model BillingCheckout {
+  id          String         @id @default(cuid())
+  orgId       String
+  org         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  plan        String
+  interval    String
+  seats       Int
+  currency    String
+  provider    String
+  providerRef String?
+  status      CheckoutStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+
+  @@index([orgId])
+}
+
+enum CheckoutStatus {
+  PENDING
+  COMPLETED
+  CANCELED
+}
+
+/// Tax invoice for one subscription charge. Amounts are in minor units.
+model Invoice {
+  id          String       @id @default(cuid())
+  // Sequential invoice number (printed as INV-<year>-<seq>)
+  seq         Int          @unique @default(autoincrement())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  description String
+  plan        String
+  interval    String
+  seats       Int
+  periodStart DateTime
+  periodEnd   DateTime
+  currency    String
+  subtotal    Int
+  // Tax rate in basis points (1800 = 18%)
+  taxRate     Int          @default(0)
+  taxLabel    String?
+  tax         Int          @default(0)
+  total       Int
+  provider    String
+  // Provider charge id; unique so repeated webhooks don't duplicate invoices
+  providerRef String?      @unique
+  // Seller and customer details as printed
+  seller      Json
+  billTo      Json
+  paidAt      DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId, createdAt])
 }

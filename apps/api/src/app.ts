@@ -25,6 +25,7 @@ import { formRoutes } from './templates/forms.js';
 import { templateRoutes } from './templates/routes.js';
 import { verifyRoutes } from './verify/routes.js';
 import { websiteRoutes } from './website/routes.js';
+import { billingRoutes } from './billing/routes.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
 export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] } = {}) {
@@ -73,6 +74,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(aiRoutes);
       await v1.register(mcpRoutes);
       await v1.register(paymentRoutes);
+      await v1.register(billingRoutes);
       await v1.register(envelopeManageRoutes);
       await v1.register(teamRoutes);
       await v1.register(organizationRoutes);

@@ -71,9 +71,45 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
           </div>
         </div>
       </header>
+      {me && <BillingBanner me={me} wide={wide} />}
       <main className={cx('mx-auto px-4 py-6 sm:px-6 sm:py-8', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
         {me ? children : <PageLoader />}
       </main>
     </MeContext.Provider>
+  );
+}
+
+const TRIAL_WARN_DAYS = 5;
+
+/** Trial and subscription notices; admins get a link to Billing. */
+function BillingBanner({ me, wide }: { me: Me; wide?: boolean }) {
+  const b = me.billing;
+  if (!b) return null;
+  const admin = !me.user || me.user.role === 'OWNER' || me.user.role === 'ADMIN';
+  let text: string | null = null;
+  let urgent = false;
+  if (b.state === 'trialing' && b.trialEndsAt) {
+    const days = Math.max(0, Math.ceil((new Date(b.trialEndsAt).getTime() - Date.now()) / 86_400_000));
+    if (days <= TRIAL_WARN_DAYS) text = `Your free trial ends in ${days} day${days === 1 ? '' : 's'}.`;
+  } else if (b.state === 'past_due') {
+    text = 'Your last payment failed. Update your payment method to avoid interruption.';
+  } else if (!b.canSend) {
+    text = b.blockedReason;
+    urgent = true;
+  }
+  if (!text) return null;
+  return (
+    <div className={cx('border-b text-sm', urgent ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-900')}>
+      <div className={cx('mx-auto flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:px-6', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
+        <span>{text}</span>
+        {admin ? (
+          <Link href="/settings?tab=billing" className="font-semibold underline">
+            {b.state === 'past_due' ? 'Go to billing' : 'Choose a plan'}
+          </Link>
+        ) : (
+          <span>Ask an admin to choose a plan.</span>
+        )}
+      </div>
+    </div>
   );
 }

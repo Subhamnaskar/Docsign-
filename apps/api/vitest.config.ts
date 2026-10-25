@@ -27,6 +27,9 @@ export default defineConfig({
       // Payment signature checks are exercised with known test secrets
       STRIPE_WEBHOOK_SECRET: 'whsec_test_secret',
       RAZORPAY_KEY_SECRET: 'rzp_test_secret',
+      STRIPE_BILLING_WEBHOOK_SECRET: 'whsec_billing_secret',
+      RAZORPAY_WEBHOOK_SECRET: 'rzp_webhook_secret',
+      BILLING_GST_RATE: '18',
       ANTHROPIC_API_KEY: '',
     },
   },

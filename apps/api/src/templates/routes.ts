@@ -15,6 +15,7 @@ import {
   getTemplate,
   type FullTemplate,
 } from './service.js';
+import { assertFeature } from '../billing/plans.js';
 
 export const MAX_BULK_ROWS = 100;
 
@@ -175,6 +176,7 @@ export async function templateRoutes(app: FastifyInstance) {
    */
   app.post('/templates/:id/bulk-send', async (req) => {
     const { id } = req.params as { id: string };
+    await assertFeature(req.auth.orgId, 'bulkSend');
     const body = parse(
       z.object({
         rows: z

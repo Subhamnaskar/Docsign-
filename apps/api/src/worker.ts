@@ -3,6 +3,7 @@ import { prisma } from './db.js';
 import { finalizeEnvelope, notifySender, notifySigners } from './envelopes/service.js';
 import { deliverPendingWebhooks, enqueueWebhook } from './webhooks/dispatcher.js';
 import type { FastifyBaseLogger } from 'fastify';
+import { renewSandboxSubscriptions } from './billing/service.js';
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -58,6 +59,7 @@ export function startWorker(log: FastifyBaseLogger) {
       await expireEnvelopes();
       await sendReminders();
       await retryFinalization();
+      await renewSandboxSubscriptions();
     } catch (err) {
       log.error({ err }, 'worker tick failed');
     } finally {

@@ -15,6 +15,7 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 | Field editor | Signature, initials, date signed, name, email, text, number, checkbox, dropdown, radio, formula (calculated), attachment upload, payment; required/optional, conditional show/hide, AI field detection |
 | Signer experience | Email link → identity check (email, SMS or WhatsApp code, or an access code) → e-sign consent → guided signing (draw / type / upload), mobile-friendly, in-person (host) signing, embedded signing in your own site |
 | India | Aadhaar eSign 2.1 (ESP XML protocol, built-in sandbox ESP), DSC USB-token signing via a local utility, sandbox e-stamp certificates; signatures are applied as incremental PDF updates so each one stays valid |
+| Billing | 14-day free trial, Starter / Business / Enterprise plans with agreement and user limits, monthly or yearly subscriptions, pro-rata plan changes, cancel at period end, GST tax invoices (PDF), Settings → Billing; prices in `apps/api/src/billing/plans.ts` (placeholders) feed the website pricing page |
 | Payments | Collect a fee as part of signing: built-in sandbox checkout, Stripe Checkout and Razorpay Payment Links adapters |
 | Compliance engine | Jurisdiction packs for US, UK, EU and India; resolves signature level, identity strength, retention, data region and consent text; blocks documents that cannot legally be e-signed |
 | Trust | PAdES (ETSI.CAdES.detached) seal with RFC 3161 timestamp (PAdES-B-T); key behind a `KeyProvider` interface (HSM-ready) |
@@ -35,6 +36,7 @@ Everything that depends on an outside contract ships with a working sandbox so t
 | DSC tokens | — | Local signing utility protocol (`docs/dsc-utility.md`) | The desktop utility, CCA root certificates in `DSC_TRUST_DIR` |
 | e-Stamp | Specimen certificate page. **Not valid** | — (interface only) | SHCIL or state e-stamp vendor agreement |
 | Payments | Built-in test checkout at `/api/v1/dev/pay/...` | Stripe Checkout, Razorpay Payment Links | Stripe or Razorpay keys and webhook secret |
+| Subscriptions | Built-in test checkout at `/api/v1/dev/billing/...`; renewals run in the worker | Stripe Billing, Razorpay Subscriptions | Same keys plus `STRIPE_BILLING_WEBHOOK_SECRET` or `RAZORPAY_WEBHOOK_SECRET`; seller name, address and GSTIN for invoices |
 | Single sign-on | — | Any OIDC provider (Okta, Entra ID, Google) | An app registration at your identity provider |
 | AI | Off | Claude API | `ANTHROPIC_API_KEY`, and an admin opts the organisation in |
 
@@ -79,6 +81,13 @@ CLAMAV_HOST=localhost npm test             # also runs the malware-scanning test
 ```
 
 The suite covers the policy engine, crypto, PAdES sealing, incremental signing and tamper detection, audit-chain tampering, the full signing flow, tenant isolation and roles, forged links, OTP lockout, API keys, templates, bulk send, fields and formulas, SMS/access-code identity, Aadhaar eSign against the sandbox ESP, SSO and SCIM, AI endpoints (with a stubbed model), payments and webhook signature checks. CI (`.github/workflows/ci.yml`) runs typechecks, the API tests and the web build on every push and pull request.
+
+## Billing
+
+- New organisations start on a 14-day trial (25 agreements, 5 users, every feature). When it ends, sending stops until an admin picks a plan; existing agreements stay available.
+- Limits are enforced by the API: agreements per billing period at send time, users at invite / SSO / SCIM time, and features (API keys, webhooks, bulk send, SSO) per plan. API keys stop working on plans without the API.
+- Enterprise is not sold online. Sales sets it up with `npm run billing:set-plan -w @docsign/api -- <org id or email> enterprise --seats 50 --months 12` (also extends trials: `... trial --months 1`).
+- Indian (INR) invoices add GST at `BILLING_GST_RATE` (default 18%); set it to 0 if the business is not GST-registered, and have an accountant confirm the invoice format (place of supply, CGST/SGST vs IGST) before launch.
 
 ## Running more than one API instance
 
@@ -134,6 +143,7 @@ apps/api      Fastify + Prisma (PostgreSQL) — domain services, policy engine, 
   src/estamp      e-Stamp provider interface (sandbox)
   src/messaging   SMS / WhatsApp providers
   src/payments    Payment providers (sandbox, Stripe, Razorpay)
+  src/billing     Plans and limits, subscriptions, invoices
   src/sso         OIDC single sign-on and SCIM 2.0
   src/ai          Claude API features; src/mcp is the MCP server
   src/team        Members, roles, invitations; src/organization holds settings and branding

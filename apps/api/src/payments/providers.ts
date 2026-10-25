@@ -55,8 +55,7 @@ async function stripeCheckout(req: CheckoutRequest): Promise<Checkout> {
 }
 
 /** Stripe-Signature: t=<ts>,v1=<hex HMAC-SHA256 of "ts.payload"> */
-export function verifyStripeSignature(rawBody: string, header: string | undefined, toleranceSec = 300): boolean {
-  const secret = config.payments.stripe.webhookSecret;
+export function verifyStripeSignature(rawBody: string, header: string | undefined, secret = config.payments.stripe.webhookSecret, toleranceSec = 300): boolean {
   if (!secret || !header) return false;
   const parts = Object.fromEntries(header.split(',').map((kv) => kv.split('=') as [string, string]));
   const ts = Number(parts.t);

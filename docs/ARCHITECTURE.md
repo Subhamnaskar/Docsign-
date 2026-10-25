@@ -58,3 +58,4 @@ Neither needs changes to the envelope engine.
 - **Sender UI language**: the sender app is English; signers get their language. Translations need native-speaker review.
 - **Bulk send scale**: batches run synchronously, capped at 100 rows. Move to a queued job for larger batches.
 - **Legal pages**: the website's legal pages are outlines.
+- **Billing**: prices in `src/billing/plans.ts` are placeholders; GST handling on invoices needs an accountant's review (CGST/SGST split by place of supply is not done); Stripe/Razorpay subscription adapters are untested against the real services.

@@ -9,6 +9,7 @@ import { randomToken, sha256Hex } from '../lib/crypto.js';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { parse } from '../lib/validate.js';
+import { assertSeatAvailable } from '../billing/plans.js';
 
 const INVITE_TTL_MS = 7 * 24 * 3600 * 1000;
 const role = z.enum(['OWNER', 'ADMIN', 'MEMBER']);
@@ -66,6 +67,9 @@ export async function teamRoutes(app: FastifyInstance) {
       const body = parse(z.object({ email: z.string().trim().toLowerCase().email(), role: role.default('MEMBER') }), req.body);
       if (body.role === 'OWNER' && req.auth.role !== 'OWNER') throw forbidden('Only owners can invite owners.');
       if (await prisma.user.findUnique({ where: { email: body.email } })) throw conflict('That person already has an account.');
+      // Re-inviting replaces the open invitation, so it doesn't need another seat
+      const reinvite = await prisma.invitation.findFirst({ where: { orgId: req.auth.orgId, email: body.email, acceptedAt: null, expiresAt: { gt: new Date() } } });
+      if (!reinvite) await assertSeatAvailable(req.auth.orgId);
       const token = randomToken();
       await prisma.invitation.deleteMany({ where: { orgId: req.auth.orgId, email: body.email, acceptedAt: null } });
       const inv = await prisma.invitation.create({
@@ -116,6 +120,7 @@ export async function teamRoutes(app: FastifyInstance) {
         const owners = await prisma.user.count({ where: { orgId: req.auth.orgId, role: 'OWNER', disabledAt: null } });
         if (owners <= 1) throw badRequest('An organisation needs at least one active owner.');
       }
+      if (body.active === true && user.disabledAt) await assertSeatAvailable(req.auth.orgId);
       const updated = await prisma.user.update({
         where: { id },
         data: {

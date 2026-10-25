@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { hmacSha256Hex, randomToken, safeEqualHex, sha256Hex } from './crypto.js';
 import { forbidden, unauthorized } from './errors.js';
+import { assertFeature } from '../billing/plans.js';
 
 export const SESSION_COOKIE = 'ds_session';
 export const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
@@ -47,6 +48,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     if (!key.startsWith(API_KEY_PREFIX)) throw unauthorized('Invalid API key');
     const apiKey = await prisma.apiKey.findUnique({ where: { keyHash: sha256Hex(key) } });
     if (!apiKey || apiKey.revokedAt) throw unauthorized('Invalid API key');
+    await assertFeature(apiKey.orgId, 'api');
     // Best-effort usage tracking; not worth failing the request over
     prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
     // API calls act on behalf of the org's owner for attribution of created envelopes

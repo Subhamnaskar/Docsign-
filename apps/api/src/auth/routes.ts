@@ -10,6 +10,7 @@ import { conflict, forbidden, unauthorized } from '../lib/errors.js';
 import { ssoOrgForEmail } from '../sso/routes.js';
 import { parse } from '../lib/validate.js';
 import { JURISDICTIONS } from '../policy/jurisdictions.js';
+import { billingBrief } from '../billing/routes.js';
 
 const password = z.string().min(10, 'Use at least 10 characters').max(200);
 // Compared against when the user doesn't exist, so response timing doesn't reveal registered emails
@@ -89,6 +90,7 @@ export async function authRoutes(app: FastifyInstance) {
       },
       cell: config.cellRegion,
       features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode },
+      billing: billingBrief(org),
     };
   });
 

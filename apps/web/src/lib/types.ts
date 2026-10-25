@@ -159,6 +159,17 @@ export interface Me {
   organization: { id: string; name: string; jurisdiction: string; dataRegion: string; brandColor: string | null; embedOrigins: string[]; aiEnabled?: boolean };
   cell: string;
   features?: { ai: boolean; aadhaarEsign: string };
+  billing?: {
+    plan: string;
+    planName: string;
+    state: 'trialing' | 'trial_expired' | 'active' | 'past_due' | 'canceled';
+    canSend: boolean;
+    blockedReason: string | null;
+    trialEndsAt: string | null;
+    cancelAtPeriodEnd: boolean;
+    periodEnd: string | null;
+    features: string[];
+  };
 }
 
 export interface Estamp {

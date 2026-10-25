@@ -8,6 +8,7 @@ import { notFound } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { listAdapters } from '../adapters/registry.js';
 import { signPayload, WEBHOOK_EVENTS } from '../webhooks/dispatcher.js';
+import { assertFeature } from '../billing/plans.js';
 
 export async function developerRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
@@ -24,6 +25,7 @@ export async function developerRoutes(app: FastifyInstance) {
 
   /** The full key is returned once, at creation. */
   app.post('/api-keys', async (req, reply) => {
+    await assertFeature(req.auth.orgId, 'api');
     const { name } = parse(z.object({ name: z.string().trim().min(1).max(80) }), req.body);
     const key = `${API_KEY_PREFIX}${randomToken(24)}`;
     const created = await prisma.apiKey.create({
@@ -55,6 +57,7 @@ export async function developerRoutes(app: FastifyInstance) {
   });
 
   app.post('/webhooks', async (req, reply) => {
+    await assertFeature(req.auth.orgId, 'api');
     const body = parse(
       z.object({
         url: z.string().url().refine((u) => /^https?:\/\//.test(u), 'Use an http(s) URL'),

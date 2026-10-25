@@ -17,60 +17,50 @@ export const brand = {
 };
 
 /**
- * Plans from the blueprint (section 14.1). Set `price` once pricing is decided;
- * while it is null the page shows "Contact us" instead of a number.
+ * Marketing copy for each plan. Prices, limits and the trial come from the API
+ * (`GET /api/v1/billing/plans`, defined in apps/api/src/billing/plans.ts), so
+ * the website and in-app billing always agree.
  */
 export const plans: {
-  id: string;
-  name: string;
+  id: 'starter' | 'business' | 'enterprise';
   audience: string;
-  price: string | null;
-  period?: string;
   highlighted?: boolean;
   features: string[];
   cta: { label: string; href: string };
 }[] = [
   {
     id: 'starter',
-    name: 'Starter',
     audience: 'Freelancers and small teams',
-    price: null,
-    period: 'per user / month',
     features: [
       'Unlimited templates',
       'Sequential and parallel signing',
-      'Email one-time passcode for signers',
+      'Email, SMS or WhatsApp codes for signers',
       'Sealed PDFs with certificate of completion',
       'Signer experience in 10 languages',
     ],
-    cta: { label: 'Start free', href: '/register' },
+    cta: { label: 'Start free trial', href: '/register' },
   },
   {
     id: 'business',
-    name: 'Business',
     audience: 'Growing companies',
-    price: null,
-    period: 'per user / month',
     highlighted: true,
     features: [
       'Everything in Starter',
       'Bulk send from CSV',
-      'REST API, API keys and webhooks',
-      'Automatic reminders and expiry',
+      'REST API, webhooks, Zapier and MCP',
+      'Web forms, payments and embedded signing',
       'Compliance profiles for US, UK, EU and India',
     ],
-    cta: { label: 'Start free', href: '/register' },
+    cta: { label: 'Start free trial', href: '/register' },
   },
   {
     id: 'enterprise',
-    name: 'Enterprise',
     audience: 'Regulated industries and large organisations',
-    price: null,
     features: [
       'Everything in Business',
       'Single sign-on (OIDC) and SCIM provisioning',
-      'Roles, branding and an activity log',
       'Aadhaar eSign and DSC (India) via licensed partners',
+      'Invoiced billing and custom terms',
       'Dedicated regional cell and customer-managed keys (planned)',
       'Premium support and onboarding',
     ],

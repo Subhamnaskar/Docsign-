@@ -2,6 +2,7 @@ import type { User } from '@prisma/client';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../db.js';
 import { randomToken, sha256Hex } from '../lib/crypto.js';
+import { assertSeatAvailable } from '../billing/plans.js';
 
 /**
  * SCIM 2.0 user provisioning (RFC 7643/7644), the subset identity providers
@@ -49,6 +50,12 @@ interface ScimUserBody {
 
 const displayName = (b: ScimUserBody) =>
   b.displayName || b.name?.formatted || [b.name?.givenName, b.name?.familyName].filter(Boolean).join(' ') || b.userName?.split('@')[0] || 'User';
+
+const hasSeat = (orgId: string) =>
+  assertSeatAvailable(orgId).then(
+    () => true,
+    () => false,
+  );
 
 export async function scimRoutes(app: FastifyInstance) {
   app.addContentTypeParser('application/scim+json', { parseAs: 'string' }, (_req, body, done) => {
@@ -115,6 +122,7 @@ export async function scimRoutes(app: FastifyInstance) {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return scimError(reply, 409, 'User already exists');
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: req.scimOrgId } });
+    if (body.active !== false && !(await hasSeat(org.id))) return scimError(reply, 403, 'All user seats are in use. Add seats under Settings → Billing.');
     const u = await prisma.user.create({
       data: {
         email,
@@ -141,6 +149,7 @@ export async function scimRoutes(app: FastifyInstance) {
     const body = req.body as ScimUserBody;
     const u = await prisma.user.findFirst({ where: { id, orgId: req.scimOrgId } });
     if (!u) return scimError(reply, 404, 'User not found');
+    if (body.active === true && u.disabledAt && !(await hasSeat(u.orgId))) return scimError(reply, 403, 'All user seats are in use.');
     await prisma.user.update({ where: { id }, data: { name: displayName(body), externalId: body.externalId ?? u.externalId } });
     if (body.active !== undefined) await setActive(id, body.active);
     reply.type('application/scim+json');

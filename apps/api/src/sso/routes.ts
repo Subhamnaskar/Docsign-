@@ -9,6 +9,7 @@ import { randomToken, sha256Hex } from '../lib/crypto.js';
 import { badRequest, conflict, HttpError, notFound } from '../lib/errors.js';
 import { open, seal } from '../lib/secretbox.js';
 import { parse } from '../lib/validate.js';
+import { assertFeature, assertSeatAvailable } from '../billing/plans.js';
 
 /**
  * Single sign-on with OpenID Connect (Google Workspace, Microsoft Entra ID,
@@ -108,6 +109,11 @@ export async function ssoRoutes(app: FastifyInstance) {
     if (user && user.orgId !== org.id) return reply.redirect(`${config.appUrl}/login?sso=other_org`, 303);
     if (user?.disabledAt) return reply.redirect(`${config.appUrl}/login?sso=deactivated`, 303);
     if (!user) {
+      try {
+        await assertSeatAvailable(org.id);
+      } catch {
+        return reply.redirect(`${config.appUrl}/login?sso=no_seats`, 303);
+      }
       // Just-in-time provisioning; no usable password
       user = await prisma.user.create({
         data: {
@@ -150,6 +156,7 @@ export async function ssoRoutes(app: FastifyInstance) {
     });
 
     r.put('/organization/sso', async (req) => {
+      await assertFeature(req.auth.orgId, 'sso');
       const body = parse(
         z.object({
           issuer: z.string().url(),
@@ -196,6 +203,7 @@ export async function ssoRoutes(app: FastifyInstance) {
 
     /** Creates (or rotates) the SCIM bearer token; shown once. */
     r.post('/organization/scim-token', async (req) => {
+      await assertFeature(req.auth.orgId, 'sso');
       const token = `scim_${randomToken(32)}`;
       await prisma.organization.update({ where: { id: req.auth.orgId }, data: { scimTokenHash: sha256Hex(token) } });
       await logActivity(req, 'scim.token_rotated');
