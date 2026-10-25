@@ -1,244 +1,243 @@
 import Link from 'next/link';
-import { Check, CtaBand, GoldLink, OutlineLink, Section, SectionHeading } from '@/components/marketing/Site';
+import { HomeSolutions } from '@/components/marketing/HomeSolutions';
+import { AiMock, CodeMock, WorkflowMock } from '@/components/marketing/Mocks';
+import { CtaBand, GoldLink } from '@/components/marketing/Site';
 import { brand } from '@/lib/brand';
+import { SOLUTIONS } from '@/lib/solutions';
 
-/** Illustrative product mock: a document with signer fields and a status panel. */
-function ProductMock() {
-  return (
-    <div className="relative mx-auto w-full max-w-md lg:max-w-none" aria-hidden>
-      <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-brand-500/30 via-brand-300/10 to-transparent blur-2xl" />
-      <div className="rounded-2xl border border-white/10 bg-white p-5 text-left shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-gray-900">Mutual NDA</div>
-          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">Out for signature</span>
-        </div>
-        <div className="mt-4 space-y-2">
-          {[100, 92, 96, 70].map((w, i) => (
-            <div key={i} className="h-2 rounded bg-gray-100" style={{ width: `${w}%` }} />
-          ))}
-        </div>
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <div className="rounded-lg border-2 border-brand-500 bg-brand-50 p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-700">Signed · Priya S.</div>
-            <svg viewBox="0 0 120 32" className="mt-1 h-8 w-full text-[#111c59]">
-              <path d="M4 24c10-2 14-18 22-18s2 16 10 16 8-10 14-10 4 8 10 8 10-6 16-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div className="rounded-lg border-2 border-dashed border-amber-400 bg-amber-50 p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">Sign here · Daniel M.</div>
-            <div className="mt-2 h-6 rounded bg-amber-100/80" />
-          </div>
-        </div>
-        <div className="mt-5 space-y-2 border-t border-gray-100 pt-4 text-xs">
-          {[
-            ['✓', 'Identity verified (email OTP)', 'text-green-600'],
-            ['✓', 'Consent recorded · India, IT Act 2000', 'text-green-600'],
-            ['•', 'Seal + timestamp applied on completion', 'text-gray-400'],
-          ].map(([icon, text, color]) => (
-            <div key={text} className="flex items-center gap-2 text-gray-600">
-              <span className={`font-bold ${color}`}>{icon}</span>
-              {text}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="absolute -bottom-8 -right-4 hidden rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg sm:block">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Audit trail</div>
-        <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-green-700">
-          <span className="h-2 w-2 rounded-full bg-green-500" /> Hash chain intact · 21 events
-        </div>
-      </div>
-    </div>
-  );
-}
+/** Tools the product connects to today (names only; no partner logos). */
+const WORKS_WITH = ['Google Drive', 'Dropbox', 'OneDrive', 'Microsoft Word', 'Outlook', 'Google Docs', 'Salesforce', 'HubSpot', 'Slack', 'Microsoft Teams', 'Zapier'];
 
-const STEPS = [
-  { title: 'Upload and prepare', body: 'Upload a PDF or Word file, add signers, and drag signature, date and text fields onto the page, or start from a template.' },
-  { title: 'Signers verify and sign', body: 'Each signer gets a personal link, verifies with a one-time code, agrees to sign electronically and signs on any device.' },
-  { title: 'Sealed and verifiable', body: 'The completed PDF is sealed with a digital signature and trusted timestamp, stored write-once, and verifiable by anyone.' },
+/** Facts about the product, not customer numbers. */
+const FACTS = [
+  { value: '4', label: 'legal frameworks built in', note: 'IT Act 2000 (India), ESIGN and UETA (US), Electronic Communications Act (UK), eIDAS (EU)' },
+  { value: '10', label: 'signer languages', note: 'Including Hindi and right-to-left Arabic, chosen per signer' },
+  { value: '100%', label: 'of signed PDFs sealed', note: 'PAdES digital seal, trusted timestamp and long-term validation data' },
+  { value: 'SHA-256', label: 'hash-chained audit trail', note: 'Every event linked to the one before, so tampering shows' },
 ];
 
-const FEATURES = [
-  { title: 'Compliance engine', body: 'Picks the right signature level, consent wording, retention and data region for each country and document type, and blocks documents that cannot be e-signed.' },
-  { title: 'Court-grade evidence', body: 'Every action goes into a tamper-evident, hash-chained audit trail, summarised in a sealed certificate of completion.' },
-  { title: 'Templates and bulk send', body: 'Save layouts as templates with roles like "Employee", then send one agreement or hundreds from a CSV.' },
-  { title: 'Signer languages', body: 'Emails and the signing page in English, Hindi, Spanish, French, German, Portuguese, Italian, Dutch, Arabic and Japanese.' },
-  { title: 'API-first', body: 'Our own app runs on the same REST API you get, with API keys and signed webhooks for CRM, HR and banking systems.' },
-  { title: 'Malware-scanned uploads', body: 'Every uploaded file is scanned before it enters the system. Signature images are re-encoded to block malformed files.' },
-];
-
-const SEGMENTS = [
-  { title: 'Banking & lending', body: 'Loan agreements, account opening and KYC, with a path to Aadhaar eSign and qualified signatures.' },
-  { title: 'HR & legal', body: 'Offer letters, NDAs and vendor contracts with templates, bulk send and a full audit trail.' },
-  { title: 'Real estate', body: 'Leases and sale agreements, with guardrails for documents that need notarisation.' },
-  { title: 'Software vendors', body: 'Embed signing in your product through the API and webhooks, with usage-based pricing.' },
-];
+const STANDARDS = ['IT Act 2000', 'eIDAS', 'ESIGN & UETA', 'PAdES (ETSI EN 319 142)', 'RFC 3161 timestamps', 'Data stored in India'];
 
 export default function Home() {
   return (
     <>
-      <section className="bg-cream px-3 pb-6 pt-10 sm:px-6 sm:pt-12">
-        <p className="mx-auto flex max-w-6xl items-center justify-center gap-3 text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-600 sm:text-xs">
-          <span className="hidden h-px w-10 bg-brand-400 sm:block" /> {brand.name} · e-signatures for every market <span className="hidden h-px w-10 bg-brand-400 sm:block" />
-        </p>
-        <div className="relative mx-auto mt-6 max-w-6xl overflow-hidden rounded-[2rem] bg-night bg-dots shadow-2xl shadow-black/10">
-          <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-brand-500/20 blur-3xl" aria-hidden />
-          <div className="absolute -bottom-32 right-0 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" aria-hidden />
-          <span className="absolute left-5 top-5 h-6 w-6 rounded-tl-md border-l-2 border-t-2 border-white/30" aria-hidden />
-          <span className="absolute right-5 top-5 h-6 w-6 rounded-tr-md border-r-2 border-t-2 border-white/30" aria-hidden />
-          <span className="absolute bottom-5 left-5 h-6 w-6 rounded-bl-md border-b-2 border-l-2 border-white/30" aria-hidden />
-          <span className="absolute bottom-5 right-5 h-6 w-6 rounded-br-md border-b-2 border-r-2 border-white/30" aria-hidden />
-          <div className="relative grid items-center gap-14 px-6 py-14 sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:py-20">
-            <div>
-              <h1 className="text-[2.6rem] font-black leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-[4.2rem]">
-                Sign agreements in every market, <span className="text-gold">compliant by design.</span>
-              </h1>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-300">{brand.description}</p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <GoldLink href="/register">Start free 14-day trial →</GoldLink>
-                <OutlineLink href="/contact" dark>
-                  Book a demo
-                </OutlineLink>
-              </div>
-              <p className="mt-5 text-sm text-gray-400">
-                No credit card required · Received a signed PDF?{' '}
-                <Link href="/verify" className="font-semibold text-brand-300 hover:text-brand-200">
-                  Verify it here
-                </Link>
-              </p>
-            </div>
-            <ProductMock />
-          </div>
+      {/* Hero: start sign-up with just an email */}
+      <section className="relative overflow-hidden bg-night bg-dots text-white">
+        <div className="absolute -left-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-brand-500/25 blur-3xl" aria-hidden />
+        <div className="absolute -bottom-48 right-0 h-[30rem] w-[30rem] rounded-full bg-indigo-600/20 blur-3xl" aria-hidden />
+        <div className="relative mx-auto max-w-5xl px-4 pb-24 pt-20 text-center sm:px-6 sm:pt-28">
+          <h1 className="text-[2.75rem] font-black leading-[1.02] tracking-tight sm:text-7xl lg:text-[5.5rem]">
+            Everything you need <span className="block text-gold">to agree.</span>
+          </h1>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-300 sm:text-xl">Send, sign and manage your agreements, with the right signature for every country. Free for 14 days.</p>
+          <form action="/register" method="get" className="mx-auto mt-10 flex max-w-xl flex-col gap-2 sm:flex-row sm:gap-0">
+            <label htmlFor="hero-email" className="sr-only">
+              Work email
+            </label>
+            <input
+              id="hero-email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="name@company.com"
+              className="h-14 w-full shrink-0 rounded-lg bg-white px-5 sm:w-auto sm:flex-1 text-base text-ink placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-400/40 sm:rounded-r-none"
+            />
+            <button type="submit" className="h-14 rounded-lg bg-gold px-7 text-base font-bold text-ink hover:brightness-105 sm:rounded-l-none">
+              Get started
+            </button>
+          </form>
+          <p className="mt-4 text-sm text-gray-400">
+            No credit card required. By continuing you agree to the{' '}
+            <Link href="/legal/terms" className="underline hover:text-white">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/legal/privacy" className="underline hover:text-white">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </div>
-        <ul className="mx-auto mt-6 flex max-w-6xl flex-wrap justify-center gap-2.5">
-          {['IT Act 2000 · ESIGN · eIDAS', 'Aadhaar eSign & DSC', 'Tamper-evident audit trail', 'Made in India'].map((c) => (
-            <li key={c} className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700">
-              <svg className="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.7-9.3a1 1 0 0 0-1.4-1.4L9 10.6 7.7 9.3a1 1 0 0 0-1.4 1.4l2 2a1 1 0 0 0 1.4 0l4-4Z" clipRule="evenodd" />
-              </svg>
-              {c}
-            </li>
-          ))}
-        </ul>
-        <dl className="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-8 pb-6 text-center sm:grid-cols-4">
-          {[
-            ['4', 'Legal frameworks'],
-            ['10', 'Signer languages'],
-            ['PAdES', 'Long-term validation'],
-            ['14 days', 'Free trial'],
-          ].map(([v, l]) => (
-            <div key={l}>
-              <dt className="text-gold text-3xl font-black tracking-tight">{v}</dt>
-              <dd className="mt-1 text-sm text-gray-500">{l}</dd>
-            </div>
-          ))}
-        </dl>
       </section>
 
-      <Section>
-        <SectionHeading number="01" eyebrow="How it works" title="From upload to sealed PDF in three steps" center />
-        <ol className="mt-14 grid gap-8 md:grid-cols-3">
-          {STEPS.map((s, i) => (
-            <li key={s.title} className="relative rounded-2xl border border-gray-200 bg-white p-7 transition hover:-translate-y-0.5 hover:shadow-lg">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold text-sm font-black text-ink">{i + 1}</span>
-              <h3 className="mt-5 text-lg font-bold text-ink">{s.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.body}</p>
-            </li>
-          ))}
-        </ol>
-      </Section>
-
-      <Section tone="muted">
-        <SectionHeading number="02" eyebrow="Platform" title="Everything you need to sign with confidence" intro="Built for teams that need more than a signature box: evidence that holds up, compliance per country and an API to automate it." />
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-gray-200 bg-white p-7 transition hover:-translate-y-0.5 hover:shadow-lg">
-              <h3 className="font-bold text-ink">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-gray-600">{f.body}</p>
-            </div>
-          ))}
+      {/* Works with */}
+      <section className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Works with the tools you already use</p>
+          <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-9 gap-y-3">
+            {WORKS_WITH.map((n) => (
+              <li key={n} className="text-lg font-bold tracking-tight text-gray-400">
+                {n}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="mt-8">
-          <Link href="/product" className="text-sm font-semibold text-brand-600 hover:underline">
-            See all features →
-          </Link>
-        </div>
-      </Section>
+      </section>
 
-      <Section tone="dark">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <div>
-            <SectionHeading dark number="03" eyebrow="Compliance engine" title="One platform. The right rules for each country." intro="Choose the governing jurisdiction and document type. The policy engine applies the signature level, signer checks, consent text, retention and data region for you." />
-            <ul className="mt-8 space-y-3 text-gray-300">
-              <Check dark>ESIGN Act and UETA (US), Electronic Communications Act (UK), eIDAS (EU), IT Act 2000 (India)</Check>
-              <Check dark>Automatic guardrails: wills, certain property deeds and other excluded documents are blocked</Check>
-              <Check dark>New countries are added as configuration and partner adapters, not rebuilds</Check>
-            </ul>
-            <Link href="/compliance" className="mt-8 inline-block text-sm font-semibold text-brand-300 hover:text-brand-200">
-              How compliance works →
+      {/* Statement + solution tabs */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-7xl px-4 pb-24 pt-20 sm:px-6">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-3xl font-black tracking-tight text-ink sm:text-5xl">One platform for every agreement</h2>
+            <p className="mt-5 text-lg leading-relaxed text-gray-600 sm:text-xl">
+              Prepare, sign, verify and manage agreements in one place, with identity checks, payments and the evidence courts expect.
+            </p>
+            <Link href="/product" className="mt-6 inline-flex items-center gap-1 text-lg font-semibold text-brand-700 hover:text-ink">
+              Explore the platform <span aria-hidden>›</span>
             </Link>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 font-mono text-sm shadow-2xl">
-            <div className="text-xs uppercase tracking-wide text-gray-400">Policy decision</div>
-            <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5">
-              {[
-                ['Jurisdiction', 'India'],
-                ['Document', 'Employment offer'],
-                ['Signature level', 'Simple (SES)'],
-                ['Signer check', 'Email one-time passcode'],
-                ['Seal', 'PAdES + RFC 3161 timestamp'],
-                ['Retention', '8 years, write-once'],
-                ['Data region', 'in'],
-                ['Result', '✓ Allowed'],
-              ].map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="text-gray-400">{k}</dt>
-                  <dd className={k === 'Result' ? 'text-emerald-400' : 'text-white'}>{v}</dd>
-                </div>
-              ))}
-            </dl>
+          <div className="mt-14">
+            <HomeSolutions />
           </div>
-        </div>
-      </Section>
 
-      <Section>
-        <SectionHeading number="04" eyebrow="Who it's for" title="Built for teams where signatures carry weight" center />
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {SEGMENTS.map((s) => (
-            <div key={s.title} className="rounded-2xl border border-gray-200 bg-white p-7 transition hover:-translate-y-0.5 hover:shadow-lg">
-              <h3 className="font-bold text-ink">{s.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.body}</p>
+          {/* Workflow: wide card */}
+          <article className="mt-6 grid items-center gap-10 overflow-hidden rounded-2xl bg-brand-50 p-8 ring-1 ring-brand-100 sm:p-12 lg:grid-cols-2">
+            <div>
+              <h3 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Automate agreement processes</h3>
+              <p className="mt-4 text-[17px] leading-relaxed text-gray-600">
+                Generate documents from Word templates, route them for approval, and send them to each signer in the right order, with reminders and expiry dates handled for you.
+              </p>
+              <Link href="/product" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
+                Explore templates and approvals <span aria-hidden>›</span>
+              </Link>
             </div>
-          ))}
-        </div>
-      </Section>
+            <div className="flex justify-center py-4">
+              <WorkflowMock />
+            </div>
+          </article>
 
-      <Section tone="muted">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <div>
-            <SectionHeading number="05" eyebrow="Developers" title="Send for signature with one API call" intro="Create envelopes from templates, track progress with signed webhooks and download sealed PDFs, all over a clean REST API." />
-            <Link href="/developers" className="mt-8 inline-block rounded-full bg-ink px-6 py-3 text-sm font-bold text-white hover:bg-black">
-              Read the API overview
+          {/* Developers + AI */}
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <article className="flex flex-col overflow-hidden rounded-2xl bg-brand-50 ring-1 ring-brand-100">
+              <div className="p-8 sm:p-10">
+                <h3 className="text-2xl font-bold tracking-tight text-ink">Build with the API, SDKs and MCP</h3>
+                <p className="mt-4 text-[17px] leading-relaxed text-gray-600">
+                  Our own app runs on the same REST API you get. Embed signing, react to signed webhooks, and let AI agents work with agreements through the MCP server.
+                </p>
+                <Link href="/developers" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
+                  Explore developer tools <span aria-hidden>›</span>
+                </Link>
+              </div>
+              <div className="mt-auto translate-y-6 px-8 sm:px-10">
+                <CodeMock />
+              </div>
+            </article>
+            <article className="flex flex-col overflow-hidden rounded-2xl bg-brand-50 ring-1 ring-brand-100">
+              <div className="p-8 sm:p-10">
+                <h3 className="text-2xl font-bold tracking-tight text-ink">Let AI read the fine print</h3>
+                <p className="mt-4 text-[17px] leading-relaxed text-gray-600">
+                  Summaries, key terms and renewal dates pulled from your contracts, so nothing important is buried on page twelve. Off until your admin turns it on.
+                </p>
+                <Link href="/solutions/legal" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
+                  Explore AI features <span aria-hidden>›</span>
+                </Link>
+              </div>
+              <div className="mt-auto translate-y-6 px-8 sm:px-10">
+                <AiMock />
+              </div>
+            </article>
+          </div>
+
+          <div className="mt-16 flex flex-wrap items-center justify-center gap-6">
+            <GoldLink href="/pricing" className="rounded-lg px-7">
+              View plans and pricing
+            </GoldLink>
+            <Link href="/product" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
+              Explore all products <span aria-hidden>›</span>
             </Link>
           </div>
-          <pre className="overflow-x-auto rounded-2xl bg-night p-6 text-xs leading-relaxed text-gray-200 sm:text-sm">
-            <code>{`curl https://${brand.domain}/api/v1/templates/$TEMPLATE/envelopes \\
-  -H "Authorization: Bearer $API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "send": true,
-    "recipients": [{
-      "roleId": "$EMPLOYEE_ROLE",
-      "name": "Priya Sharma",
-      "email": "priya@example.com",
-      "locale": "hi"
-    }]
-  }'`}</code>
-          </pre>
         </div>
-      </Section>
+      </section>
 
-      <CtaBand />
+      {/* Integrations band */}
+      <section className="relative overflow-hidden bg-night bg-dots text-white">
+        <div className="absolute inset-x-0 -top-32 mx-auto h-64 w-[40rem] rounded-full bg-brand-500/20 blur-3xl" aria-hidden />
+        <div className="relative mx-auto max-w-4xl px-4 py-24 text-center sm:px-6">
+          <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Build your own agreement workflows</h2>
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-gray-300 sm:text-xl">
+            Connect your CRM, cloud storage, Office and Google Docs, chat tools and thousands of apps through Zapier, or build exactly what you need with the API.
+          </p>
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
+            <Link href="/partners" className="rounded-lg border border-white/40 px-7 py-3.5 font-bold hover:bg-white/10">
+              Explore integrations
+            </Link>
+            <Link href="/developers" className="rounded-lg px-7 py-3.5 font-bold text-brand-300 hover:text-brand-200">
+              API documentation ›
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust */}
+      <section className="bg-[#1b1530] text-white">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[1fr_2fr]">
+          <div>
+            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Built for trust</h2>
+            <p className="mt-5 text-lg leading-relaxed text-gray-300">
+              We take your agreements as seriously as you do: every signature is verified, every event is recorded, and every signed PDF can be checked by anyone.
+            </p>
+            <Link href="/compliance" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-300 hover:text-brand-200">
+              Explore trust and security <span aria-hidden>›</span>
+            </Link>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {FACTS.map((f) => (
+              <div key={f.label} className="rounded-2xl bg-white p-7 text-ink">
+                <p className="text-gold text-4xl font-black tracking-tight">{f.value}</p>
+                <p className="mt-2 text-xl font-bold">{f.label}</p>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{f.note}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Laws and standards supported</p>
+          <ul className="mt-5 grid gap-4 border-y border-white/15 py-6 sm:grid-cols-3 lg:grid-cols-6">
+            {STANDARDS.map((s) => (
+              <li key={s} className="flex items-center gap-3 text-lg">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-brand-300 text-sm text-brand-300" aria-hidden>
+                  ✓
+                </span>
+                {s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* Solutions grid */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-3xl font-black tracking-tight text-ink sm:text-5xl">Built for teams where signatures carry weight</h2>
+            <p className="mt-5 text-lg text-gray-600 sm:text-xl">From a two-person agency to a bank&apos;s lending desk, {brand.name} fits the way your team already works.</p>
+          </div>
+          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {SOLUTIONS.map((s) => (
+              <Link key={s.slug} href={`/solutions/${s.slug}`} className="group rounded-2xl border border-gray-200 p-7 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">{s.group === 'team' ? 'Team' : 'Industry'}</p>
+                <h3 className="mt-2 text-xl font-bold text-ink">{s.name}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.summary}</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 group-hover:text-ink">
+                  Learn more <span aria-hidden>›</span>
+                </span>
+              </Link>
+            ))}
+            <Link href="/contact" className="group flex flex-col justify-between rounded-2xl bg-night bg-dots p-7 text-white">
+              <div>
+                <h3 className="text-xl font-bold">Something else?</h3>
+                <p className="mt-2 text-sm text-gray-400">Tell us what you sign and we&apos;ll show you how it works.</p>
+              </div>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-300">
+                Talk to us <span aria-hidden>›</span>
+              </span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <CtaBand title="See it on your own documents" intro="Start a free 14-day trial and send your first agreement in minutes, or talk to us about your compliance requirements." />
     </>
   );
 }

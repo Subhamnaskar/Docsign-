@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { brand } from '@/lib/brand';
+import { SOLUTIONS } from '@/lib/solutions';
 import { cx } from '@/lib/cx';
 import { Logo } from '../ui';
 
@@ -13,6 +14,10 @@ const FOOTER = [
       { href: '/verify', label: 'Verify a document' },
       { href: '/register', label: 'Start free' },
     ],
+  },
+  {
+    title: 'Solutions',
+    links: SOLUTIONS.map((s) => ({ href: `/solutions/${s.slug}`, label: s.name })),
   },
   {
     title: 'Trust',
@@ -45,7 +50,7 @@ const FOOTER = [
 export function SiteFooter() {
   return (
     <footer className="border-t border-gray-200/70 bg-cream">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_repeat(4,1fr)]">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-3 lg:grid-cols-[1.4fr_repeat(5,1fr)]">
         <div>
           <Logo className="text-gray-900" />
           <p className="mt-3 max-w-xs text-sm text-gray-500">{brand.tagline}</p>
@@ -66,7 +71,7 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="border-t border-gray-100">
-        <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-xs text-gray-400 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-2 px-4 py-6 text-xs text-gray-400 sm:px-6">
           <span>
             {brand.name} is a product of {brand.legalEntity}. © {new Date().getFullYear()} {brand.legalEntity}. All rights reserved.
           </span>
@@ -90,7 +95,7 @@ export function Section({ children, className, id, tone }: { children: ReactNode
         className,
       )}
     >
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">{children}</div>
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">{children}</div>
     </section>
   );
 }
@@ -126,7 +131,7 @@ export function SectionHeading({ eyebrow, number, title, intro, center, dark }: 
 export function PageHero({ eyebrow, title, intro, children }: { eyebrow: string; title: string; intro: string; children?: ReactNode }) {
   return (
     <section className="border-b border-gray-200/70 bg-cream">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
         <Eyebrow>{eyebrow}</Eyebrow>
         <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-tight text-ink sm:text-[3.4rem] sm:leading-[1.05]">{title}</h1>
         <p className="mt-5 max-w-2xl text-lg leading-relaxed text-gray-600">{intro}</p>
@@ -163,7 +168,7 @@ export function OutlineLink({ href, children, dark, className }: { href: string;
 export function CtaBand({ title = 'See it on your own documents', intro = 'Create a free account and send your first agreement in minutes, or talk to us about your compliance requirements.' }: { title?: string; intro?: string }) {
   return (
     <section className="bg-cream px-4 py-16 sm:px-6">
-      <div className="mx-auto flex max-w-6xl flex-col items-start gap-8 overflow-hidden rounded-[2rem] bg-night bg-dots px-8 py-14 sm:px-12 md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto flex max-w-7xl flex-col items-start gap-8 overflow-hidden rounded-[2rem] bg-night bg-dots px-8 py-14 sm:px-12 md:flex-row md:items-center md:justify-between">
         <div className="max-w-xl">
           <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">{title}</h2>
           <p className="mt-3 text-gray-400">{intro}</p>

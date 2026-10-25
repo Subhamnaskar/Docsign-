@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthCard } from '@/components/AuthCard';
 import { Alert, Button, Input, Label, Select } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
@@ -22,6 +22,11 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  // The website's "Get started" box passes the email along (?email=)
+  useEffect(() => {
+    const email = new URLSearchParams(window.location.search).get('email');
+    if (email) setForm((f) => ({ ...f, email }));
+  }, []);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
