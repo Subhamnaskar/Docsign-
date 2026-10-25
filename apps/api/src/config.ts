@@ -17,6 +17,8 @@ export const config = {
     accessKeyId: env('S3_ACCESS_KEY', 'docsign'),
     secretAccessKey: env('S3_SECRET_KEY', 'docsign-secret'),
     bucket: env('S3_BUCKET', 'docsign-documents'),
+    /** Write-once retention for sealed documents; set S3_OBJECT_LOCK=false for stores without Object Lock (e.g. Supabase Storage) */
+    objectLock: (process.env.S3_OBJECT_LOCK ?? 'true') !== 'false',
   },
   smtp: {
     host: env('SMTP_HOST', 'localhost'),

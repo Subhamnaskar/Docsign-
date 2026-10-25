@@ -17,13 +17,13 @@ const s3 = new S3Client({
   credentials: { accessKeyId: config.s3.accessKeyId, secretAccessKey: config.s3.secretAccessKey },
 });
 
-/** Creates the bucket with Object Lock enabled so sealed documents can be stored write-once. */
+/** Creates the bucket (with Object Lock where supported) so sealed documents can be stored write-once. */
 export async function ensureBucket(): Promise<void> {
   try {
     await s3.send(new HeadBucketCommand({ Bucket: config.s3.bucket }));
   } catch {
     await s3.send(
-      new CreateBucketCommand({ Bucket: config.s3.bucket, ObjectLockEnabledForBucket: true }),
+      new CreateBucketCommand({ Bucket: config.s3.bucket, ...(config.s3.objectLock && { ObjectLockEnabledForBucket: true }) }),
     );
   }
 }
@@ -34,7 +34,7 @@ export async function putObject(
   contentType: string,
   retainYears?: number,
 ): Promise<void> {
-  const retention = retainYears
+  const retention = retainYears && config.s3.objectLock
     ? {
         // GOVERNANCE mode: write-once for normal users; privileged admins can
         // still lift it (use COMPLIANCE in production cells).

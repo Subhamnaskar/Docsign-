@@ -41,6 +41,8 @@ class LocalKeyProvider implements KeyProvider {
     const certPath = join(dir, 'seal-cert.pem');
     const caPath = join(dir, 'root-ca.pem');
     const caKeyPath = join(dir, 'root-ca-key.pem');
+    // Hosts without a persistent disk keep the keys in SEAL_KEYS (see `npm run keys:export`)
+    restoreFromEnv(dir);
     // Older dev setups didn't keep the CA key, which is needed to issue revocation lists
     if (!existsSync(keyPath) || !existsSync(caKeyPath)) generate(keyPath, certPath, caPath, caKeyPath);
     this.privateKeyPem = readFileSync(keyPath, 'utf8');
@@ -192,4 +194,23 @@ export function sealKeyProvider(): KeyProvider {
       ? new AwsKmsKeyProvider(config.seal.kmsKeyId, config.seal.certChainPath, config.seal.kmsRegion)
       : new LocalKeyProvider(resolve(config.keysDir));
   return provider;
+}
+
+/** Key files kept in the SEAL_KEYS environment variable (base64 JSON of file name to PEM). */
+const SEAL_KEY_FILES = ['seal-key.pem', 'seal-cert.pem', 'root-ca.pem', 'root-ca-key.pem'];
+
+function restoreFromEnv(dir: string) {
+  const packed = process.env.SEAL_KEYS;
+  if (!packed) return;
+  const files = JSON.parse(Buffer.from(packed, 'base64').toString('utf8')) as Record<string, string>;
+  for (const name of SEAL_KEY_FILES) {
+    if (!files[name]) throw new Error(`SEAL_KEYS is missing ${name}`);
+    writeFileSync(join(dir, name), files[name], { mode: 0o600 });
+  }
+}
+
+/** The local seal key files as one SEAL_KEYS value (for hosts that wipe their disk on restart). */
+export function exportSealKeys(dir: string): string {
+  const files = Object.fromEntries(SEAL_KEY_FILES.map((name) => [name, readFileSync(join(dir, name), 'utf8')]));
+  return Buffer.from(JSON.stringify(files)).toString('base64');
 }

@@ -1,0 +1,57 @@
+# Render Blueprint: one free web service running the website and the API.
+# Render dashboard → New → Blueprint → pick this repository. Fill in the
+# values marked sync:false when asked. Full guide: deploy/FREE-NO-CARD.md
+services:
+  - type: web
+    name: docsign
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/billing/plans
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CELL_REGION
+        value: in
+      - key: APP_SECRET
+        generateValue: true
+      # https://<your-service>.onrender.com (or your own domain)
+      - key: APP_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      # Supabase → Connect → Session pooler connection string
+      - key: DATABASE_URL
+        sync: false
+      # Supabase → Storage → S3 connection
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        value: docsign-documents
+      - key: S3_OBJECT_LOCK
+        value: "false"
+      # Brevo SMTP
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      # Output of: npm run keys:export -w @docsign/api
+      - key: SEAL_KEYS
+        sync: false
+      - key: PLATFORM_ADMINS
+        sync: false
+      - key: TSA_URL
+        value: http://timestamp.digicert.com

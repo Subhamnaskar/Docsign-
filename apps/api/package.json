@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "worker": "tsx src/worker-main.ts",
+    "keys:export": "tsx src/trust/export-keys.ts",
     "billing:set-plan": "tsx src/billing/set-plan.ts",
     "start:worker": "node dist/worker-main.js"
   },

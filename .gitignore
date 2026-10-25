@@ -9,3 +9,4 @@ next-env.d.ts
 *.tsbuildinfo
 apps/web/public/pdf.worker.min.mjs
 .keys-test/
+.keys-prod/
