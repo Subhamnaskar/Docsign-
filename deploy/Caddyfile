@@ -1,0 +1,11 @@
+# HTTPS for your domain (certificate from Let's Encrypt, renewed automatically).
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API straight to the API service (large uploads, webhooks); same origin keeps cookies first-party
+	@api path /api/*
+	reverse_proxy @api api:4000
+
+	# Everything else: the website and the app
+	reverse_proxy web:3000
+}

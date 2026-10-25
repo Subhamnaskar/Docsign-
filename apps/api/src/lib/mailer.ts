@@ -6,7 +6,8 @@ import { mailIdentityFor } from '../governance/delivery.js';
 const transport = nodemailer.createTransport({
   host: config.smtp.host,
   port: config.smtp.port,
-  secure: false,
+  secure: config.smtp.secure,
+  ...(config.smtp.user && { auth: { user: config.smtp.user, pass: config.smtp.pass } }),
 });
 
 export interface Mail {

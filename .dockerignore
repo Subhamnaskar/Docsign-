@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/dist
+**/.keys
+**/.keys-test
+**/.env
+**/.env.*
+!**/.env.example
+.git
+demo
+docs
+sdks
+integrations
+**/*.log

@@ -21,6 +21,11 @@ export const config = {
   smtp: {
     host: env('SMTP_HOST', 'localhost'),
     port: Number(env('SMTP_PORT', '1025')),
+    /** Login for real email services (Brevo, SES, Gmail…); empty for the local test inbox */
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+    /** true for port 465 (implicit TLS); port 587 upgrades with STARTTLS automatically */
+    secure: (process.env.SMTP_SECURE ?? '') === 'true',
     from: env('MAIL_FROM', 'DocSign <no-reply@docsign.local>'),
   },
   gotenbergUrl: env('GOTENBERG_URL', 'http://localhost:3100'),
