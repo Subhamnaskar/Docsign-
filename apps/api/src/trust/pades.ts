@@ -6,12 +6,26 @@ import { config } from '../config.js';
 import { CadesSigner, type TimestampResult } from './cades.js';
 import { addSignatureField, embedCms, incrementalUpdate, prepareByteRange, type SignatureFieldOptions } from './incremental.js';
 import { sealKeyProvider } from './keys.js';
+import { addLtv, type LtvResult } from './ltv.js';
+
+export type SealFormat = 'PAdES-B-B' | 'PAdES-B-T' | 'PAdES-B-LT' | 'PAdES-B-LTA';
 
 export interface SealResult {
   pdf: Buffer;
-  format: 'PAdES-B-T' | 'PAdES-B-B';
+  format: SealFormat;
   timestamp: TimestampResult;
   keyProvider: string;
+  ltv: Omit<LtvResult, 'pdf'>;
+}
+
+/**
+ * Adds long-term validation data after the seal. The baseline levels build on
+ * each other, so B-LT/B-LTA are only claimed on top of a timestamped (B-T) seal.
+ */
+async function finish(sealed: Buffer, timestamp: TimestampResult, keyProvider: string): Promise<SealResult> {
+  const { pdf, ...ltv } = await addLtv(sealed);
+  const format: SealFormat = !timestamp.timestamped ? 'PAdES-B-B' : (ltv.level ?? 'PAdES-B-T');
+  return { pdf, format, timestamp, keyProvider, ltv };
 }
 
 /**
@@ -38,12 +52,7 @@ export async function sealPdf(
   const keys = sealKeyProvider();
   const signer = new CadesSigner(keys, config.tsaUrl);
   const pdf = await new SignPdf().sign(withPlaceholder, signer);
-  return {
-    pdf,
-    format: signer.lastTimestamp.timestamped ? 'PAdES-B-T' : 'PAdES-B-B',
-    timestamp: signer.lastTimestamp,
-    keyProvider: keys.id,
-  };
+  return finish(pdf, signer.lastTimestamp, keys.id);
 }
 
 /**
@@ -69,5 +78,5 @@ export async function sealPdfIncremental(input: Buffer, opts: { reason: string }
     { fieldName: `DocSign Seal ${Date.now()}`, reason: opts.reason, name: 'DocSign Platform Seal', contactInfo: config.appUrl, location: `DocSign cell: ${config.cellRegion}` },
     (content) => signer.sign(content),
   );
-  return { pdf, format: signer.lastTimestamp.timestamped ? 'PAdES-B-T' : 'PAdES-B-B', timestamp: signer.lastTimestamp, keyProvider: keys.id };
+  return finish(pdf, signer.lastTimestamp, keys.id);
 }

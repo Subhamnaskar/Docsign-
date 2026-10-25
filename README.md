@@ -18,9 +18,10 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 | Billing | 14-day free trial, Starter / Business / Enterprise plans with agreement and user limits, monthly or yearly subscriptions, pro-rata plan changes, cancel at period end, GST tax invoices (PDF), Settings → Billing; prices in `apps/api/src/billing/plans.ts` (placeholders) feed the website pricing page |
 | Payments | Collect a fee as part of signing: built-in sandbox checkout, Stripe Checkout and Razorpay Payment Links adapters |
 | Compliance engine | Jurisdiction packs for US, UK, EU and India; resolves signature level, identity strength, retention, data region and consent text; blocks documents that cannot legally be e-signed |
-| Trust | PAdES (ETSI.CAdES.detached) seal with RFC 3161 timestamp (PAdES-B-T); key behind a `KeyProvider` interface (HSM-ready) |
+| Trust | PAdES (ETSI.CAdES.detached) seal with RFC 3161 timestamp, plus long-term validation: certificates and OCSP/CRL revocation data in a DSS (B-LT) and a document timestamp (B-LTA), renewed automatically before it ages out; key behind a `KeyProvider` interface (HSM-ready) |
 | Evidence | Append-only SHA-256 hash-chained audit log, certificate of completion (also sealed), write-once storage via S3 Object Lock |
 | Verification portal | Public `/verify`: fingerprint lookup, CMS signature check, timestamp check, tamper detection, audit chain status |
+| Account security | Email verification before sending, password reset and change, TOTP two-factor authentication with recovery codes, organisation-wide 2FA requirement, signed-in device list with remote sign-out, security notification emails |
 | Teams & admin | Owner / admin / member roles (members see only their own agreements), invitations, OIDC single sign-on with optional enforcement, SCIM 2.0 user provisioning, branding (logo, colour, email footer), organisation activity log, reports dashboard |
 | AI (opt-in) | On the Claude API: document summaries for signers, contract review for senders, field detection, Q&A over an agreement. Off until an admin turns it on for the organisation |
 | API & integrations | REST API (`/api/v1`), API keys, HMAC-signed webhooks with retries, REST hooks (Zapier style), MCP server at `/api/v1/mcp` so AI assistants can look up, send (from templates), remind and void agreements |
@@ -159,6 +160,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how this maps to the bluepr
 ## Development notes
 
 - The dev platform seal key and a private dev root CA are generated on first start into `apps/api/.keys/` (git-ignored). Adobe Reader will show the seal as "validity unknown" until that root is trusted; production uses an HSM-held key with a publicly trusted certificate.
-- Set `TSA_URL=` (empty) to work offline; seals then fall back to PAdES-B-B and the audit trail records why.
+- Set `TSA_URL=` (empty) to work offline; seals then fall back to PAdES-B-B (with the validation data still embedded) and the audit trail records why. With a TSA, documents reach PAdES-B-LTA; the worker renews archive timestamps after `LTA_RENEW_AFTER_DAYS` (default 5 years) and keeps earlier copies verifiable.
+- The dev CA publishes an empty revocation list at `/api/v1/trust/dev-ca.crl`. Dev key folders created before this existed are regenerated once on start, because the CA key is now kept.
 - Translations (emails and signing page) are first drafts. Have native speakers review them, and have legal review the consent wording, before production. The consent disclosure itself stays in the governing jurisdiction's wording.
 - Signer-supplied signature images are fully decoded and re-encoded before storage (`src/lib/image.ts`). A malformed PNG otherwise hangs pdf-lib's decoder and blocks the API's event loop.

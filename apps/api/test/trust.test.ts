@@ -79,7 +79,9 @@ describe('incremental signatures', () => {
     const sigs = await verifyPdfSignatures(pdf);
     expect(sigs).toHaveLength(3);
     expect(sigs.every((s) => s.integrityValid)).toBe(true);
-    expect(sigs.map((s) => s.coversWholeDocument)).toEqual([false, false, true]);
+    // Later signatures and the validation data are permitted additions, so every signature still counts as unaltered
+    expect(sigs.map((s) => s.laterChanges)).toEqual(['validation-data', 'validation-data', 'validation-data']);
+    expect(sigs.every((s) => s.coversWholeDocument)).toBe(true);
 
     // Still a valid PDF for other tools, with both signature fields
     const { PDFDocument } = await import('pdf-lib');

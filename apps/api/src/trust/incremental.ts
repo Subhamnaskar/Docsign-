@@ -120,24 +120,36 @@ export interface SignatureFieldOptions {
   signatureLength?: number;
   /** Omit for an invisible signature (platform seal) */
   appearance?: SignatureAppearance;
+  /** 'timestamp' adds a PAdES document timestamp (RFC 3161 token, no signer) */
+  kind?: 'signature' | 'timestamp';
 }
 
 /** Adds a signature field with an empty /Contents placeholder to `doc` (call inside incrementalUpdate). */
 export async function addSignatureField(doc: PDFDocument, opts: SignatureFieldOptions) {
   const ctx = doc.context;
   const length = opts.signatureLength ?? 24_000;
-  const sig = ctx.obj({
-    Type: 'Sig',
-    Filter: 'Adobe.PPKLite',
-    SubFilter: 'ETSI.CAdES.detached',
-    ByteRange: [0, PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER)],
-    Contents: PDFHexString.of('0'.repeat(length * 2)),
-    Reason: PDFString.of(opts.reason),
-    Name: PDFString.of(opts.name),
-    Location: PDFString.of(opts.location ?? ''),
-    ContactInfo: PDFString.of(opts.contactInfo ?? ''),
-    M: PDFString.fromDate(new Date()),
-  });
+  const byteRange = [0, PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER), PDFName.of(BYTE_RANGE_PLACEHOLDER)];
+  const sig =
+    opts.kind === 'timestamp'
+      ? ctx.obj({
+          Type: 'DocTimeStamp',
+          Filter: 'Adobe.PPKLite',
+          SubFilter: 'ETSI.RFC3161',
+          ByteRange: byteRange,
+          Contents: PDFHexString.of('0'.repeat(length * 2)),
+        })
+      : ctx.obj({
+          Type: 'Sig',
+          Filter: 'Adobe.PPKLite',
+          SubFilter: 'ETSI.CAdES.detached',
+          ByteRange: byteRange,
+          Contents: PDFHexString.of('0'.repeat(length * 2)),
+          Reason: PDFString.of(opts.reason),
+          Name: PDFString.of(opts.name),
+          Location: PDFString.of(opts.location ?? ''),
+          ContactInfo: PDFString.of(opts.contactInfo ?? ''),
+          M: PDFString.fromDate(new Date()),
+        });
   const sigRef = ctx.register(sig);
 
   const pageIndex = opts.appearance?.page ?? 0;
@@ -156,7 +168,11 @@ export async function addSignatureField(doc: PDFDocument, opts: SignatureFieldOp
   });
   if (opts.appearance) widget.set(PDFName.of('AP'), ctx.obj({ N: await appearanceStream(doc, opts.appearance) }));
   const widgetRef = ctx.register(widget);
-  page.node.addAnnot(widgetRef);
+  // Not page.node.addAnnot(): that "normalises" the page, wrapping its content
+  // streams and rewriting resources, which is a real change to signed content
+  const annots = page.node.lookupMaybe(PDFName.of('Annots'), PDFArray);
+  if (annots) annots.push(widgetRef);
+  else page.node.set(PDFName.of('Annots'), ctx.obj([widgetRef]));
 
   const catalog = doc.catalog;
   let acroForm = catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);

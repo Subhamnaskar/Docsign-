@@ -93,6 +93,8 @@ export const config = {
     /** sandbox (specimen certificates, not valid) | off */
     provider: env('ESTAMP_PROVIDER', 'sandbox'),
   },
+  /** Renew PAdES archive timestamps (B-LTA) older than this many days */
+  ltaRenewAfterDays: Number(env('LTA_RENEW_AFTER_DAYS', String(5 * 365))),
   /** 'inline' runs background jobs inside the API process; 'off' expects `npm run worker`. */
   workerMode: env('WORKER_MODE', 'inline') as 'inline' | 'off',
   clamav: {

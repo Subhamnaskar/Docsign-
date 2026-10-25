@@ -35,7 +35,7 @@ When any signer signs with Aadhaar eSign or a DSC, the envelope switches to incr
 
 | Phase | Status in this repository | Still to do |
 |---|---|---|
-| 2. Trust | Aadhaar eSign 2.1 (sandbox ESP + production adapter), DSC tokens, SMS/WhatsApp/access-code identity, incremental signing | QES via QTSP partners (CSC API), ID document verification, native mobile apps, Salesforce/M365/Google integrations, LTV (B-LT/B-LTA) |
+| 2. Trust | Aadhaar eSign 2.1 (sandbox ESP + production adapter), DSC tokens, SMS/WhatsApp/access-code identity, incremental signing, PAdES B-LT/B-LTA with archive-timestamp renewal | QES via QTSP partners (CSC API), ID document verification, native mobile apps, Salesforce/M365/Google integrations |
 | 3. Enterprise | Roles, OIDC SSO, SCIM, branding, activity log, reports, AI (Claude API), web forms, conditional and calculated fields, REST hooks, MCP server | Workflow builder (Temporal), CLM repository, BYOK, dedicated cells, SOC 2 audit (see [compliance/soc2-readiness.md](compliance/soc2-readiness.md)) |
 | 4. Regulated | e-stamp interface with a sandbox provider, payments at signing | RON, real e-stamp vendor, FedRAMP cell, on-prem, ICP-Brasil, national eIDs |
 | 5. Full suite | — | Negotiation/redlining, marketplace, EUDI Wallet (see below), China stack |
@@ -52,7 +52,6 @@ Neither needs changes to the envelope engine.
 ## Still open
 
 - **HSM/KMS key provider**: `LocalKeyProvider` keeps a dev key on disk. Production needs a cloud KMS or HSM implementation of `KeyProvider` and a publicly trusted (AATL/EUTL) seal certificate.
-- **LTV**: seals are B-T. B-LT/B-LTA (embedded revocation data, re-timestamping) are not done.
 - **Real-provider testing**: ESP, Twilio/MSG91, Stripe/Razorpay and OIDC adapters are written to the providers' published APIs but only tested against sandboxes and stubs.
 - **e-Stamp vendor**: only the interface and a specimen provider exist.
 - **Sender UI language**: the sender app is English; signers get their language. Translations need native-speaker review.

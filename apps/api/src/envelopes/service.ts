@@ -13,7 +13,7 @@ import { getObject, putObject } from '../lib/storage.js';
 import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
 import { isIncremental, prepareForSend } from '../esign/service.js';
 import { formatAmount } from '../payments/providers.js';
-import { sealPdf, sealPdfIncremental } from '../trust/pades.js';
+import { sealPdf, sealPdfIncremental, type SealResult } from '../trust/pades.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 import { assertCanSend } from '../billing/plans.js';
 import { HttpError } from '../lib/errors.js';
@@ -90,6 +90,19 @@ function activeSigners(env: Envelope, recipients: Recipient[]): Recipient[] {
   const next = Math.min(...pending.map((r) => r.routingOrder));
   return pending.filter((r) => r.routingOrder === next);
 }
+
+/** Long-term validation details for the audit trail. */
+const ltvAudit = (sealed: SealResult) => ({
+  level: sealed.ltv.level,
+  certificates: sealed.ltv.certificates,
+  crls: sealed.ltv.crls,
+  ocsps: sealed.ltv.ocsps,
+  ...(sealed.ltv.missing.length ? { missingRevocationData: sealed.ltv.missing } : {}),
+  ...(sealed.ltv.documentTimestamp ? { archiveTimestamp: sealed.ltv.documentTimestamp.toISOString() } : {}),
+  ...(sealed.ltv.error ? { error: sealed.ltv.error } : {}),
+});
+
+const ltvFields = (sealed: SealResult) => ({ ltvLevel: sealed.format, archiveTimestampAt: sealed.ltv.documentTimestamp ?? null });
 
 export async function sendEnvelope(orgId: string, id: string, actor: Actor, client: { ip?: string | null; userAgent?: string | null }) {
   const env = await getEnvelope(orgId, id);
@@ -241,12 +254,12 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
       await putObject(finalKey, sealed.pdf, 'application/pdf', policy.retentionYears);
       sealFormat = sealed.format;
       await prisma.$transaction(async (tx) => {
-        await tx.document.update({ where: { id: doc.id }, data: { finalKey, finalSha256 } });
+        await tx.document.update({ where: { id: doc.id }, data: { finalKey, finalSha256, ...ltvFields(sealed) } });
         await appendAudit(tx, {
           envelopeId: env.id,
           type: 'document.sealed',
           actor: { kind: 'system' },
-          data: { documentId: doc.id, sha256: finalSha256, format: sealed.format, keyProvider: sealed.keyProvider, incremental: true },
+          data: { documentId: doc.id, sha256: finalSha256, format: sealed.format, keyProvider: sealed.keyProvider, incremental: true, ltv: ltvAudit(sealed) },
         });
       });
       continue;
@@ -274,7 +287,7 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
     const finalKey = `envelopes/${env.id}/completed/${doc.id}.pdf`;
     await putObject(finalKey, sealed.pdf, 'application/pdf', policy.retentionYears);
     await prisma.$transaction(async (tx) => {
-      await tx.document.update({ where: { id: doc.id }, data: { finalKey, finalSha256 } });
+      await tx.document.update({ where: { id: doc.id }, data: { finalKey, finalSha256, ...ltvFields(sealed) } });
       await appendAudit(tx, {
         envelopeId: env.id,
         type: 'document.sealed',
@@ -287,6 +300,7 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
           timestamp: sealed.timestamp.timestamped
             ? { genTime: sealed.timestamp.genTime?.toISOString(), tsa: sealed.timestamp.tsa }
             : { error: sealed.timestamp.error ?? 'No timestamp authority configured' },
+          ltv: ltvAudit(sealed),
         },
       });
     });
@@ -323,7 +337,13 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await tx.envelope.update({
       where: { id: env.id },
-      data: { status: 'COMPLETED', certificateKey, certificateSha256: sha256Hex(sealedCert.pdf), finalizingAt: null },
+      data: {
+        status: 'COMPLETED',
+        certificateKey,
+        certificateSha256: sha256Hex(sealedCert.pdf),
+        certificateArchiveTimestampAt: sealedCert.ltv.documentTimestamp ?? null,
+        finalizingAt: null,
+      },
     });
     await enqueueWebhook(tx, env.orgId, 'envelope.completed', {
       envelopeId: env.id,

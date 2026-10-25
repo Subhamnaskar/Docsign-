@@ -246,6 +246,8 @@ model Envelope {
   voidReason        String?
   certificateKey    String?
   certificateSha256 String?
+  certificateArchiveTimestampAt DateTime?
+  certificatePriorSha256        String[]  @default([])
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   documents         Document[]
@@ -273,6 +275,11 @@ model Document {
   workingKey  String?
   finalKey    String?
   finalSha256 String?
+  // PAdES level reached (B-B, B-T, B-LT, B-LTA) and when the last archive timestamp was added
+  ltvLevel           String?
+  archiveTimestampAt DateTime?
+  // Fingerprints of earlier sealed versions (before archive-timestamp renewals), still verifiable
+  priorSha256        String[] @default([])
   createdAt   DateTime @default(now())
   fields      Field[]
 

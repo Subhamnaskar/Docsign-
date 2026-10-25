@@ -18,14 +18,18 @@ interface VerifyResult {
     jurisdiction: string;
     signers: { name: string; email: string; signedAt: string | null }[];
     auditTrail: { valid: boolean; events: number };
+    superseded?: boolean;
   } | null;
+  ltv?: { dss: boolean; documentTimestamps: number };
   signatures: {
     index: number;
+    kind?: 'signature' | 'document-timestamp';
     subFilter: string | null;
     signerName: string | null;
     issuerName: string | null;
     integrityValid: boolean;
     coversWholeDocument: boolean;
+    laterChanges?: 'none' | 'validation-data' | 'other';
     timestamp: { genTime: string; valid: boolean } | null;
     error?: string;
   }[];
@@ -130,14 +134,21 @@ export default function VerifyPage() {
               <ul className="mt-3 space-y-2 text-sm">
                 <Check ok={!!result.match}>Fingerprint matches a completed DocSign record</Check>
                 <Check ok={sigOk}>Digital signature is cryptographically valid</Check>
-                <Check ok={untouched}>No changes after signing</Check>
+                <Check ok={untouched}>No changes after signing (validation data may be added later)</Check>
                 {result.signatures.map((s) => s.timestamp && (
                   <Check key={s.index} ok={s.timestamp.valid}>
-                    Trusted timestamp {formatDate(s.timestamp.genTime)}
+                    {s.kind === 'document-timestamp' ? 'Archive timestamp' : 'Trusted timestamp'} {formatDate(s.timestamp.genTime)}
                   </Check>
                 ))}
+                {result.ltv?.dss && <Check ok>Long-term validation data embedded (certificates and revocation status)</Check>}
                 {result.match && <Check ok={result.match.auditTrail.valid}>Audit trail intact ({result.match.auditTrail.events} events)</Check>}
               </ul>
+              {result.match?.superseded && (
+                <p className="mt-3 text-sm text-gray-600">
+                  This is an earlier copy. The stored original has since received a fresh archive timestamp, which keeps its signatures verifiable long-term; the
+                  content is the same.
+                </p>
+              )}
               <p className="mt-4 break-all font-mono text-[11px] text-gray-400">SHA-256 {result.sha256}</p>
             </Card>
 
@@ -170,7 +181,13 @@ export default function VerifyPage() {
                     <dt className="text-gray-400">Issuer</dt>
                     <dd>{s.issuerName ?? 'Unknown'}</dd>
                     <dt className="text-gray-400">Format</dt>
-                    <dd>{s.subFilter === 'ETSI.CAdES.detached' ? `PAdES ${s.timestamp ? '(B-T)' : '(B-B)'}` : s.subFilter}</dd>
+                    <dd>
+                      {s.kind === 'document-timestamp'
+                        ? 'PAdES document timestamp (RFC 3161)'
+                        : s.subFilter === 'ETSI.CAdES.detached'
+                          ? `PAdES ${!s.timestamp ? '(B-B)' : result.ltv?.documentTimestamps ? '(B-LTA)' : result.ltv?.dss ? '(B-LT)' : '(B-T)'}`
+                          : s.subFilter}
+                    </dd>
                     {s.error && (
                       <>
                         <dt className="text-gray-400">Error</dt>
