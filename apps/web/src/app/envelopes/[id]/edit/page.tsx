@@ -112,6 +112,26 @@ function CloudImport({ envelopeId, onImported, onError }: { envelopeId: string; 
   );
 }
 
+/** Department picker, shown when the organisation uses departments. */
+function DepartmentSelect({ env, onPatch }: { env: Envelope; onPatch: (data: Partial<Envelope>) => Promise<void> }) {
+  const [list, setList] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    api<{ id: string; name: string }[]>('/departments').then(setList).catch(() => {});
+  }, []);
+  if (!list.length) return null;
+  return (
+    <div>
+      <Label htmlFor="dept">Department</Label>
+      <Select id="dept" value={env.departmentId ?? ''} onChange={(e) => onPatch({ departmentId: e.target.value || null })}>
+        <option value="">None</option>
+        {list.map((d) => (
+          <option key={d.id} value={d.id}>{d.name}</option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
 function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope: (e: Envelope) => void; options: Options }) {
   const [uploading, setUploading] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -242,6 +262,7 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
 
         <Card className="space-y-4 p-5">
           <h2 className="font-semibold">Details</h2>
+          <DepartmentSelect env={env} onPatch={patch} />
           <div>
             <Label htmlFor="title">Agreement title</Label>
             <Input id="title" defaultValue={env.title} maxLength={200} onBlur={(e) => e.target.value.trim() && e.target.value !== env.title && patch({ title: e.target.value.trim() })} />

@@ -13,6 +13,8 @@ import { Alert, Button, Card, cx, Input, Label, Select, Textarea } from '@/compo
 import { api } from '@/lib/api';
 import { formatDate, relativeTime } from '@/lib/format';
 import type { Option } from '@/lib/types';
+import { DepartmentsSettings } from '@/components/settings/Departments';
+import { GovernanceSettings } from '@/components/settings/Governance';
 
 interface ApiKey {
   id: string;
@@ -318,7 +320,9 @@ const TABS = [
   { id: 'billing', label: 'Billing', admin: true },
   { id: 'branding', label: 'Branding', admin: true },
   { id: 'sso', label: 'Single sign-on', admin: true },
+  { id: 'departments', label: 'Departments', admin: true },
   { id: 'integrations', label: 'Integrations', admin: true },
+  { id: 'governance', label: 'Governance', admin: true },
   { id: 'developers', label: 'API & webhooks', admin: true },
   { id: 'activity', label: 'Activity', admin: true },
 ] as const;
@@ -371,7 +375,9 @@ function Settings() {
             <Webhooks />
           </>
         )}
+        {tab === 'departments' && <DepartmentsSettings />}
         {tab === 'integrations' && <IntegrationsSettings />}
+        {tab === 'governance' && <GovernanceSettings />}
         {tab === 'activity' && <ActivityLog />}
       </div>
     </>

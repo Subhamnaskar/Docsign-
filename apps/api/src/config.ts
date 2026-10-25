@@ -26,6 +26,14 @@ export const config = {
   gotenbergUrl: env('GOTENBERG_URL', 'http://localhost:3100'),
   tsaUrl: process.env.TSA_URL ?? '',
   keysDir: env('KEYS_DIR', '.keys'),
+  /** Platform seal key: local (dev key on disk) | aws-kms (HSM-backed key in AWS KMS) */
+  seal: {
+    provider: env('SEAL_KEY_PROVIDER', 'local') as 'local' | 'aws-kms',
+    kmsKeyId: process.env.SEAL_KMS_KEY_ID ?? '',
+    kmsRegion: env('SEAL_KMS_REGION', process.env.AWS_REGION ?? 'ap-south-1'),
+    /** PEM bundle: seal certificate first, then intermediates */
+    certChainPath: process.env.SEAL_CERT_CHAIN_PATH ?? '',
+  },
   appSecret: env('APP_SECRET', 'change-me-to-a-long-random-string-at-least-32-chars'),
   salesEmail: env('SALES_EMAIL', 'sales@docsign.local'),
   messaging: {

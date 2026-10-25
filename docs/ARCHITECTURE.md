@@ -51,7 +51,7 @@ Neither needs changes to the envelope engine.
 
 ## Still open
 
-- **HSM/KMS key provider**: `LocalKeyProvider` keeps a dev key on disk. Production needs a cloud KMS or HSM implementation of `KeyProvider` and a publicly trusted (AATL/EUTL) seal certificate.
+- **Seal key and certificate**: an AWS KMS `KeyProvider` exists (`SEAL_KEY_PROVIDER=aws-kms`) but is untested without an account; production still needs a publicly trusted (AATL/EUTL) seal certificate.
 - **Real-provider testing**: ESP, Twilio/MSG91, Stripe/Razorpay and OIDC adapters are written to the providers' published APIs but only tested against sandboxes and stubs.
 - **e-Stamp vendor**: only the interface and a specimen provider exist.
 - **Sender UI language**: the sender app is English; signers get their language. Translations need native-speaker review.

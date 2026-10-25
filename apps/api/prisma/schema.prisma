@@ -42,6 +42,28 @@ model Organization {
   approvalPolicy     String            @default("off")
   // Who may approve; empty = any owner or admin
   approverIds        String[]          @default([])
+  // --- Data governance ---
+  // Delete completed agreements this many days after completion (never before the legal retention); null = keep
+  retentionDays      Int?
+  // Delete drafts, voided, declined and expired agreements after this many days; null = keep
+  purgeIncompleteDays Int?
+  // --- Access ---
+  // CIDR ranges allowed to use the app and API (empty = anywhere)
+  ipAllowlist        String[]          @default([])
+  // --- Email from the customer's domain (DKIM-signed) ---
+  emailFromName      String?
+  emailReplyTo       String?
+  emailDomain        String?
+  dkimSelector       String?
+  dkimPrivateKeyEnc  String?
+  dkimPublicKey      String?
+  emailDomainVerifiedAt DateTime?
+  // --- Signing pages on the customer's own domain (e.g. sign.example.com) ---
+  customDomain       String?           @unique
+  customDomainToken  String?
+  customDomainVerifiedAt DateTime?
+  // --- Customer-managed key for documents at rest (S3 SSE-KMS key ARN) ---
+  storageKmsKeyId    String?
   // --- Billing (see src/billing/plans.ts) ---
   plan               String            @default("trial")
   billingStatus      BillingStatus     @default(TRIALING)
@@ -64,6 +86,7 @@ model Organization {
   taxId              String?
   createdAt          DateTime          @default(now())
   users              User[]
+  departments        Department[]
   envelopes          Envelope[]
   apiKeys            ApiKey[]
   webhooks           WebhookEndpoint[]
@@ -114,6 +137,7 @@ model User {
   // Hashed single-use recovery codes
   recoveryCodeHashes String[]     @default([])
   authTokens   AuthToken[]
+  departments  DepartmentMember[]
   createdAt    DateTime     @default(now())
 }
 
@@ -233,6 +257,12 @@ model Envelope {
   routing           RoutingMode    @default(SEQUENTIAL)
   jurisdiction      String
   documentType      String         @default("general")
+  departmentId      String?
+  department        Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  // Legal hold: never deleted by retention rules while set
+  legalHoldAt       DateTime?
+  legalHoldReason   String?
+  legalHoldBy       String?
   // Internal approval before sending: PENDING | APPROVED | REJECTED (null = not requested)
   approvalStatus      String?
   approvalRequestedAt DateTime?
@@ -584,6 +614,8 @@ model Template {
   id           String             @id @default(cuid())
   orgId        String
   org          Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  // Shared with one department only (null = whole organisation)
+  departmentId String?
   createdById  String
   name         String
   description  String?
@@ -880,4 +912,29 @@ model DocumentVersion {
   createdAt  DateTime @default(now())
 
   @@index([documentId])
+}
+
+/// A department or workspace inside an organisation (e.g. "Sales", "HR").
+model Department {
+  id        String             @id @default(cuid())
+  orgId     String
+  org       Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime           @default(now())
+  members   DepartmentMember[]
+  envelopes Envelope[]
+
+  @@unique([orgId, name])
+}
+
+model DepartmentMember {
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // member | manager (managers see every agreement in the department)
+  role         String     @default("member")
+
+  @@id([departmentId, userId])
+  @@index([userId])
 }

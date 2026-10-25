@@ -277,7 +277,7 @@ export async function signingRoutes(app: FastifyInstance) {
           heading: t(r.locale, 'otpHeading'),
           paragraphs: [t(r.locale, 'otpIntro', { title: r.envelope.title }), code, t(r.locale, 'otpExpiry')],
         });
-        await sendMail({ to: r.email, subject: t(r.locale, 'otpSubject', { code }), html, text });
+        await sendMail({ to: r.email, subject: t(r.locale, 'otpSubject', { code }), html, text, orgId: r.envelope.orgId });
         return { sentTo: maskEmail(r.email), channel, expiresInSeconds: OTP_TTL_MS / 1000 };
       }
       await sendOtpMessage(channel, { to: r.phone!, code, text: t(r.locale, 'otpSubject', { code }) });

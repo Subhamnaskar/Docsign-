@@ -32,6 +32,8 @@ import { enachRoutes } from './enach/routes.js';
 import { docgenRoutes } from './docgen/routes.js';
 import { contractRoutes } from './contracts/routes.js';
 import { negotiationRoutes } from './negotiation/routes.js';
+import { governanceRoutes } from './governance/routes.js';
+import { departmentRoutes } from './governance/departments.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
 export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] } = {}) {
@@ -75,6 +77,8 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(docgenRoutes);
       await v1.register(contractRoutes);
       await v1.register(negotiationRoutes);
+      await v1.register(governanceRoutes);
+      await v1.register(departmentRoutes);
       await v1.register(formRoutes);
       await v1.register(reportRoutes);
       await v1.register(esignRoutes);

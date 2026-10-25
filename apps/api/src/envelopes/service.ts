@@ -19,6 +19,7 @@ import { assertCanSend } from '../billing/plans.js';
 import { HttpError } from '../lib/errors.js';
 import { mandateLabels } from '../enach/routes.js';
 import { approvalGate } from '../approvals/service.js';
+import { appBaseFor } from '../governance/delivery.js';
 
 export const envelopeInclude = {
   documents: { orderBy: { order: 'asc' } },
@@ -29,11 +30,16 @@ export const envelopeInclude = {
 export type FullEnvelope = Prisma.EnvelopeGetPayload<{ include: typeof envelopeInclude }>;
 
 /** Members see the envelopes they created; admins and owners see the whole organisation's. */
-export function envelopeScope(auth: { orgId: string; userId: string | null; role: string }): Prisma.EnvelopeWhereInput {
-  return auth.role === 'MEMBER' ? { orgId: auth.orgId, createdById: auth.userId ?? '-' } : { orgId: auth.orgId };
+/** Members see their own agreements and those of departments they manage; admins see everything. */
+export function envelopeScope(auth: { orgId: string; userId: string | null; role: string; managedDepartmentIds?: string[] }): Prisma.EnvelopeWhereInput {
+  if (auth.role !== 'MEMBER') return { orgId: auth.orgId };
+  const managed = auth.managedDepartmentIds ?? [];
+  return managed.length
+    ? { orgId: auth.orgId, OR: [{ createdById: auth.userId ?? '-' }, { departmentId: { in: managed } }] }
+    : { orgId: auth.orgId, createdById: auth.userId ?? '-' };
 }
 
-export async function getVisibleEnvelope(auth: { orgId: string; userId: string | null; role: string }, id: string): Promise<FullEnvelope> {
+export async function getVisibleEnvelope(auth: { orgId: string; userId: string | null; role: string; managedDepartmentIds?: string[] }, id: string): Promise<FullEnvelope> {
   const env = await prisma.envelope.findFirst({ where: { id, ...envelopeScope(auth) }, include: envelopeInclude });
   if (!env) throw notFound('Envelope');
   return env;
@@ -156,6 +162,7 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
 export async function notifySigners(env: Envelope, recipients: Recipient[], kind: 'invite' | 'reminder') {
   const sender = await prisma.user.findUnique({ where: { id: env.createdById } });
   const brand = await getBranding(env.orgId);
+  const base = await appBaseFor(env.orgId);
   for (const r of recipients) {
     // Embedded and in-person signers are reached through the integrating app or the host
     if (r.embedded || r.hostUserId) continue;
@@ -170,13 +177,14 @@ export async function notifySigners(env: Envelope, recipients: Recipient[], kind
         ...(env.message ? [t(r.locale, 'senderMessage', { ...vars, message: env.message })] : []),
         ...(env.expiresAt ? [t(r.locale, 'expires', { date: formatDateFor(r.locale, env.expiresAt) })] : []),
       ],
-      button: { label: t(r.locale, 'reviewAndSign'), url: signingUrl(r) },
+      button: { label: t(r.locale, 'reviewAndSign'), url: signingUrl(r, base) },
     });
     await sendMail({
       to: r.email,
       subject: t(r.locale, kind === 'invite' ? 'inviteSubject' : 'reminderSubject', vars),
       html,
       text,
+      orgId: env.orgId,
     });
     await prisma.$transaction(async (tx) => {
       await tx.recipient.update({ where: { id: r.id }, data: { lastNotifiedAt: new Date() } });
@@ -401,6 +409,7 @@ async function sendCompletionEmails(envelopeId: string) {
       html,
       text,
       attachments: attach ? attachments : undefined,
+      orgId: env.orgId,
     });
   }
 }
@@ -421,7 +430,7 @@ export async function voidEnvelope(orgId: string, id: string, reason: string, ac
       heading: t(r.locale, 'voidedSubject', vars),
       paragraphs: [t(r.locale, 'hello', vars), t(r.locale, 'voidedBody', vars), t(r.locale, 'reason', vars)],
     });
-    await sendMail({ to: r.email, subject: t(r.locale, 'voidedSubject', vars), html, text }).catch(() => {});
+    await sendMail({ to: r.email, subject: t(r.locale, 'voidedSubject', vars), html, text, orgId: env.orgId }).catch(() => {});
   }
   return getEnvelope(orgId, id);
 }

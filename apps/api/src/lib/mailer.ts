@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config.js';
 import { RTL_LOCALES, t } from '../i18n/messages.js';
+import { mailIdentityFor } from '../governance/delivery.js';
 
 const transport = nodemailer.createTransport({
   host: config.smtp.host,
@@ -14,10 +15,14 @@ export interface Mail {
   html: string;
   text: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
+  /** Sending organisation: its sender name, reply-to and verified domain (DKIM) are used */
+  orgId?: string;
 }
 
 export async function sendMail(mail: Mail): Promise<void> {
-  await transport.sendMail({ from: config.smtp.from, ...mail });
+  const { orgId, ...rest } = mail;
+  const identity = orgId ? await mailIdentityFor(orgId) : { from: config.smtp.from };
+  await transport.sendMail({ ...identity, ...rest });
 }
 
 const escape = (s: string) =>

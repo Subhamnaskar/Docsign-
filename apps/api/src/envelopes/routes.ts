@@ -33,6 +33,7 @@ import { mandateConfig } from '../enach/mandate-config.js';
 import { calculateDuty, INSTRUMENTS, supportedDuty } from '../estamp/duty.js';
 import { approvalFingerprint, isApprover } from '../approvals/service.js';
 import { layout, sendMail } from '../lib/mailer.js';
+import { assertDepartmentUsable } from '../governance/departments.js';
 
 const jurisdictionCode = z.string().refine((c) => c in JURISDICTIONS, 'Unknown jurisdiction');
 const documentTypeCode = z.string().refine((c) => c in DOCUMENT_TYPES, 'Unknown document type');
@@ -45,6 +46,8 @@ const envelopeInput = z.object({
   routing: z.enum(['SEQUENTIAL', 'PARALLEL']).optional(),
   reminderDays: z.number().int().min(0).max(30).optional(),
   expiresAt: z.coerce.date().nullish(),
+  /** Department (workspace) the agreement belongs to */
+  departmentId: z.string().nullish(),
   /** India: buy an e-stamp for this agreement when it is sent */
   estamp: z
     .object({
@@ -129,6 +132,8 @@ export function serializeEnvelope(env: FullEnvelope) {
     estamp: env.estamp,
     estampResult: env.estampResult,
     certificateSha256: env.certificateSha256,
+    departmentId: env.departmentId,
+    legalHold: env.legalHoldAt ? { since: env.legalHoldAt, reason: env.legalHoldReason } : null,
     approval: env.approvalStatus
       ? { status: env.approvalStatus, requestedAt: env.approvalRequestedAt, requestedBy: env.approvalRequestedBy, decidedBy: env.approvalDecidedBy, note: env.approvalNote }
       : null,
@@ -302,6 +307,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
 
   app.post('/envelopes', async (req, reply) => {
     const body = parse(envelopeInput, req.body);
+    if (body.departmentId) await assertDepartmentUsable(req.auth, body.departmentId);
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: req.auth.orgId } });
     if (!req.auth.userId) throw badRequest('The organisation has no owner to attribute this envelope to.');
     const env = await prisma.$transaction(async (tx) => {
@@ -316,6 +322,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
           routing: body.routing ?? 'SEQUENTIAL',
           reminderDays: body.reminderDays ?? 2,
           expiresAt: body.expiresAt ?? null,
+          departmentId: body.departmentId ?? null,
         },
       });
       await appendAudit(tx, {
@@ -341,6 +348,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
     const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
     const { estamp, ...body } = parse(envelopeInput.partial(), req.body);
+    if (body.departmentId) await assertDepartmentUsable(req.auth, body.departmentId);
     await prisma.envelope.update({
       where: { id },
       data: { ...body, ...(estamp !== undefined ? { estamp: estamp ?? Prisma.DbNull } : {}) },
@@ -352,6 +360,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
+    if (env.legalHoldAt) throw conflict('This agreement is on legal hold.');
     await prisma.envelope.delete({ where: { id } });
     reply.code(204);
   });

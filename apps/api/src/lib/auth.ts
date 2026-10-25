@@ -5,6 +5,7 @@ import { prisma } from '../db.js';
 import { hmacSha256Hex, randomToken, safeEqualHex, sha256Hex } from './crypto.js';
 import { forbidden, HttpError, unauthorized } from './errors.js';
 import { assertFeature } from '../billing/plans.js';
+import { ipAllowed, orgIpAllowlist } from '../governance/delivery.js';
 
 export const SESSION_COOKIE = 'ds_session';
 export const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
@@ -20,6 +21,8 @@ export interface AuthContext {
   actor: Actor;
   /** Present for cookie sessions */
   sessionId?: string;
+  /** Departments this member manages (they see those agreements too) */
+  managedDepartmentIds?: string[];
 }
 
 declare module 'fastify' {
@@ -57,6 +60,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     if (!key.startsWith(API_KEY_PREFIX)) throw unauthorized('Invalid API key');
     const apiKey = await prisma.apiKey.findUnique({ where: { keyHash: sha256Hex(key) } });
     if (!apiKey || apiKey.revokedAt) throw unauthorized('Invalid API key');
+    await assertIpAllowed(request, apiKey.orgId);
     await assertFeature(apiKey.orgId, 'api');
     // Best-effort usage tracking; not worth failing the request over
     prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
@@ -80,6 +84,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
   if (!session || session.expiresAt < new Date()) throw unauthorized('Session expired');
   const { user } = session;
   if (user.disabledAt) throw unauthorized('This account has been deactivated.');
+  await assertIpAllowed(request, user.orgId);
   // Organisation policy: password users must set up two-factor before doing anything else
   if (user.org.require2fa && !user.totpEnabledAt && !user.passwordHash.startsWith('sso:') && !MFA_SETUP_PATHS.test(request.url)) {
     throw new HttpError(403, 'Your organisation requires two-factor authentication. Set it up under Settings → Security.', 'mfa_setup_required');
@@ -93,7 +98,17 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     role: user.role,
     actor: { kind: 'user', id: user.id, name: user.name, email: user.email },
     sessionId: session.id,
+    managedDepartmentIds:
+      user.role === 'MEMBER'
+        ? (await prisma.departmentMember.findMany({ where: { userId: user.id, role: 'manager' }, select: { departmentId: true } })).map((d) => d.departmentId)
+        : undefined,
   };
+}
+
+/** Organisation IP allowlist (signers are not restricted, only the organisation's own users and keys). */
+async function assertIpAllowed(request: FastifyRequest, orgId: string) {
+  const list = await orgIpAllowlist(orgId);
+  if (!ipAllowed(request.ip, list)) throw new HttpError(403, `Access from ${request.ip} is not allowed by your organisation's IP allowlist.`, 'ip_not_allowed');
 }
 
 const LAST_SEEN_RESOLUTION_MS = 5 * 60_000;
@@ -136,8 +151,9 @@ export function signingTokenMatches(r: TokenSubject, mac: string): boolean {
   return safeEqualHex(mac, signingMac(r));
 }
 
-export function signingUrl(r: TokenSubject): string {
-  return `${config.appUrl}/sign/${signingToken(r)}`;
+/** `base` is the organisation's verified custom domain when it has one (see appBaseFor). */
+export function signingUrl(r: TokenSubject, base = config.appUrl): string {
+  return `${base}/sign/${signingToken(r)}`;
 }
 
 export function clientInfo(request: FastifyRequest) {

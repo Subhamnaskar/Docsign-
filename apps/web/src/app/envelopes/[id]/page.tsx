@@ -271,6 +271,8 @@ function Detail() {
 
           {env.status !== 'DRAFT' && <ContractTerms envelopeId={env.id} />}
 
+          {me?.user && me.user.role !== 'MEMBER' && <RecordsCard env={env} onChange={load} />}
+
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Audit trail</h2>
@@ -385,6 +387,55 @@ function Detail() {
         </div>
       </Modal>
     </>
+  );
+}
+
+/** Admin controls for records management: legal hold, audit export, permanent deletion. */
+function RecordsCard({ env, onChange }: { env: Envelope; onChange: () => Promise<void> }) {
+  const router = useRouter();
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  async function run(fn: () => Promise<unknown>) {
+    setError(null);
+    try {
+      await fn();
+      await onChange();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold">Records</h2>
+      {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+      {env.legalHold ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <strong>On legal hold</strong> since {formatDate(env.legalHold.since)}{env.legalHold.reason ? `: ${env.legalHold.reason}` : ''}. It will not be deleted by retention rules.
+          <button className="ml-2 font-semibold underline" onClick={() => run(() => api(`/envelopes/${env.id}/legal-hold`, { method: 'DELETE' }))}>Release</button>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Input className="min-w-0 flex-1" placeholder="Reason for legal hold, e.g. dispute reference" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Legal hold reason" />
+          <Button variant="secondary" disabled={reason.trim().length < 3} onClick={() => run(() => api(`/envelopes/${env.id}/legal-hold`, { method: 'POST', json: { reason: reason.trim() } }).then(() => setReason('')))}>
+            Place legal hold
+          </Button>
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
+        <a className="font-medium text-brand-700 hover:underline" href={`/api/v1/envelopes/${env.id}/audit.csv`}>Export audit trail (CSV)</a>
+        {!env.legalHold && env.status !== 'SENT' && (
+          <button
+            className="text-red-600 hover:underline"
+            onClick={() =>
+              confirm('Permanently delete this agreement and its files? This cannot be undone.') &&
+              run(() => api(`/envelopes/${env.id}/permanently`, { method: 'DELETE' }).then(() => router.push('/dashboard')))
+            }
+          >
+            Delete permanently
+          </button>
+        )}
+      </div>
+    </Card>
   );
 }
 

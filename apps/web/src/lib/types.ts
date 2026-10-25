@@ -110,6 +110,8 @@ export interface Policy {
 
 export interface Envelope {
   id: string;
+  departmentId?: string | null;
+  legalHold?: { since: string; reason: string | null } | null;
   approval?: { status: 'PENDING' | 'APPROVED' | 'REJECTED'; requestedAt: string | null; requestedBy: string | null; decidedBy: string | null; note: string | null } | null;
   title: string;
   message: string | null;

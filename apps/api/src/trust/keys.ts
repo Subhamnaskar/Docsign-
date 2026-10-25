@@ -1,4 +1,5 @@
-import { createSign, generateKeyPairSync, randomBytes, webcrypto } from 'node:crypto';
+import { KMSClient, SignCommand } from '@aws-sdk/client-kms';
+import { createHash, createSign, generateKeyPairSync, randomBytes, webcrypto } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import forge from 'node-forge';
@@ -147,9 +148,48 @@ async function devCrl(root: pkijs.Certificate, caKeyPem: string): Promise<Buffer
   return Buffer.from(crl.toSchema(true).toBER());
 }
 
+/**
+ * Seal key held in AWS KMS (an HSM-backed asymmetric RSA key, usage SIGN_VERIFY).
+ * Only SHA-256 digests are sent to KMS; the certificate chain issued for the
+ * key's public half (by an AATL/EUTL CA for production) is read from a PEM file.
+ * Follows the KMS Sign API; untested without an AWS account.
+ */
+class AwsKmsKeyProvider implements KeyProvider {
+  readonly id: string;
+  private chain: Buffer[];
+  private client: KMSClient;
+
+  constructor(
+    private keyId: string,
+    chainPath: string,
+    region: string,
+  ) {
+    this.id = `aws-kms:${keyId}`;
+    const pems = readFileSync(chainPath, 'utf8').match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? [];
+    if (!pems.length) throw new Error(`No certificates found in ${chainPath}`);
+    this.chain = pems.map(pemToDer);
+    this.client = new KMSClient({ region });
+  }
+
+  certificateChain() {
+    return this.chain;
+  }
+
+  async sign(data: Buffer) {
+    const res = await this.client.send(
+      new SignCommand({ KeyId: this.keyId, Message: createHash('sha256').update(data).digest(), MessageType: 'DIGEST', SigningAlgorithm: 'RSASSA_PKCS1_V1_5_SHA_256' }),
+    );
+    if (!res.Signature) throw new Error('KMS returned no signature');
+    return Buffer.from(res.Signature);
+  }
+}
+
 let provider: KeyProvider | undefined;
 
 export function sealKeyProvider(): KeyProvider {
-  provider ??= new LocalKeyProvider(resolve(config.keysDir));
+  provider ??=
+    config.seal.provider === 'aws-kms'
+      ? new AwsKmsKeyProvider(config.seal.kmsKeyId, config.seal.certChainPath, config.seal.kmsRegion)
+      : new LocalKeyProvider(resolve(config.keysDir));
   return provider;
 }

@@ -1,11 +1,14 @@
 import {
   CreateBucketCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectVersionsCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { config } from '../config.js';
+import { prisma } from '../db.js';
 
 const s3 = new S3Client({
   endpoint: config.s3.endpoint,
@@ -39,6 +42,7 @@ export async function putObject(
         ObjectLockRetainUntilDate: new Date(Date.now() + retainYears * 365 * 24 * 3600 * 1000),
       }
     : {};
+  const kmsKeyId = await customerKeyFor(key);
   await s3.send(
     new PutObjectCommand({
       Bucket: config.s3.bucket,
@@ -46,8 +50,52 @@ export async function putObject(
       Body: body,
       ContentType: contentType,
       ...retention,
+      // Organisations with a customer-managed key get SSE-KMS under that key
+      ...(kmsKeyId ? { ServerSideEncryption: 'aws:kms' as const, SSEKMSKeyId: kmsKeyId } : {}),
     }),
   );
+}
+
+const keyCache = new Map<string, { at: number; keyId: string | null }>();
+
+/** The organisation's KMS key for an object, from its key prefix (envelopes/<id>/…, doc-templates/<orgId>/…). */
+async function customerKeyFor(key: string): Promise<string | null> {
+  const env = /^envelopes\/([^/]+)\//.exec(key)?.[1];
+  const orgFromPath = /^doc-templates\/([^/]+)\//.exec(key)?.[1];
+  const cacheKey = env ? `e:${env}` : orgFromPath ? `o:${orgFromPath}` : null;
+  if (!cacheKey) return null;
+  const hit = keyCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < 60_000) return hit.keyId;
+  const orgId = env ? (await prisma.envelope.findUnique({ where: { id: env }, select: { orgId: true } }))?.orgId : orgFromPath;
+  const keyId = orgId ? ((await prisma.organization.findUnique({ where: { id: orgId }, select: { storageKmsKeyId: true } }))?.storageKmsKeyId ?? null) : null;
+  keyCache.set(cacheKey, { at: Date.now(), keyId });
+  return keyId;
+}
+
+export const forgetCustomerKeys = () => keyCache.clear();
+
+/**
+ * Deletes every version under a prefix. Versions still under an Object Lock
+ * retention period are refused by the store; they are counted as `locked`
+ * and the caller retries later.
+ */
+export async function deletePrefix(prefix: string): Promise<{ deleted: number; locked: number }> {
+  let deleted = 0;
+  let locked = 0;
+  let keyMarker: string | undefined;
+  let versionMarker: string | undefined;
+  do {
+    const page = await s3.send(new ListObjectVersionsCommand({ Bucket: config.s3.bucket, Prefix: prefix, KeyMarker: keyMarker, VersionIdMarker: versionMarker }));
+    const objects = [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])].map((v) => ({ Key: v.Key!, VersionId: v.VersionId }));
+    if (objects.length) {
+      const res = await s3.send(new DeleteObjectsCommand({ Bucket: config.s3.bucket, Delete: { Objects: objects, Quiet: true } }));
+      locked += res.Errors?.length ?? 0;
+      deleted += objects.length - (res.Errors?.length ?? 0);
+    }
+    keyMarker = page.IsTruncated ? page.NextKeyMarker : undefined;
+    versionMarker = page.IsTruncated ? page.NextVersionIdMarker : undefined;
+  } while (keyMarker);
+  return { deleted, locked };
 }
 
 export async function getObject(key: string): Promise<Buffer> {

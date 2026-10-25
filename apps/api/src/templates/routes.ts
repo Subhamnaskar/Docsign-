@@ -16,6 +16,7 @@ import {
   type FullTemplate,
 } from './service.js';
 import { assertFeature } from '../billing/plans.js';
+import { departmentIdsOf } from '../governance/departments.js';
 
 export const MAX_BULK_ROWS = 100;
 
@@ -67,8 +68,9 @@ export async function templateRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
   app.get('/templates', async (req) => {
+    const mine = req.auth.role === 'MEMBER' ? await departmentIdsOf(req.auth.userId) : null;
     const list = await prisma.template.findMany({
-      where: { orgId: req.auth.orgId },
+      where: { orgId: req.auth.orgId, ...(mine ? { OR: [{ departmentId: null }, { departmentId: { in: mine } }] } : {}) },
       orderBy: { updatedAt: 'desc' },
       include: { roles: { orderBy: { routingOrder: 'asc' } }, _count: { select: { documents: true } } },
     });
