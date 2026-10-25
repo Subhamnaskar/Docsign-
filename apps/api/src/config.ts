@@ -128,7 +128,7 @@ export const config = {
     /** GST percentage on INR invoices; 0 if the business is not GST-registered */
     gstRate: Number(env('BILLING_GST_RATE', '18')),
     seller: {
-      name: env('BILLING_SELLER_NAME', '[Company Name]'),
+      name: env('BILLING_SELLER_NAME', 'NuronixAI'),
       address: process.env.BILLING_SELLER_ADDRESS ?? '',
       taxId: process.env.BILLING_SELLER_GSTIN ?? '',
     },

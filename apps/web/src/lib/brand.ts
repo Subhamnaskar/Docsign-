@@ -13,7 +13,7 @@ export const brand = {
   salesEmail: 'sales@docsign.example',
   supportEmail: 'support@docsign.example',
   /** Registered company details for the footer and legal pages. */
-  legalEntity: '[Company Name]',
+  legalEntity: 'NuronixAI',
 };
 
 /**

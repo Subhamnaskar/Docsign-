@@ -68,7 +68,7 @@ export function SiteFooter() {
       <div className="border-t border-gray-100">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-xs text-gray-400 sm:px-6">
           <span>
-            © {new Date().getFullYear()} {brand.legalEntity}. All rights reserved.
+            {brand.name} is a product of {brand.legalEntity}. © {new Date().getFullYear()} {brand.legalEntity}. All rights reserved.
           </span>
           <a href={`mailto:${brand.supportEmail}`} className="hover:text-gray-600">
             {brand.supportEmail}
