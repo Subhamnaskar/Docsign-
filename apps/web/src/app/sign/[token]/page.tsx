@@ -11,6 +11,8 @@ import { evaluateFormula } from '@/lib/formula';
 import { FIELD_LABELS, formatMoney } from '@/lib/format';
 import { isRtl, LANGUAGES, signerT, type SignerKey, type Translate } from '@/lib/i18n';
 import type { Field, PageInfo } from '@/lib/types';
+import { IdChecks, type IdCheckState } from '@/components/IdChecks';
+import { MandateDialog } from '@/components/MandateDialog';
 
 interface SigningSession {
   state: 'ready' | 'waiting' | 'signed' | 'completed' | 'declined' | 'voided' | 'expired' | 'unavailable';
@@ -31,6 +33,7 @@ interface SigningSession {
     returnUrl: string | null;
     signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
     esignSandbox: boolean;
+    idChecks?: IdCheckState[];
   };
   branding: { name: string; color: string | null; logoUrl: string | null };
   aiAvailable: boolean;
@@ -309,6 +312,7 @@ function SignDocument({
   const approving = session.recipient.role === 'APPROVER';
 
   const [paying, setPaying] = useState(false);
+  const [mandateField, setMandateField] = useState<Field | null>(null);
   async function startPayment(f: Field) {
     setPaying(true);
     setError(null);
@@ -604,6 +608,22 @@ function SignDocument({
                         </button>
                       );
                     }
+                    if (f.type === 'MANDATE') {
+                      const registered = Boolean(values[f.id]);
+                      return (
+                        <button
+                          key={f.id}
+                          id={`field-${f.id}`}
+                          type="button"
+                          style={style}
+                          disabled={registered}
+                          onClick={() => setMandateField(f)}
+                          className={cx(boxClass, 'flex items-center justify-center truncate px-1 font-semibold', registered ? 'text-green-700' : 'text-amber-900')}
+                        >
+                          {registered ? '✓ eNACH mandate registered' : `Set up eNACH · up to ${formatMoney(f.amount ?? 0, 'INR')}`}
+                        </button>
+                      );
+                    }
                     if (f.type === 'ATTACHMENT') {
                       return (
                         <label key={f.id} id={`field-${f.id}`} style={style} className={cx(boxClass, 'flex cursor-pointer items-center justify-center truncate px-1 font-medium')}>
@@ -733,6 +753,7 @@ function SignDocument({
           </Button>
         </div>
       </Modal>
+      {mandateField && <MandateDialog token={token} field={mandateField} defaultHolder={session.recipient.name} onClose={() => setMandateField(null)} />}
     </>
   );
 }
@@ -785,8 +806,10 @@ export default function SignPage() {
     }
   };
   const [paymentCancelled, setPaymentCancelled] = useState(false);
+  const [mandateRejected, setMandateRejected] = useState(false);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('payment') === 'cancelled') setPaymentCancelled(true);
+    if (new URLSearchParams(window.location.search).get('mandate') === 'rejected') setMandateRejected(true);
   }, []);
   const [locale, setLocale] = useState<string | null>(null);
   const [reassignedTo, setReassignedTo] = useState<string | null>(null);
@@ -872,6 +895,11 @@ export default function SignPage() {
           <Alert tone="warning">{tr('paymentCancelled')}</Alert>
         </div>
       )}
+      {mandateRejected && (
+        <div className="mx-auto mb-4 max-w-3xl">
+          <Alert tone="warning">The bank did not approve the eNACH mandate. Check the account details and try again.</Alert>
+        </div>
+      )}
       {esignError && (
         <div className="mx-auto mb-4 max-w-3xl">
           <Alert>{tr('esignFailed', { reason: esignError })}</Alert>
@@ -881,6 +909,8 @@ export default function SignPage() {
         <Verify session={session} token={token} onVerified={load} tr={tr} />
       ) : !consented ? (
         <Consent session={session} onAccept={() => setConsented(true)} tr={tr} />
+      ) : session.recipient.idChecks?.some((c) => c.status !== 'PASSED') ? (
+        <IdChecks token={token} recipientName={session.recipient.name} checks={session.recipient.idChecks} onChange={load} />
       ) : (
         <SignDocument session={session} token={token} onDone={load} onReassigned={setReassignedTo} tr={tr} />
       )}

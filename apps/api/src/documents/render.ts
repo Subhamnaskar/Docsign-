@@ -94,8 +94,8 @@ export async function renderCompletedPdf(
       const shown =
         f.type === 'ATTACHMENT'
           ? `Attached: ${opts.attachmentNames?.get(value) ?? 'file'}`
-          : f.type === 'PAYMENT'
-            ? (opts.paymentLabels?.get(value) ?? 'Paid')
+          : f.type === 'PAYMENT' || f.type === 'MANDATE'
+            ? (opts.paymentLabels?.get(value) ?? (f.type === 'MANDATE' ? 'eNACH mandate registered' : 'Paid'))
             : value;
       const text = winAnsiSafe(shown);
       const size = fitText(font, text, box.w, box.h);

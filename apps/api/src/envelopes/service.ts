@@ -17,6 +17,7 @@ import { sealPdf, sealPdfIncremental, type SealResult } from '../trust/pades.js'
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 import { assertCanSend } from '../billing/plans.js';
 import { HttpError } from '../lib/errors.js';
+import { mandateLabels } from '../enach/routes.js';
 
 export const envelopeInclude = {
   documents: { orderBy: { order: 'asc' } },
@@ -206,10 +207,10 @@ export async function advanceEnvelope(envelopeId: string) {
 
 const STALE_CLAIM_MS = 5 * 60 * 1000;
 
-/** "Paid ₹500.00 · receipt pay_123" for each confirmed payment of the envelope. */
+/** "Paid ₹500.00 · receipt pay_123" per confirmed payment, and the registration line per active eNACH mandate. */
 export async function paidLabels(envelopeId: string): Promise<Map<string, string>> {
   const payments = await prisma.payment.findMany({ where: { envelopeId, status: 'PAID' } });
-  return new Map(payments.map((p) => [p.id, `Paid ${formatAmount(p.amount, p.currency)} · ${p.receipt ?? p.id}`]));
+  return new Map([...payments.map((p) => [p.id, `Paid ${formatAmount(p.amount, p.currency)} · ${p.receipt ?? p.id}`] as [string, string]), ...(await mandateLabels(envelopeId))]);
 }
 
 /**

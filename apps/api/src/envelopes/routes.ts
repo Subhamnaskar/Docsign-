@@ -27,6 +27,9 @@ import {
   voidEnvelope,
   type FullEnvelope,
 } from './service.js';
+import { ID_CHECKS } from '../kyc/names.js';
+import { mandateConfig } from '../enach/mandate-config.js';
+import { calculateDuty, INSTRUMENTS, supportedDuty } from '../estamp/duty.js';
 
 const jurisdictionCode = z.string().refine((c) => c in JURISDICTIONS, 'Unknown jurisdiction');
 const documentTypeCode = z.string().refine((c) => c in DOCUMENT_TYPES, 'Unknown document type');
@@ -71,6 +74,8 @@ const recipientsInput = z
       /** Signs inside your app via an embedded session; no emails are sent. */
       embedded: z.boolean().default(false),
       clientUserId: z.string().max(200).nullish(),
+      /** Identity checks before signing (India): PAN, BANK, DIGILOCKER, VIDEO */
+      idChecks: z.array(z.enum(ID_CHECKS)).max(4).default([]),
     }),
   )
   .max(50);
@@ -81,7 +86,7 @@ const fieldsInput = z
     z.object({
       documentId: z.string(),
       recipientId: z.string(),
-      type: z.enum(['SIGNATURE', 'INITIALS', 'DATE_SIGNED', 'NAME', 'EMAIL', 'TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT', 'PAYMENT']),
+      type: z.enum(['SIGNATURE', 'INITIALS', 'DATE_SIGNED', 'NAME', 'EMAIL', 'TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT', 'PAYMENT', 'MANDATE']),
       page: z.number().int().min(0),
       x: fraction,
       y: fraction,
@@ -94,6 +99,8 @@ const fieldsInput = z
       condition: z.object({ fieldLabel: z.string().min(1).max(100), equals: z.string().max(100) }).nullish(),
       amount: z.number().int().min(1).max(100_000_000).nullish(),
       currency: z.string().regex(/^[A-Z]{3}$/, 'Use an ISO currency code like INR').nullish(),
+      /** MANDATE: { frequency, months } */
+      config: mandateConfig.partial().nullish(),
     }),
   )
   .max(500);
@@ -145,6 +152,7 @@ export function serializeEnvelope(env: FullEnvelope) {
       embedded: r.embedded,
       clientUserId: r.clientUserId,
       signatureMethod: r.signatureMethod,
+      idChecks: r.idChecks,
       status: r.status,
       viewedAt: r.viewedAt,
       verifiedAt: r.verifiedAt,
@@ -170,12 +178,32 @@ export function serializeEnvelope(env: FullEnvelope) {
       condition: f.condition,
       amount: f.amount,
       currency: f.currency,
+      config: f.config,
       filled: f.value !== null,
     })),
   };
 }
 
 export async function envelopeRoutes(app: FastifyInstance) {
+  /** Indicative stamp duty for an instrument in a state (confirm against the current schedule). */
+  app.get('/estamp/duty', { preHandler: requireAuth }, async (req) => {
+    const q = parse(
+      z.object({
+        state: z.string().length(2).toUpperCase().optional(),
+        instrument: z.enum(Object.keys(INSTRUMENTS) as [keyof typeof INSTRUMENTS, ...(keyof typeof INSTRUMENTS)[]]).optional(),
+        amount: z.coerce.number().min(0).max(1e12).optional(),
+        monthlyRent: z.coerce.number().min(0).max(1e9).optional(),
+        months: z.coerce.number().int().min(1).max(60).optional(),
+        deposit: z.coerce.number().min(0).max(1e10).optional(),
+      }),
+      req.query,
+    );
+    if (!q.state || !q.instrument) return { instruments: INSTRUMENTS, supported: supportedDuty() };
+    const result = calculateDuty({ ...q, state: q.state, instrument: q.instrument });
+    if (!result) throw badRequest('No rate on file for that state and instrument. Enter the duty manually.');
+    return result;
+  });
+
   app.addHook('preHandler', requireAuth);
 
   app.get('/policy/options', async () => ({
@@ -410,6 +438,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
           embedded: r.embedded,
           clientUserId: r.clientUserId ?? null,
           signatureMethod: r.role === 'SIGNER' ? r.signatureMethod : ('ELECTRONIC' as const),
+          idChecks: r.role === 'CC' ? [] : [...new Set(r.idChecks)],
         };
         const codeHash = (rid: string) => (r.accessCode ? { accessCodeHash: sha256Hex(`${rid}:${r.accessCode}`) } : {});
         if (existing) {
@@ -453,6 +482,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
         }
       }
       if (f.type === 'PAYMENT' && (!f.amount || !f.currency)) throw badRequest('Payment fields need an amount and a currency.');
+      if (f.type === 'MANDATE' && !f.amount) throw badRequest('eNACH mandate fields need a maximum debit amount.');
       if (f.condition && !list.some((g) => g.label === f.condition!.fieldLabel)) {
         throw badRequest(`Condition refers to a field labelled "${f.condition.fieldLabel}" that doesn't exist.`);
       }
@@ -467,8 +497,9 @@ export async function envelopeRoutes(app: FastifyInstance) {
           label: f.label ?? null,
           formula: f.type === 'FORMULA' ? f.formula! : null,
           condition: f.condition ?? undefined,
-          amount: f.type === 'PAYMENT' ? f.amount! : null,
-          currency: f.type === 'PAYMENT' ? f.currency! : null,
+          amount: f.type === 'PAYMENT' || f.type === 'MANDATE' ? f.amount! : null,
+          currency: f.type === 'PAYMENT' ? f.currency! : f.type === 'MANDATE' ? 'INR' : null,
+          config: f.type === 'MANDATE' ? mandateConfig.parse(f.config ?? {}) : undefined,
           envelopeId: id,
         })),
       }),

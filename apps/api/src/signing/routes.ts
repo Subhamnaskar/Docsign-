@@ -19,6 +19,7 @@ import { resolvePolicy, type ResolvedPolicy } from '../policy/engine.js';
 import { advanceEnvelope, notifySender, notifySigners } from '../envelopes/service.js';
 import { applyElectronicIncrement, isIncremental } from '../esign/service.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
+import { assertKycComplete, kycSummary } from '../kyc/routes.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_MS = 30 * 1000;
@@ -206,6 +207,7 @@ export async function signingRoutes(app: FastifyInstance) {
         maskedPhone: r.phone ? maskPhone(r.phone) : null,
         embedded: r.embedded,
         returnUrl: r.embedded ? r.embedReturnUrl : null,
+        idChecks: verified ? await kycSummary(r) : r.idChecks.map((kind) => ({ kind, status: 'NOT_STARTED' })),
       },
       branding: await getBranding(env.orgId),
       aiAvailable: config.ai.enabled && Boolean((await prisma.organization.findUnique({ where: { id: env.orgId }, select: { aiEnabled: true } }))?.aiEnabled),
@@ -234,6 +236,7 @@ export async function signingRoutes(app: FastifyInstance) {
         condition: f.condition,
         amount: f.amount,
         currency: f.currency,
+        config: f.config,
         value: f.value,
       })),
       // Values from earlier signers that this signer's conditions/formulas may refer to
@@ -361,6 +364,7 @@ export async function signingRoutes(app: FastifyInstance) {
     requireReady(r);
     requireSession(req, r);
     if (r.signatureMethod !== 'ELECTRONIC') throw badRequest('This document is signed with Aadhaar eSign or a DSC; use that option to sign.');
+    await assertKycComplete(r);
     const [fields, others, attachments] = await Promise.all([
       prisma.field.findMany({ where: { recipientId: r.id } }),
       prisma.field.findMany({ where: { envelopeId: r.envelopeId, recipientId: { not: r.id } } }),

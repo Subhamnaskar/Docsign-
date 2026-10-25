@@ -361,9 +361,77 @@ model Recipient {
   lastNotifiedAt       DateTime?
   signedIp             String?
   signedUserAgent      String?
+  // Identity checks the signer must pass before signing: PAN, BANK, DIGILOCKER, VIDEO
+  idChecks             String[]        @default([])
+  // Random words the signer reads aloud in the video check (short-lived)
+  videoChallenge       String?
+  videoChallengeAt     DateTime?
   fields               Field[]
+  kycChecks            KycCheck[]
 
   @@index([envelopeId])
+}
+
+/// Result of one identity check. Identifiers are stored masked; full numbers never are.
+model KycCheck {
+  id          String       @id @default(cuid())
+  envelopeId  String
+  recipientId String
+  recipient   Recipient    @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  kind        String
+  provider    String
+  status      KycStatus
+  // 0-100 similarity between the verified name and the recipient's name
+  nameMatch   Int?
+  // Masked identifiers and returned attributes (registered name, bank, DOB year...)
+  data        Json         @default("{}")
+  // Video recording (VIDEO checks)
+  storageKey  String?
+  sha256      String?
+  providerRef String?
+  createdAt   DateTime     @default(now())
+
+  @@index([recipientId])
+  @@index([providerRef])
+}
+
+enum KycStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
+/// eNACH (NPCI e-mandate) authorised by a signer through a MANDATE field.
+model Mandate {
+  id          String        @id @default(cuid())
+  envelopeId  String
+  recipientId String
+  fieldId     String
+  provider    String
+  providerRef String?
+  status      MandateStatus @default(PENDING)
+  // Maximum debit per instalment, minor units
+  maxAmount   Int
+  currency    String        @default("INR")
+  frequency   String
+  startsOn    DateTime
+  endsOn      DateTime
+  // Unique Mandate Reference Number from NPCI, once registered
+  umrn        String?
+  bankName    String?
+  // Masked account number
+  account     String?
+  confirmedAt DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([recipientId])
+  @@index([providerRef])
+}
+
+enum MandateStatus {
+  PENDING
+  ACTIVE
+  FAILED
 }
 
 enum FieldType {
@@ -383,6 +451,8 @@ enum FieldType {
   ATTACHMENT
   // Signer pays an amount before finishing
   PAYMENT
+  // Signer authorises recurring debits (eNACH e-mandate, India)
+  MANDATE
 }
 
 model Field {
@@ -412,6 +482,8 @@ model Field {
   currency    String?
   // Show this field only when another field has a value: { "fieldLabel": "Has guarantor", "equals": "true" }
   condition   Json?
+  // Type-specific settings, e.g. MANDATE: { "frequency": "MONTHLY", "months": 12 }
+  config      Json?
   // Filled in by the signer. Signatures/initials are PNG data URLs.
   value       String?
 

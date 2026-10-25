@@ -33,6 +33,7 @@ export const FIELD_LABELS: Record<string, string> = {
   FORMULA: 'Formula',
   ATTACHMENT: 'Attachment',
   PAYMENT: 'Payment',
+  MANDATE: 'eNACH mandate',
 };
 
 export const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(minor / 100);
@@ -54,6 +55,10 @@ export const AUDIT_LABELS: Record<string, string> = {
   'recipient.corrected': 'Recipient corrected',
   'recipient.reassigned': 'Reassigned by signer',
   'payment.completed': 'Payment received',
+  'mandate.registered': 'eNACH mandate registered',
+  'recipient.id_check_passed': 'Identity check passed',
+  'recipient.id_check_failed': 'Identity check failed',
+  'document.archive_timestamp_renewed': 'Archive timestamp renewed',
   'document.stamped': 'e-Stamp attached',
   'recipient.esign_failed': 'Aadhaar eSign / DSC attempt failed',
   'recipient.declined': 'Declined to sign',

@@ -14,7 +14,7 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 | Workflow | Sequential or parallel routing, signers + CC, reminders, expiry, void, decline, duplicate, correct a recipient after sending (old link stops working), signer-initiated reassign, folders, bulk ZIP download, CSV export |
 | Field editor | Signature, initials, date signed, name, email, text, number, checkbox, dropdown, radio, formula (calculated), attachment upload, payment; required/optional, conditional show/hide, AI field detection |
 | Signer experience | Email link → identity check (email, SMS or WhatsApp code, or an access code) → e-sign consent → guided signing (draw / type / upload), mobile-friendly, in-person (host) signing, embedded signing in your own site |
-| India | Aadhaar eSign 2.1 (ESP XML protocol, built-in sandbox ESP), DSC USB-token signing via a local utility, sandbox e-stamp certificates; signatures are applied as incremental PDF updates so each one stays valid |
+| India | Aadhaar eSign 2.1 (ESP XML protocol, built-in sandbox ESP), DSC USB-token signing via a local utility, e-stamp certificates (sandbox) with an indicative stamp-duty calculator, signer ID checks before signing (PAN, bank account penny-drop, Aadhaar via DigiLocker, video selfie with a spoken code, all with name matching), eNACH e-mandate fields for recurring debits; signatures are applied as incremental PDF updates so each one stays valid |
 | Billing | 14-day free trial, Starter / Business / Enterprise plans with agreement and user limits, monthly or yearly subscriptions, pro-rata plan changes, cancel at period end, GST tax invoices (PDF), Settings → Billing; prices in `apps/api/src/billing/plans.ts` (placeholders) feed the website pricing page |
 | Payments | Collect a fee as part of signing: built-in sandbox checkout, Stripe Checkout and Razorpay Payment Links adapters |
 | Compliance engine | Jurisdiction packs for US, UK, EU and India; resolves signature level, identity strength, retention, data region and consent text; blocks documents that cannot legally be e-signed |
@@ -37,6 +37,9 @@ Everything that depends on an outside contract ships with a working sandbox so t
 | DSC tokens | — | Local signing utility protocol (`docs/dsc-utility.md`) | The desktop utility, CCA root certificates in `DSC_TRUST_DIR` |
 | e-Stamp | Specimen certificate page. **Not valid** | — (interface only) | SHCIL or state e-stamp vendor agreement |
 | Payments | Built-in test checkout at `/api/v1/dev/pay/...` | Stripe Checkout, Razorpay Payment Links | Stripe or Razorpay keys and webhook secret |
+| ID checks (PAN, bank) | Built-in rules (numbers containing 0000 fail) | Cashfree Verification Suite | Cashfree client ID and secret |
+| DigiLocker | Built-in consent page | DigiLocker / MeriPehchaan OAuth API | DigiLocker partner (requester) registration |
+| eNACH | Built-in bank approval page with test UMRNs | Razorpay registration links | Razorpay account with e-mandate enabled, webhook secret |
 | Subscriptions | Built-in test checkout at `/api/v1/dev/billing/...`; renewals run in the worker | Stripe Billing, Razorpay Subscriptions | Same keys plus `STRIPE_BILLING_WEBHOOK_SECRET` or `RAZORPAY_WEBHOOK_SECRET`; seller name, address and GSTIN for invoices |
 | Single sign-on | — | Any OIDC provider (Okta, Entra ID, Google) | An app registration at your identity provider |
 | Cloud pickers | Hidden until configured; share links always work | Google Picker, Dropbox Chooser, OneDrive picker | App credentials from each provider (see `.env.example`) |

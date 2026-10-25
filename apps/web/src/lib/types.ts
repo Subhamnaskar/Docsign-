@@ -13,7 +13,8 @@ export type FieldType =
   | 'NUMBER'
   | 'FORMULA'
   | 'ATTACHMENT'
-  | 'PAYMENT';
+  | 'PAYMENT'
+  | 'MANDATE';
 
 export interface FieldCondition {
   fieldLabel: string;
@@ -37,6 +38,8 @@ export interface DocumentInfo {
   completed: boolean;
 }
 
+export type IdCheck = 'PAN' | 'BANK' | 'DIGILOCKER' | 'VIDEO';
+
 export interface Recipient {
   id: string;
   name: string;
@@ -51,6 +54,7 @@ export interface Recipient {
   embedded?: boolean;
   clientUserId?: string | null;
   signatureMethod?: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
+  idChecks?: IdCheck[];
   status: RecipientStatus;
   viewedAt: string | null;
   verifiedAt: string | null;
@@ -78,6 +82,8 @@ export interface Field {
   /** PAYMENT: minor units (paise, cents) */
   amount?: number | null;
   currency?: string | null;
+  /** MANDATE: debit frequency and duration */
+  config?: { frequency?: string; months?: number } | null;
   filled?: boolean;
   value?: string | null;
 }

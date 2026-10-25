@@ -11,7 +11,7 @@ import { Alert, Button, Card, cx, Input, Label, PageLoader, Select, Spinner, Tex
 import { api, ApiError, upload } from '@/lib/api';
 import { FIELD_LABELS } from '@/lib/format';
 import { LANGUAGES } from '@/lib/i18n';
-import type { Envelope, Estamp, Field, Option } from '@/lib/types';
+import type { IdCheck, Envelope, Estamp, Field, Option } from '@/lib/types';
 import { type CloudConfig, type CloudPick, pickFromDropbox, pickFromGoogleDrive, pickFromOneDrive } from '@/lib/cloudPickers';
 
 const STEPS = ['Documents', 'Recipients', 'Fields', 'Review & send'] as const;
@@ -38,7 +38,10 @@ interface RecipientDraft {
   hasAccessCode: boolean;
   embedded: boolean;
   signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
+  idChecks: IdCheck[];
 }
+
+const ID_CHECK_LABELS: Record<IdCheck, string> = { PAN: 'PAN', BANK: 'Bank account', DIGILOCKER: 'Aadhaar via DigiLocker', VIDEO: 'Video selfie' };
 
 let keySeq = 0;
 const newKey = () => `r${keySeq++}`;
@@ -304,6 +307,90 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
 }
 
 /** India: stamp duty details; the e-stamp is bought and attached as page 1 when the agreement is sent. */
+interface DutyInfo {
+  instruments: Record<string, string>;
+  supported: Record<string, string[]>;
+}
+
+/** Suggests the article and duty for common instruments; the sender confirms before saving. */
+function DutyCalculator({ state, onResult }: { state: string; onResult: (article: string, duty: number) => void }) {
+  const [info, setInfo] = useState<DutyInfo | null>(null);
+  const [open, setOpen] = useState(false);
+  const [instrument, setInstrument] = useState('');
+  const [amount, setAmount] = useState('');
+  const [rent, setRent] = useState('');
+  const [months, setMonths] = useState('11');
+  const [deposit, setDeposit] = useState('');
+  const [result, setResult] = useState<{ duty: number; article: string; basis: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api<DutyInfo>('/estamp/duty').then(setInfo).catch(() => {});
+  }, []);
+  const available = info?.supported[state] ?? [];
+  if (!info || available.length === 0) return null;
+  if (!open) {
+    return (
+      <button type="button" className="text-xs font-medium text-brand-700 hover:underline" onClick={() => setOpen(true)}>
+        Calculate duty
+      </button>
+    );
+  }
+
+  async function calc() {
+    setError(null);
+    const q = new URLSearchParams({ state, instrument });
+    if (instrument === 'loan') q.set('amount', amount || '0');
+    if (instrument === 'rent') {
+      q.set('monthlyRent', rent || '0');
+      q.set('months', months || '11');
+      q.set('deposit', deposit || '0');
+    }
+    try {
+      setResult(await api(`/estamp/duty?${q}`));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <Select value={instrument} onChange={(e) => { setInstrument(e.target.value); setResult(null); }} aria-label="Instrument">
+        <option value="">Choose the instrument…</option>
+        {available.map((k) => (
+          <option key={k} value={k}>
+            {info.instruments[k]}
+          </option>
+        ))}
+      </Select>
+      {instrument === 'loan' && <Input type="number" min={0} placeholder="Loan amount (₹)" value={amount} onChange={(e) => setAmount(e.target.value)} />}
+      {instrument === 'rent' && (
+        <div className="grid grid-cols-3 gap-2">
+          <Input type="number" min={0} placeholder="Rent / month" value={rent} onChange={(e) => setRent(e.target.value)} aria-label="Monthly rent" />
+          <Input type="number" min={1} max={60} placeholder="Months" value={months} onChange={(e) => setMonths(e.target.value)} aria-label="Months" />
+          <Input type="number" min={0} placeholder="Deposit" value={deposit} onChange={(e) => setDeposit(e.target.value)} aria-label="Deposit" />
+        </div>
+      )}
+      {instrument && (
+        <Button size="sm" variant="secondary" onClick={calc}>
+          Calculate
+        </Button>
+      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      {result && (
+        <div className="text-xs text-gray-700">
+          <p>
+            <strong>₹{result.duty.toLocaleString('en-IN')}</strong> under {result.article}: {result.basis}.
+          </p>
+          <p className="mt-1 text-amber-700">Indicative only. Confirm against the current state schedule before buying the stamp.</p>
+          <button type="button" className="mt-1 font-medium text-brand-700 hover:underline" onClick={() => onResult(result.article, result.duty)}>
+            Use these values
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EstampCard({ env, onEnvelope, states }: { env: Envelope; onEnvelope: (e: Envelope) => void; states: Option[] }) {
   const [form, setForm] = useState<Estamp>(
     env.estamp ?? { state: states[0]?.code ?? 'MH', article: '', dutyAmount: 100, firstParty: '', secondParty: '', purpose: env.title },
@@ -348,6 +435,7 @@ function EstampCard({ env, onEnvelope, states }: { env: Envelope; onEnvelope: (e
               </option>
             ))}
           </Select>
+          <DutyCalculator state={form.state} onResult={(article, duty) => setForm((f) => ({ ...f, article, dutyAmount: duty }))} />
           <Input placeholder="Article, e.g. Article 5(h)" value={form.article} onChange={set('article')} />
           <Input type="number" min={1} placeholder="Duty amount (₹)" value={form.dutyAmount} onChange={set('dutyAmount')} />
           <Input placeholder="First party (pays duty)" value={form.firstParty} onChange={set('firstParty')} />
@@ -384,7 +472,7 @@ function RecipientsStep({
   const add = (r?: Partial<RecipientDraft>) =>
     setDrafts([
       ...drafts,
-      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, authMethod: 'EMAIL_OTP', phone: '', accessCode: '', hasAccessCode: false, embedded: false, signatureMethod: env.jurisdiction === 'IN' && env.policy.signatureLevel !== 'SES' ? 'AADHAAR_ESIGN' : 'ELECTRONIC', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
+      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, authMethod: 'EMAIL_OTP', phone: '', accessCode: '', hasAccessCode: false, embedded: false, idChecks: [], signatureMethod: env.jurisdiction === 'IN' && env.policy.signatureLevel !== 'SES' ? 'AADHAAR_ESIGN' : 'ELECTRONIC', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
     ]);
 
   return (
@@ -486,6 +574,25 @@ function RecipientsStep({
                   </div>
                 )}
               </div>
+            )}
+            {d.role !== 'CC' && (
+              <fieldset className="w-full">
+                <legend className="mb-1 text-sm font-medium text-gray-700">Identity checks before signing</legend>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {(Object.keys(ID_CHECK_LABELS) as IdCheck[])
+                    .filter((k) => k === 'VIDEO' || env.jurisdiction === 'IN')
+                    .map((k) => (
+                      <label key={k} className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={d.idChecks.includes(k)}
+                          onChange={(e) => update(d.key, { idChecks: e.target.checked ? [...d.idChecks, k] : d.idChecks.filter((x) => x !== k) })}
+                        />
+                        {ID_CHECK_LABELS[k]}
+                      </label>
+                    ))}
+                </div>
+              </fieldset>
             )}
             <button onClick={() => setDrafts(drafts.filter((x) => x.key !== d.key))} className="mb-2 text-sm text-gray-400 hover:text-red-600" aria-label="Remove recipient">
               Remove
@@ -621,6 +728,7 @@ function Builder() {
         hasAccessCode: Boolean(r.hasAccessCode),
         embedded: Boolean(r.embedded),
         signatureMethod: r.signatureMethod ?? 'ELECTRONIC',
+        idChecks: r.idChecks ?? [],
       })),
     );
     setFields(e.fields);
@@ -652,7 +760,7 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/recipients`, {
             method: 'PUT',
-            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson, authMethod, phone, accessCode, embedded, signatureMethod }) => ({
+            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson, authMethod, phone, accessCode, embedded, signatureMethod, idChecks }) => ({
               id: rid,
               name: name.trim(),
               email: email.trim(),
@@ -665,6 +773,7 @@ function Builder() {
               phone: phone.trim() || null,
               accessCode: accessCode.trim() || null,
               signatureMethod: role === 'SIGNER' ? signatureMethod : 'ELECTRONIC',
+              idChecks: role === 'CC' ? [] : idChecks,
             })),
           }),
         );
@@ -672,7 +781,7 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/fields`, {
             method: 'PUT',
-            json: fields.map(({ documentId, recipientId, type, page, x, y, width, height, required, label, options, formula, condition, amount, currency }) => ({
+            json: fields.map(({ documentId, recipientId, type, page, x, y, width, height, required, label, options, formula, condition, amount, currency, config }) => ({
               documentId,
               recipientId,
               type,
@@ -688,6 +797,7 @@ function Builder() {
               condition,
               amount,
               currency,
+              config,
             })),
           }),
         );

@@ -22,6 +22,7 @@ const DEFAULT_SIZE: Record<FieldType, [number, number]> = {
   FORMULA: [90, 20],
   ATTACHMENT: [160, 22],
   PAYMENT: [150, 24],
+  MANDATE: [190, 24],
 };
 const MIN_SIZE_PT = 12;
 
@@ -39,12 +40,21 @@ const PALETTE: { type: FieldType; icon: string }[] = [
   { type: 'FORMULA', icon: 'M5 15c2 0 2-10 5-10M5 9h6m2 2 4 4m0-4-4 4' },
   { type: 'ATTACHMENT', icon: 'M14 9l-5 5a2.5 2.5 0 0 1-3.5-3.5L11 5a1.7 1.7 0 0 1 2.4 2.4L8 12.8' },
   { type: 'PAYMENT', icon: 'M3 6h14v9H3zM3 9h14M6 12h3' },
+  { type: 'MANDATE', icon: 'M4 8l6-4 6 4M5 8v6m3-6v6m4-6v6m3-6v6M3 16h14' },
 ];
 
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'BRL', 'JPY'];
 
 /** Types whose label others can reference in formulas and conditions. */
-const NEEDS_LABEL: FieldType[] = ['TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT', 'PAYMENT'];
+const NEEDS_LABEL: FieldType[] = ['TEXT', 'CHECKBOX', 'DROPDOWN', 'RADIO', 'NUMBER', 'FORMULA', 'ATTACHMENT', 'PAYMENT', 'MANDATE'];
+
+const MANDATE_FREQUENCIES = [
+  ['MONTHLY', 'Monthly'],
+  ['QUARTERLY', 'Quarterly'],
+  ['HALF_YEARLY', 'Half-yearly'],
+  ['YEARLY', 'Yearly'],
+  ['AS_PRESENTED', 'As presented'],
+] as const;
 
 function uniqueLabel(fields: Field[], base: string): string {
   const taken = new Set(fields.map((f) => f.label));
@@ -131,8 +141,9 @@ export function FieldEditor({
       options: placing === 'DROPDOWN' || placing === 'RADIO' ? ['Option 1', 'Option 2'] : [],
       formula: placing === 'FORMULA' ? '' : null,
       condition: null,
-      amount: placing === 'PAYMENT' ? 100_00 : null,
-      currency: placing === 'PAYMENT' ? 'INR' : null,
+      amount: placing === 'PAYMENT' ? 100_00 : placing === 'MANDATE' ? 5000_00 : null,
+      currency: placing === 'PAYMENT' || placing === 'MANDATE' ? 'INR' : null,
+      config: placing === 'MANDATE' ? { frequency: 'MONTHLY', months: 12 } : null,
     };
     onChange([...fieldsRef.current, field]);
     setSelected(field.id);
@@ -277,6 +288,51 @@ export function FieldEditor({
                       ))}
                     </Select>
                   </div>
+                </div>
+              )}
+              {selectedField.type === 'MANDATE' && (
+                <div className="space-y-2">
+                  <div>
+                    <Label htmlFor="mandate-amount" hint="(₹ per debit)">
+                      Maximum debit
+                    </Label>
+                    <Input
+                      id="mandate-amount"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={selectedField.amount ? selectedField.amount / 100 : ''}
+                      onChange={(e) => update(selectedField.id, { amount: Math.round(Number(e.target.value) * 100) || null })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="mandate-frequency">Frequency</Label>
+                      <Select
+                        id="mandate-frequency"
+                        value={selectedField.config?.frequency ?? 'MONTHLY'}
+                        onChange={(e) => update(selectedField.id, { config: { ...selectedField.config, frequency: e.target.value } })}
+                      >
+                        {MANDATE_FREQUENCIES.map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="mandate-months">Months</Label>
+                      <Input
+                        id="mandate-months"
+                        type="number"
+                        min={1}
+                        max={360}
+                        value={selectedField.config?.months ?? 12}
+                        onChange={(e) => update(selectedField.id, { config: { ...selectedField.config, months: Math.max(1, Math.min(360, Number(e.target.value) || 1)) } })}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">The signer authorises recurring debits from their bank account (eNACH) before finishing.</p>
                 </div>
               )}
               {selectedField.type === 'FORMULA' && (

@@ -65,6 +65,25 @@ export const config = {
     stripe: { secretKey: process.env.STRIPE_SECRET_KEY ?? '', webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '' },
     razorpay: { keyId: process.env.RAZORPAY_KEY_ID ?? '', keySecret: process.env.RAZORPAY_KEY_SECRET ?? '' },
   },
+  /** Signer identity checks (India) */
+  kyc: {
+    /** sandbox | cashfree (PAN and bank account) */
+    provider: env('KYC_PROVIDER', 'sandbox') as 'sandbox' | 'cashfree',
+    cashfree: {
+      clientId: process.env.CASHFREE_CLIENT_ID ?? '',
+      clientSecret: process.env.CASHFREE_CLIENT_SECRET ?? '',
+      baseUrl: env('CASHFREE_VERIFICATION_URL', 'https://sandbox.cashfree.com/verification'),
+    },
+    digilocker: {
+      /** sandbox | production */
+      mode: env('DIGILOCKER_MODE', 'sandbox') as 'sandbox' | 'production',
+      clientId: process.env.DIGILOCKER_CLIENT_ID ?? '',
+      clientSecret: process.env.DIGILOCKER_CLIENT_SECRET ?? '',
+      baseUrl: env('DIGILOCKER_BASE_URL', 'https://digilocker.meripehchaan.gov.in/public/oauth2'),
+    },
+  },
+  /** eNACH e-mandates: sandbox | razorpay (uses the Razorpay keys) */
+  enach: { provider: env('ENACH_PROVIDER', 'sandbox') as 'sandbox' | 'razorpay' },
   /** Cloud file pickers (public client identifiers; leave empty to hide a provider) */
   cloud: {
     googleClientId: process.env.GOOGLE_PICKER_CLIENT_ID ?? '',

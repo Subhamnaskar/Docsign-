@@ -20,6 +20,7 @@ import type { KeyProvider } from '../trust/keys.js';
 import { aspKeys, issueCertificate, sandboxCa, sandboxEspKeys } from './keys.js';
 import { completeTransaction, createSigningTransaction, failTransaction, type CryptoMethod } from './service.js';
 import { buildEsignRequest, buildEsignResponse, parseEsignRequest, parseEsignResponse, verifyEnveloped } from './xml.js';
+import { assertKycComplete } from '../kyc/routes.js';
 
 const pemToDer = (pem: string) => Buffer.from(forge.asn1.toDer(forge.pki.certificateToAsn1(forge.pki.certificateFromPem(pem))).getBytes(), 'binary');
 const pemToBase64Der = (pem: string) => pemToDer(pem).toString('base64');
@@ -55,6 +56,7 @@ export async function esignRoutes(app: FastifyInstance) {
     requireReady(r);
     requireSession(req, r);
     if (r.signatureMethod !== method) throw badRequest('This signing request uses a different signing method.');
+    await assertKycComplete(r);
     const [fields, others] = await Promise.all([
       prisma.field.findMany({ where: { recipientId: r.id } }),
       prisma.field.findMany({ where: { envelopeId: r.envelopeId, recipientId: { not: r.id } } }),

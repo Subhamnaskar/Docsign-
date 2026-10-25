@@ -98,6 +98,11 @@ export function resolveFieldValues(
         value = f.value;
         if (f.required && !value) throw badRequest(`Complete the payment (${describe(f)}).`);
         break;
+      case 'MANDATE':
+        // Set only once the bank confirms the mandate
+        value = f.value;
+        if (f.required && !value) throw badRequest(`Authorise the eNACH mandate (${describe(f)}).`);
+        break;
       case 'ATTACHMENT':
         if (value && !attachments.some((a) => a.id === value && a.fieldId === f.id)) throw badRequest(`Upload the file again for ${describe(f)}.`);
         break;

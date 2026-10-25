@@ -11,6 +11,7 @@ import { Alert, Button, Card, cx, Input, Label, Modal, PageLoader, StatusBadge, 
 import { api, fileUrl } from '@/lib/api';
 import { AUDIT_LABELS, formatDate } from '@/lib/format';
 import type { AuditEvent, Envelope, Recipient } from '@/lib/types';
+import { KycResults } from '@/components/KycResults';
 
 interface AuditResponse {
   chain: { valid: boolean; count: number; headHash: string; brokenAtSeq?: number };
@@ -221,6 +222,8 @@ function Detail() {
               ))}
             </ul>
           </Card>
+
+          <KycResults envelopeId={env.id} recipients={env.recipients} />
 
           <Card className="p-5">
             <h2 className="font-semibold">Documents</h2>
