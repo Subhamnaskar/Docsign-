@@ -129,7 +129,7 @@ export function checkAssignments(t: FullTemplate, assignments: RoleAssignment[])
 export async function createEnvelopeFromTemplate(
   t: FullTemplate,
   ctx: { orgId: string; userId: string; actor: Actor; ip?: string | null; userAgent?: string | null },
-  input: { title?: string; message?: string | null; recipients: RoleAssignment[]; documentBuffers?: Buffer[] },
+  input: { title?: string; message?: string | null; recipients: RoleAssignment[]; documentBuffers?: Buffer[]; workflowId?: string },
 ): Promise<string> {
   const docs = input.documentBuffers ?? (await Promise.all(t.documents.map((d) => getObject(d.storageKey))));
   const env = await prisma.$transaction(
@@ -144,6 +144,8 @@ export async function createEnvelopeFromTemplate(
           documentType: t.documentType,
           routing: t.routing,
           reminderDays: t.reminderDays,
+          templateId: t.id,
+          createdByWorkflowId: input.workflowId ?? null,
         },
       });
       const docMap = new Map<string, string>();

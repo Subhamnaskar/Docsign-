@@ -150,6 +150,8 @@ export interface EnvelopeSummary {
   folder?: { id: string; name: string } | null;
   approvalStatus?: string | null;
   testMode?: boolean;
+  /** Out for signature with open signer comments */
+  inReview?: boolean;
   recipients: { name: string; email: string; role: string; status: RecipientStatus }[];
 }
 

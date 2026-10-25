@@ -10,7 +10,10 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 
 const en = {
   // Navigation and shell
+  'nav.home': 'Home',
   'nav.agreements': 'Agreements',
+  'nav.workflows': 'Workflows',
+  'nav.contacts': 'Contacts',
   'nav.templates': 'Templates',
   'nav.repository': 'Repository',
   'nav.reports': 'Reports',
@@ -38,6 +41,8 @@ const en = {
   'dash.drafts': 'Drafts',
   'dash.declinedExpired': 'Declined / expired',
   'dash.filterAll': 'All',
+  'dash.waiting': 'Waiting for others',
+  'dash.inReview': 'In review',
   'dash.sentByMe': 'Sent by me',
   'dash.awaitingApproval': 'Awaiting approval',
   'dash.search': 'Search title or recipient',
@@ -114,7 +119,10 @@ const en = {
 export type AppKey = keyof typeof en;
 
 const hi: Record<AppKey, string> = {
+  'nav.home': 'होम',
   'nav.agreements': 'समझौते',
+  'nav.workflows': 'वर्कफ़्लो',
+  'nav.contacts': 'संपर्क',
   'nav.templates': 'टेम्पलेट',
   'nav.repository': 'संग्रह',
   'nav.reports': 'रिपोर्ट',
@@ -141,6 +149,8 @@ const hi: Record<AppKey, string> = {
   'dash.drafts': 'ड्राफ़्ट',
   'dash.declinedExpired': 'अस्वीकृत / समय-सीमा समाप्त',
   'dash.filterAll': 'सभी',
+  'dash.waiting': 'दूसरों की प्रतीक्षा में',
+  'dash.inReview': 'समीक्षा में',
   'dash.sentByMe': 'मेरे द्वारा भेजे गए',
   'dash.awaitingApproval': 'स्वीकृति की प्रतीक्षा में',
   'dash.search': 'शीर्षक या प्राप्तकर्ता खोजें',

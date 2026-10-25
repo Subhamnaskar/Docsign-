@@ -127,6 +127,9 @@ function Dashboard() {
   useEffect(() => {
     api<typeof stats>('/stats').then(setStats).catch(() => {});
     loadFolders();
+    // Search from the top bar arrives as ?q=
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) setSearch(q);
   }, [loadFolders]);
 
   useEffect(() => {
@@ -227,7 +230,7 @@ function Dashboard() {
                   onClick={() => setFilter(f.status)}
                   className={cx('rounded-md px-3 py-1.5 text-sm font-medium', filter === f.status ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50')}
                 >
-                  {f.status ? t(`status.${f.status}` as AppKey) : t('dash.filterAll')}
+                  {f.status === 'SENT' ? t('dash.waiting') : f.status ? t(`status.${f.status}` as AppKey) : t('dash.filterAll')}
                 </button>
               ))}
             </div>
@@ -307,7 +310,10 @@ function Dashboard() {
                       {e.status === 'DRAFT' && e.approvalStatus === 'PENDING' ? (
                         <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{t('dash.awaitingApproval')}</span>
                       ) : (
-                        <StatusBadge status={e.status} />
+                        <>
+                          <StatusBadge status={e.status} />
+                          {e.inReview && <span className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-200">{t('dash.inReview')}</span>}
+                        </>
                       )}
                       <span className="w-20 text-right text-xs text-gray-400">{relativeTime(e.updatedAt)}</span>
                     </Link>

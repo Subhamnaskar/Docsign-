@@ -37,7 +37,7 @@ export default function RegisterPage() {
     setProblems([]);
     try {
       await api('/auth/register', { method: 'POST', json: { ...form, locale } });
-      router.replace('/dashboard');
+      router.replace('/home');
     } catch (err) {
       setError((err as Error).message);
       if (err instanceof ApiError) setProblems(err.problems);

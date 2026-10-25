@@ -40,6 +40,9 @@ import { qesRoutes } from './qes/routes.js';
 import { platformRoutes } from './platform/routes.js';
 import { loadPlanSettings } from './billing/plans.js';
 import { supportRoutes } from './platform/support.js';
+import { contactRoutes } from './contacts/routes.js';
+import { workflowRoutes } from './workflows/routes.js';
+import { homeRoutes } from './home/routes.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
 const PLAN_REFRESH_MS = 60_000;
@@ -100,6 +103,9 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(qesRoutes);
       await v1.register(platformRoutes);
       await v1.register(supportRoutes);
+      await v1.register(contactRoutes);
+      await v1.register(workflowRoutes);
+      await v1.register(homeRoutes);
       await v1.register(ssoRoutes);
       await v1.register(scimRoutes);
       await v1.register(integrationRoutes);

@@ -30,7 +30,7 @@ await page.getByLabel('Work email').fill(`asha.${stamp}@acme.test`);
 await page.getByLabel(/Password/).fill('correct-horse-battery');
 await page.getByLabel('Organization').fill('Acme Lending');
 await page.getByRole('button', { name: 'Create account' }).click();
-await page.waitForURL('**/dashboard');
+await page.waitForURL('**/home');
 await shot(page, 'dashboard');
 await page.getByRole('button', { name: /New agreement/ }).click();
 await page.waitForURL('**/edit');

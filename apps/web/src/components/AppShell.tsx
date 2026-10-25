@@ -7,26 +7,32 @@ import { api, ApiError } from '@/lib/api';
 import type { Me } from '@/lib/types';
 import { cx, Logo, PageLoader } from './ui';
 import { HelpPanel } from './HelpPanel';
+import { Icon, type IconName } from './marketing/Icons';
 import { AppLocaleContext, type AppKey, appT } from '@/lib/appI18n';
 
 const MeContext = createContext<Me | null>(null);
 export const useMe = () => useContext(MeContext);
 
-const NAV: { href: string; label: AppKey }[] = [
-  { href: '/dashboard', label: 'nav.agreements' },
-  { href: '/templates', label: 'nav.templates' },
-  { href: '/repository', label: 'nav.repository' },
-  { href: '/reports', label: 'nav.reports' },
-  { href: '/verify', label: 'nav.verify' },
-  { href: '/settings', label: 'nav.settings' },
+const NAV: { href: string; label: AppKey; icon: IconName }[] = [
+  { href: '/home', label: 'nav.home', icon: 'home' },
+  { href: '/dashboard', label: 'nav.agreements', icon: 'document' },
+  { href: '/templates', label: 'nav.templates', icon: 'layers' },
+  { href: '/workflows', label: 'nav.workflows', icon: 'flow' },
+  { href: '/contacts', label: 'nav.contacts', icon: 'users' },
+  { href: '/repository', label: 'nav.repository', icon: 'folder' },
+  { href: '/reports', label: 'nav.reports', icon: 'chart' },
+  { href: '/verify', label: 'nav.verify', icon: 'shield' },
+  { href: '/settings', label: 'nav.settings', icon: 'gear' },
 ];
 
-/** Layout for signed-in pages; redirects to /login when the session is missing. */
+/** Layout for signed-in pages: navy sidebar, top bar, banners. Redirects to /login when the session is missing. */
 export function AppShell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const [me, setMe] = useState<Me | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     api<Me>('/auth/me')
@@ -39,6 +45,7 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
         if (err instanceof ApiError && err.status === 401) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       });
   }, [router, pathname]);
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   async function logout() {
     await api('/auth/logout', { method: 'POST' });
@@ -50,60 +57,115 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+  const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`) || (href === '/dashboard' && pathname.startsWith('/envelopes'));
+  const initials = (me?.user?.name ?? '?')
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  const sidebar = (
+    <div className="flex h-full flex-col bg-[#121428] text-gray-300">
+      <Link href="/home" className="flex h-16 shrink-0 items-center px-5">
+        <Logo className="text-white" />
+      </Link>
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2" aria-label="Main">
+        {NAV.map((n) => (
+          <Link
+            key={n.href}
+            href={n.href}
+            aria-current={active(n.href) ? 'page' : undefined}
+            className={cx(
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
+              active(n.href) ? 'bg-brand-500/15 text-brand-300 shadow-[inset_3px_0_0_#c9932e]' : 'text-gray-400 hover:bg-white/5 hover:text-white',
+            )}
+          >
+            <Icon name={n.icon} className="h-[18px] w-[18px]" />
+            {t(n.label)}
+          </Link>
+        ))}
+        {me?.user?.platformAdmin && (
+          <Link
+            href="/admin"
+            className={cx('mt-3 flex items-center gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold', pathname.startsWith('/admin') ? 'bg-gold text-ink' : 'text-brand-300 hover:bg-white/5')}
+          >
+            <Icon name="grid" className="h-[18px] w-[18px]" />
+            {t('nav.console')}
+          </Link>
+        )}
+      </nav>
+      <div className="border-t border-white/10 p-3">
+        <button onClick={() => setHelpOpen(true)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-white/5 hover:text-white">
+          <Icon name="globe" className="h-[18px] w-[18px]" />
+          {t('nav.help')}
+        </button>
+        {me && (
+          <div className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold text-xs font-bold text-ink">{initials}</span>
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block truncate text-sm font-medium text-white">{me.user?.name}</span>
+              <span className="block truncate text-xs text-gray-500">{me.organization.name}</span>
+            </span>
+            <button onClick={logout} title={t('nav.signOut')} aria-label={t('nav.signOut')} className="rounded-md p-1.5 text-gray-400 hover:bg-white/10 hover:text-white">
+              <Icon name="arrow" className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <AppLocaleContext.Provider value={locale}>
     <MeContext.Provider value={me}>
-      <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur">
-        <div className={cx('mx-auto flex h-14 items-center gap-6 px-4 sm:px-6', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
-          <Link href="/dashboard">
-            <Logo className="text-gray-900" />
-          </Link>
-          <nav className="flex gap-1">
-            {NAV.map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={cx(
-                  'rounded-md px-3 py-1.5 text-sm font-medium',
-                  pathname.startsWith(n.href) ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:text-gray-900',
-                )}
-              >
-                {t(n.label)}
-              </Link>
-            ))}
-            {me?.user?.platformAdmin && (
-              <Link
-                href="/admin"
-                className={cx('rounded-md px-3 py-1.5 text-sm font-semibold', pathname.startsWith('/admin') ? 'bg-ink text-white' : 'text-brand-700 hover:bg-brand-50')}
-              >
-                {t('nav.console')}
-              </Link>
-            )}
-          </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            {me && (
-              <span className="hidden text-right leading-tight text-gray-600 sm:block">
-                <span className="block font-medium text-gray-900">{me.user?.name}</span>
-                <span className="block text-xs">{me.organization.name}</span>
-              </span>
-            )}
-            <button onClick={() => setHelpOpen(true)} className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
-              {t('nav.help')}
-            </button>
-            <button onClick={logout} className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
-              {t('nav.signOut')}
-            </button>
-          </div>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 lg:block">{sidebar}</aside>
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setMenuOpen(false)} />
+          <aside className="relative h-full w-64 shadow-2xl">{sidebar}</aside>
         </div>
-      </header>
-      <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
-      {me?.support && <SupportBanner me={me} wide={wide} />}
-      {me && <AccountBanner me={me} wide={wide} />}
-      {me && <BillingBanner me={me} wide={wide} />}
-      <main className={cx('mx-auto px-4 py-6 sm:px-6 sm:py-8', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
-        {me ? children : <PageLoader />}
-      </main>
+      )}
+      <div className="lg:pl-60">
+        <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur">
+          <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+            <button className="rounded-md p-2 text-gray-600 hover:bg-gray-100 lg:hidden" onClick={() => setMenuOpen(true)} aria-label="Menu">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </button>
+            <form
+              className="relative max-w-md flex-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                router.push(`/dashboard?q=${encodeURIComponent(query.trim())}`);
+              }}
+            >
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('dash.search')}
+                aria-label={t('dash.search')}
+                className="h-9 w-full rounded-lg bg-gray-100 pl-8 pr-3 text-sm text-ink placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-400/40"
+              />
+            </form>
+            <div className="ml-auto flex items-center gap-1">
+              <Link href="/home" title="Needs your attention" className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-ink">
+                <Icon name="bell" className="h-5 w-5" />
+              </Link>
+              <Link href="/settings" title={me?.user?.name ?? ''} className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-gold text-xs font-bold text-ink">
+                {initials}
+              </Link>
+            </div>
+          </div>
+        </header>
+        <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
+        {me?.support && <SupportBanner me={me} wide={wide} />}
+        {me && <AccountBanner me={me} wide={wide} />}
+        {me && <BillingBanner me={me} wide={wide} />}
+        <main className={cx('mx-auto px-4 py-6 sm:px-6 sm:py-8', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>{me ? children : <PageLoader />}</main>
+      </div>
     </MeContext.Provider>
     </AppLocaleContext.Provider>
   );

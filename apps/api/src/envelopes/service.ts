@@ -20,6 +20,7 @@ import { HttpError } from '../lib/errors.js';
 import { mandateLabels } from '../enach/routes.js';
 import { approvalGate } from '../approvals/service.js';
 import { appBaseFor } from '../governance/delivery.js';
+import { rememberRecipients } from '../contacts/service.js';
 
 export const envelopeInclude = {
   documents: { orderBy: { order: 'asc' } },
@@ -168,6 +169,7 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
   });
 
   await notifySigners(env, toNotify, 'invite');
+  if (!env.testMode) await rememberRecipients(orgId, env.recipients).catch((err) => console.error('contacts update failed', err));
   return getEnvelope(orgId, id);
 }
 

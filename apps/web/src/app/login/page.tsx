@@ -66,7 +66,7 @@ function LoginForm() {
 
   function done() {
     const next = params.get('next');
-    router.replace(next?.startsWith('/') ? next : '/dashboard');
+    router.replace(next?.startsWith('/') ? next : '/home');
   }
 
   async function submitCode(e: React.FormEvent) {

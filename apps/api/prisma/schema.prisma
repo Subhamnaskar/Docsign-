@@ -89,6 +89,8 @@ model Organization {
   // (a key that is present replaces the plan's value; null = unlimited)
   customLimits       Json?
   creditNotes        CreditNote[]
+  contacts           Contact[]
+  workflows          Workflow[]
   // Printed on invoices
   billingName        String?
   billingEmail       String?
@@ -305,6 +307,10 @@ model Envelope {
   folder            Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
   // Set when created through a self-serve signing form
   formId            String?
+  // Template the envelope was created from (workflow conditions match on it)
+  templateId        String?
+  // Started by this workflow; workflows never trigger on these (prevents loops)
+  createdByWorkflowId String?
   // e-Stamp request (state, article, duty, parties) and the issued certificate
   estamp            Json?
   estampResult      Json?
@@ -1107,4 +1113,78 @@ model PlanSetting {
   trialDays        Int?
   updatedBy        String
   updatedAt        DateTime @updatedAt
+}
+
+/// Address book of people the organisation sends agreements to. Filled
+/// automatically from recipients when agreements are sent, or added by hand.
+model Contact {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name       String
+  email      String
+  phone      String?
+  company    String?
+  jobTitle   String?
+  // Signing page and email language
+  locale     String       @default("en")
+  notes      String?
+  tags       String[]     @default([])
+  // auto (from a sent agreement) | manual | import
+  source     String       @default("manual")
+  lastSentAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([orgId, email])
+  @@index([orgId, name])
+}
+
+/// Automation rule: when <trigger> happens to an agreement that matches
+/// <conditions>, run <actions> (email a copy, file it, tag it, send the next
+/// agreement, notify a chat channel).
+model Workflow {
+  id          String        @id @default(cuid())
+  orgId       String
+  org         Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  enabled     Boolean       @default(true)
+  // One of the webhook events: envelope.sent | envelope.completed | recipient.signed | ...
+  trigger     String
+  // [{ field, op, value }]; all must match
+  conditions  Json          @default("[]")
+  // [{ type, ...settings }], run in order
+  actions     Json
+  createdById String?
+  runCount    Int           @default(0)
+  lastRunAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  runs        WorkflowRun[]
+
+  @@index([orgId, trigger])
+}
+
+/// One execution of a workflow, queued with the triggering event and run by the worker.
+model WorkflowRun {
+  id            String    @id @default(cuid())
+  workflowId    String
+  workflow      Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  orgId         String
+  envelopeId    String?
+  event         String
+  data          Json
+  // PENDING | SUCCEEDED | FAILED
+  status        String    @default("PENDING")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  // [{ type, ok, detail }] per action
+  results       Json?
+  error         String?
+  createdAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([workflowId, createdAt])
 }

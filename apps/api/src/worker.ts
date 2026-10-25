@@ -8,6 +8,7 @@ import { renewArchiveTimestamps } from './trust/archive.js';
 import { sendRenewalReminders } from './contracts/routes.js';
 import { purgeExpired } from './governance/retention.js';
 import { deliverCrmEvents } from './crm/routes.js';
+import { runPendingWorkflows } from './workflows/engine.js';
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -61,6 +62,7 @@ export function startWorker(log: FastifyBaseLogger) {
     try {
       await deliverPendingWebhooks();
       await deliverCrmEvents();
+      await runPendingWorkflows();
       await expireEnvelopes();
       await sendReminders();
       await retryFinalization();

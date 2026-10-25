@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ContactSuggest } from '@/components/ContactSuggest';
 import { AppShell, useMe } from '@/components/AppShell';
 import { CompliancePanel } from '@/components/CompliancePanel';
 import { AiReviewPanel } from '@/components/AiPanels';
@@ -527,11 +528,22 @@ function RecipientsStep({
             )}
             <div className="min-w-[140px] flex-1">
               <Label>Name</Label>
-              <Input value={d.name} onChange={(e) => update(d.key, { name: e.target.value })} placeholder="Full name" />
+              <ContactSuggest
+                value={d.name}
+                onChange={(name) => update(d.key, { name })}
+                onPick={(c) => update(d.key, { name: c.name, email: c.email, locale: c.locale })}
+                placeholder="Full name"
+              />
             </div>
             <div className="min-w-[180px] flex-1">
               <Label>Email</Label>
-              <Input type="email" value={d.email} onChange={(e) => update(d.key, { email: e.target.value })} placeholder="name@example.com" />
+              <ContactSuggest
+                type="email"
+                value={d.email}
+                onChange={(email) => update(d.key, { email })}
+                onPick={(c) => update(d.key, { name: c.name, email: c.email, locale: c.locale })}
+                placeholder="name@example.com"
+              />
             </div>
             <div className="w-36">
               <Label>Role</Label>

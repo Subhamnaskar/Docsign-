@@ -92,8 +92,8 @@ async function main() {
   await page.getByLabel('Organization').fill(sender.org);
   await page.getByLabel(/jurisdiction/i).selectOption('IN').catch(() => {});
   await page.getByRole('button', { name: 'Create account' }).click();
-  await page.waitForURL('**/dashboard');
-  await caption(page, 2, 'The dashboard. The blue banner asks to confirm the email address before sending.');
+  await page.waitForURL('**/home');
+  await caption(page, 2, 'Home: what needs attention, quick actions and recent activity. The banner asks to confirm the email address before sending.');
 
   // 3. Confirm email (the link arrives in Mailpit)
   const confirm = await mail(sender.email, /Confirm your email/);

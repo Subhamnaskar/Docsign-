@@ -291,7 +291,13 @@ export async function envelopeRoutes(app: FastifyInstance) {
       orderBy: { updatedAt: 'desc' },
       take: q.limit + 1,
       ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
-      include: { recipients: { orderBy: { routingOrder: 'asc' } }, createdBy: { select: { name: true } }, folder: { select: { id: true, name: true } } },
+      include: {
+        recipients: { orderBy: { routingOrder: 'asc' } },
+        createdBy: { select: { name: true } },
+        folder: { select: { id: true, name: true } },
+        // Open signer comments put an agreement "in review"
+        _count: { select: { comments: { where: { resolvedAt: null, parentId: null } } } },
+      },
     });
     const hasMore = items.length > q.limit;
     return {
@@ -307,6 +313,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
         folder: e.folder,
         approvalStatus: e.approvalStatus,
         testMode: e.testMode,
+        inReview: e.status === 'SENT' && e._count.comments > 0,
         recipients: e.recipients.map((r) => ({ name: r.name, email: r.email, role: r.role, status: r.status })),
       })),
       nextCursor: hasMore ? items[q.limit - 1].id : null,
