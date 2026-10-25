@@ -16,6 +16,7 @@ import { formatAmount } from '../payments/providers.js';
 import { sealPdf, sealPdfIncremental } from '../trust/pades.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 import { assertCanSend } from '../billing/plans.js';
+import { HttpError } from '../lib/errors.js';
 
 export const envelopeInclude = {
   documents: { orderBy: { order: 'asc' } },
@@ -98,6 +99,10 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
   const policy = resolvePolicy(env.jurisdiction, env.documentType);
   if (!policy.allowed) throw unprocessable('This document cannot be sent under the selected compliance profile.', { problems: policy.blockers });
   await assertCanSend(orgId);
+  if (actor.kind === 'user') {
+    const sender = await prisma.user.findUnique({ where: { id: actor.id }, select: { emailVerifiedAt: true } });
+    if (sender && !sender.emailVerifiedAt) throw new HttpError(403, 'Confirm your email address before sending. We sent you a link when you signed up.', 'email_unverified');
+  }
 
   await prepareForSend(id, actor);
   // Documents may have changed (e-stamp page added); record what is actually sent

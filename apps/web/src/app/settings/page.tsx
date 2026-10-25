@@ -5,6 +5,7 @@ import { AppShell, useMe } from '@/components/AppShell';
 import { ActivityLog } from '@/components/settings/Activity';
 import { BillingSettings } from '@/components/settings/Billing';
 import { BrandingSettings } from '@/components/settings/Branding';
+import { SecuritySettings } from '@/components/settings/Security';
 import { SsoSettings } from '@/components/settings/Sso';
 import { Team } from '@/components/settings/Team';
 import { Alert, Button, Card, cx, Input, Label, Select, Textarea } from '@/components/ui';
@@ -38,6 +39,7 @@ function Organization() {
   const [saved, setSaved] = useState(false);
   const [origins, setOrigins] = useState((me?.organization.embedOrigins ?? []).join('\n'));
   const [aiEnabled, setAiEnabled] = useState(Boolean(me?.organization.aiEnabled));
+  const [require2fa, setRequire2fa] = useState(Boolean(me?.organization.require2fa));
   const [orgError, setOrgError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,7 +52,7 @@ function Organization() {
     try {
       await api('/organization', {
         method: 'PATCH',
-        json: { name, jurisdiction, aiEnabled, embedOrigins: origins.split('\n').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean) },
+        json: { name, jurisdiction, aiEnabled, require2fa, embedOrigins: origins.split('\n').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean) },
       });
     } catch (err) {
       setOrgError((err as Error).message);
@@ -86,6 +88,12 @@ function Organization() {
             </span>
           </label>
         )}
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" className="mt-0.5" checked={require2fa} onChange={(e) => setRequire2fa(e.target.checked)} />
+          <span>
+            Require two-factor authentication <span className="text-gray-500">for everyone who signs in with a password. Single sign-on users rely on your identity provider.</span>
+          </span>
+        </label>
         <div className="sm:col-span-2">
           <Label htmlFor="org-origins" hint="(one per line)">
             Allowed embed origins
@@ -276,6 +284,7 @@ function Webhooks() {
 
 const TABS = [
   { id: 'organization', label: 'Organization', admin: true },
+  { id: 'security', label: 'Security', admin: false },
   { id: 'team', label: 'Team', admin: false },
   { id: 'billing', label: 'Billing', admin: true },
   { id: 'branding', label: 'Branding', admin: true },
@@ -288,7 +297,7 @@ function Settings() {
   const me = useMe();
   const admin = me?.user?.role === 'OWNER' || me?.user?.role === 'ADMIN' || !me?.user;
   const tabs = TABS.filter((t) => admin || !t.admin);
-  const [tab, setTab] = useState<string>(tabs[0].id);
+  const [tab, setTab] = useState<string>(me?.user?.mfaSetupRequired ? 'security' : tabs[0].id);
   // Deep links such as /settings?tab=billing (checkout returns here)
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get('tab');
@@ -314,6 +323,14 @@ function Settings() {
       </div>
       <div className="mt-6 space-y-6">
         {tab === 'organization' && <Organization />}
+        {tab === 'security' && (
+          <SecuritySettings
+            onTwoFactorChange={() => {
+              // Required setup finished: reload so the rest of the app unlocks
+              if (me?.user?.mfaSetupRequired) window.location.assign('/dashboard');
+            }}
+          />
+        )}
         {tab === 'team' && <Team />}
         {tab === 'billing' && <BillingSettings />}
         {tab === 'branding' && <BrandingSettings />}

@@ -83,12 +83,19 @@ export function client(app: FastifyInstance) {
   };
 }
 
+/** Follows the confirmation link from the sign-up email. */
+export async function verifyEmail(c: ReturnType<typeof client>, email: string) {
+  const token = lastMail(email, /Confirm your email/).text.match(/\/verify-email\/([\w-]+)/)![1];
+  await c.json('POST', '/auth/verify-email', { json: { token } });
+}
+
 export async function registerSender(app: FastifyInstance, jurisdiction = 'US') {
   const c = client(app);
   const email = `sender-${uid()}@acme.test`;
   await c.json('POST', '/auth/register', {
     json: { name: 'Sam Sender', email, password: 'correct-horse-battery', organizationName: 'Acme', jurisdiction },
   });
+  await verifyEmail(c, email);
   return { c, email };
 }
 

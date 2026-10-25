@@ -32,7 +32,7 @@ export async function teamRoutes(app: FastifyInstance) {
     const user = await prisma.$transaction(async (tx) => {
       await tx.invitation.update({ where: { id: inv.id }, data: { acceptedAt: new Date() } });
       return tx.user.create({
-        data: { email: inv.email, name: body.name, passwordHash: await bcrypt.hash(body.password, 12), role: inv.role, orgId: inv.orgId },
+        data: { email: inv.email, name: body.name, passwordHash: await bcrypt.hash(body.password, 12), role: inv.role, orgId: inv.orgId, emailVerifiedAt: new Date() },
       });
     });
     await prisma.activityLog.create({

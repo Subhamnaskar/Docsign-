@@ -6,13 +6,15 @@ import { prisma } from '../db.js';
 import { logActivity } from '../lib/activity.js';
 import { createSession, requireAuth, requireRole, SESSION_COOKIE } from '../lib/auth.js';
 import { sha256Hex } from '../lib/crypto.js';
-import { conflict, forbidden, unauthorized } from '../lib/errors.js';
+import { badRequest, conflict, forbidden, unauthorized } from '../lib/errors.js';
 import { ssoOrgForEmail } from '../sso/routes.js';
 import { parse } from '../lib/validate.js';
 import { JURISDICTIONS } from '../policy/jurisdictions.js';
 import { billingBrief } from '../billing/routes.js';
+import { isSsoOnly, passwordSchema } from './security.js';
+import { issueToken, sendVerificationEmail } from './tokens.js';
 
-const password = z.string().min(10, 'Use at least 10 characters').max(200);
+const password = passwordSchema;
 // Compared against when the user doesn't exist, so response timing doesn't reveal registered emails
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 12);
 
@@ -48,6 +50,7 @@ export async function authRoutes(app: FastifyInstance) {
       },
     });
     await createSession(reply, user.id);
+    await sendVerificationEmail(user);
     reply.code(201);
     return { id: user.id, name: user.name, email: user.email };
   });
@@ -63,6 +66,10 @@ export async function authRoutes(app: FastifyInstance) {
       throw forbidden('Your organisation requires single sign-on. Use "Sign in with SSO".');
     }
     if (user.disabledAt) throw unauthorized('This account has been deactivated.');
+    if (user.totpEnabledAt) {
+      // Password was right; the session is only created after the second factor
+      return { mfaRequired: true, mfaToken: await issueToken(user.id, 'MFA_LOGIN') };
+    }
     await createSession(reply, user.id);
     return { id: user.id, name: user.name, email: user.email };
   });
@@ -78,7 +85,16 @@ export async function authRoutes(app: FastifyInstance) {
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: req.auth.orgId } });
     const user = req.auth.userId ? await prisma.user.findUnique({ where: { id: req.auth.userId } }) : null;
     return {
-      user: user && { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: user && {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        emailVerified: Boolean(user.emailVerifiedAt),
+        twoFactor: Boolean(user.totpEnabledAt),
+        // The organisation requires two-factor and this password user hasn't set it up
+        mfaSetupRequired: org.require2fa && !user.totpEnabledAt && !isSsoOnly(user),
+      },
       organization: {
         id: org.id,
         name: org.name,
@@ -87,6 +103,7 @@ export async function authRoutes(app: FastifyInstance) {
         brandColor: org.brandColor,
         embedOrigins: org.embedOrigins,
         aiEnabled: org.aiEnabled,
+        require2fa: org.require2fa,
       },
       cell: config.cellRegion,
       features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode },
@@ -101,10 +118,16 @@ export async function authRoutes(app: FastifyInstance) {
         jurisdiction: z.string().refine((c) => c in JURISDICTIONS, 'Unknown jurisdiction').optional(),
         brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #4f46e5').nullable().optional(),
         aiEnabled: z.boolean().optional(),
+        require2fa: z.boolean().optional(),
         embedOrigins: z.array(z.string().url().refine((u) => /^https?:\/\/[^/]+$/.test(u), 'Use an origin like https://app.example.com')).max(20).optional(),
       }),
       req.body,
     );
+    if (body.require2fa && req.auth.userId) {
+      // Turning the policy on would otherwise lock the admin out mid-session
+      const admin = await prisma.user.findUniqueOrThrow({ where: { id: req.auth.userId } });
+      if (!admin.totpEnabledAt && !isSsoOnly(admin)) throw badRequest('Turn on two-factor authentication for your own account first (Settings → Security).');
+    }
     const org = await prisma.organization.update({ where: { id: req.auth.orgId }, data: body });
     await logActivity(req, 'organization.updated', body);
     return {
@@ -115,6 +138,7 @@ export async function authRoutes(app: FastifyInstance) {
       brandColor: org.brandColor,
       embedOrigins: org.embedOrigins,
       aiEnabled: org.aiEnabled,
+      require2fa: org.require2fa,
     };
   });
 }

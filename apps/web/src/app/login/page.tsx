@@ -15,11 +15,16 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [ssoMode, setSsoMode] = useState(false);
+  // Second step when the account has two-factor authentication
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
   const ssoError = params.get('sso');
   const SSO_MESSAGES: Record<string, string> = {
     expired: 'Your sign-in took too long. Please try again.',
     failed: 'Your identity provider did not complete the sign-in.',
     no_email: 'Your identity provider did not share a verified email address.',
+    no_seats: 'All user seats in your organisation are in use. Ask an administrator to add seats.',
     wrong_domain: 'That account is not part of an organisation that uses single sign-on here.',
     other_org: 'This email belongs to a different organisation.',
     deactivated: 'Your account has been deactivated. Contact your administrator.',
@@ -43,13 +48,71 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
-      await api('/auth/login', { method: 'POST', json: { email, password } });
-      const next = params.get('next');
-      router.replace(next?.startsWith('/') ? next : '/dashboard');
+      const res = await api<{ mfaRequired?: boolean; mfaToken?: string }>('/auth/login', { method: 'POST', json: { email, password } });
+      if (res.mfaRequired && res.mfaToken) {
+        setMfaToken(res.mfaToken);
+        setLoading(false);
+        return;
+      }
+      done();
     } catch (err) {
       setError((err as Error).message);
       setLoading(false);
     }
+  }
+
+  function done() {
+    const next = params.get('next');
+    router.replace(next?.startsWith('/') ? next : '/dashboard');
+  }
+
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await api('/auth/login/mfa', { method: 'POST', json: { token: mfaToken, code } });
+      done();
+    } catch (err) {
+      const msg = (err as Error).message;
+      setError(msg);
+      setLoading(false);
+      // Expired or locked: start over from the password
+      if (/expired/i.test(msg)) {
+        setMfaToken(null);
+        setCode('');
+      }
+    }
+  }
+
+  if (mfaToken) {
+    return (
+      <AuthCard title="Two-factor authentication" subtitle={useRecovery ? 'Enter one of your recovery codes.' : 'Enter the 6-digit code from your authenticator app.'}>
+        <form onSubmit={submitCode} className="space-y-4">
+          {error && <Alert>{error}</Alert>}
+          <div>
+            <Label htmlFor="code">{useRecovery ? 'Recovery code' : 'Authentication code'}</Label>
+            <Input
+              id="code"
+              autoFocus
+              required
+              autoComplete="one-time-code"
+              inputMode={useRecovery ? 'text' : 'numeric'}
+              placeholder={useRecovery ? 'XXXX-XXXX' : '123456'}
+              className="font-mono tracking-widest"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+          </div>
+          <Button type="submit" className="w-full" loading={loading}>
+            Verify
+          </Button>
+          <button type="button" onClick={() => { setUseRecovery((r) => !r); setCode(''); }} className="w-full text-sm text-gray-500 hover:text-gray-800">
+            {useRecovery ? 'Use your authenticator app instead' : 'Lost your phone? Use a recovery code'}
+          </button>
+        </form>
+      </AuthCard>
+    );
   }
 
   return (
@@ -73,7 +136,12 @@ function LoginForm() {
         </div>
         {!ssoMode && (
           <div>
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link href="/forgot-password" className="text-xs font-medium text-brand-600 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
         )}

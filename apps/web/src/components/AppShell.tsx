@@ -26,7 +26,11 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
 
   useEffect(() => {
     api<Me>('/auth/me')
-      .then(setMe)
+      .then((m) => {
+        // Organisation policy: nothing else works until two-factor is set up
+        if (m.user?.mfaSetupRequired && pathname !== '/settings') router.replace('/settings?tab=security');
+        setMe(m);
+      })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       });
@@ -71,6 +75,7 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
           </div>
         </div>
       </header>
+      {me && <AccountBanner me={me} wide={wide} />}
       {me && <BillingBanner me={me} wide={wide} />}
       <main className={cx('mx-auto px-4 py-6 sm:px-6 sm:py-8', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
         {me ? children : <PageLoader />}
@@ -108,6 +113,38 @@ function BillingBanner({ me, wide }: { me: Me; wide?: boolean }) {
           </Link>
         ) : (
           <span>Ask an admin to choose a plan.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Unconfirmed email (can't send yet) and required two-factor setup. */
+function AccountBanner({ me, wide }: { me: Me; wide?: boolean }) {
+  const [resent, setResent] = useState(false);
+  const u = me.user;
+  if (!u) return null;
+  const width = wide ? 'max-w-[1400px]' : 'max-w-6xl';
+  if (u.mfaSetupRequired) {
+    return (
+      <div className="border-b border-amber-200 bg-amber-50 text-sm text-amber-900">
+        <div className={cx('mx-auto px-4 py-2 sm:px-6', width)}>Your organisation requires two-factor authentication. Set it up below to continue.</div>
+      </div>
+    );
+  }
+  if (u.emailVerified !== false) return null;
+  return (
+    <div className="border-b border-brand-100 bg-brand-50 text-sm text-brand-800">
+      <div className={cx('mx-auto flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:px-6', width)}>
+        <span>
+          Confirm your email address to start sending. We sent a link to <strong>{u.email}</strong>.
+        </span>
+        {resent ? (
+          <span className="font-medium">Sent. Check your inbox.</span>
+        ) : (
+          <button className="font-semibold underline" onClick={() => api('/auth/verify-email/resend', { method: 'POST' }).then(() => setResent(true))}>
+            Resend email
+          </button>
         )}
       </div>
     </div>

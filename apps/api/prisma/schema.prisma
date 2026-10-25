@@ -36,6 +36,8 @@ model Organization {
   scimTokenHash      String?           @unique
   // AI features send document content to the model provider; admins opt in
   aiEnabled          Boolean           @default(false)
+  // Every password user must turn on two-factor authentication
+  require2fa         Boolean           @default(false)
   // --- Billing (see src/billing/plans.ts) ---
   plan               String            @default("trial")
   billingStatus      BillingStatus     @default(TRIALING)
@@ -98,7 +100,37 @@ model User {
   // Identity-provider subject and SCIM externalId, when provisioned that way
   ssoSubject   String?
   externalId   String?
+  // Senders confirm their email before sending; invited and SSO users are verified on creation
+  emailVerifiedAt    DateTime?
+  // Two-factor authentication (TOTP), secrets sealed with lib/secretbox
+  totpSecretEnc      String?
+  totpPendingEnc     String?
+  totpEnabledAt      DateTime?
+  // Hashed single-use recovery codes
+  recoveryCodeHashes String[]     @default([])
+  authTokens   AuthToken[]
   createdAt    DateTime     @default(now())
+}
+
+/// Single-use tokens for email verification, password reset and the second login step.
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      AuthTokenKind
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int           @default(0)
+  createdAt DateTime      @default(now())
+
+  @@index([userId, kind])
+}
+
+enum AuthTokenKind {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+  MFA_LOGIN
 }
 
 model Invitation {
@@ -147,6 +179,9 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
+  ip         String?
+  userAgent  String?
+  lastSeenAt DateTime @default(now())
   createdAt DateTime @default(now())
 }
 

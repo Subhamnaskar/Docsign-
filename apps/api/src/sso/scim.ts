@@ -132,6 +132,8 @@ export async function scimRoutes(app: FastifyInstance) {
         orgId: org.id,
         externalId: body.externalId ?? null,
         disabledAt: body.active === false ? new Date() : null,
+        // The identity provider vouches for the address
+        emailVerifiedAt: new Date(),
       },
     });
     await prisma.activityLog.create({ data: { orgId: org.id, type: 'user.joined', actor: { kind: 'system' }, data: { via: 'scim', email } } });

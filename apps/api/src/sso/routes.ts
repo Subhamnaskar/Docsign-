@@ -123,6 +123,7 @@ export async function ssoRoutes(app: FastifyInstance) {
           role: org.ssoDefaultRole,
           orgId: org.id,
           ssoSubject: claims?.sub,
+          emailVerifiedAt: new Date(),
         },
       });
       await prisma.activityLog.create({

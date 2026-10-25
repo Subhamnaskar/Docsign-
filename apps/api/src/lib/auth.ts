@@ -3,7 +3,7 @@ import type { Actor } from '../audit/audit.js';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { hmacSha256Hex, randomToken, safeEqualHex, sha256Hex } from './crypto.js';
-import { forbidden, unauthorized } from './errors.js';
+import { forbidden, HttpError, unauthorized } from './errors.js';
 import { assertFeature } from '../billing/plans.js';
 
 export const SESSION_COOKIE = 'ds_session';
@@ -18,6 +18,8 @@ export interface AuthContext {
   /** API keys act with owner rights. */
   role: Role;
   actor: Actor;
+  /** Present for cookie sessions */
+  sessionId?: string;
 }
 
 declare module 'fastify' {
@@ -28,8 +30,15 @@ declare module 'fastify' {
 
 export async function createSession(reply: FastifyReply, userId: string) {
   const token = randomToken();
+  const ua = reply.request.headers['user-agent'];
   await prisma.session.create({
-    data: { userId, tokenHash: sha256Hex(token), expiresAt: new Date(Date.now() + SESSION_TTL_MS) },
+    data: {
+      userId,
+      tokenHash: sha256Hex(token),
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      ip: reply.request.ip,
+      userAgent: typeof ua === 'string' ? ua.slice(0, 300) : null,
+    },
   });
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
@@ -66,18 +75,30 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
   if (!token) throw unauthorized();
   const session = await prisma.session.findUnique({
     where: { tokenHash: sha256Hex(token) },
-    include: { user: true },
+    include: { user: { include: { org: { select: { require2fa: true } } } } },
   });
   if (!session || session.expiresAt < new Date()) throw unauthorized('Session expired');
   const { user } = session;
   if (user.disabledAt) throw unauthorized('This account has been deactivated.');
+  // Organisation policy: password users must set up two-factor before doing anything else
+  if (user.org.require2fa && !user.totpEnabledAt && !user.passwordHash.startsWith('sso:') && !MFA_SETUP_PATHS.test(request.url)) {
+    throw new HttpError(403, 'Your organisation requires two-factor authentication. Set it up under Settings → Security.', 'mfa_setup_required');
+  }
+  if (Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_RESOLUTION_MS) {
+    prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
+  }
   request.auth = {
     orgId: user.orgId,
     userId: user.id,
     role: user.role,
     actor: { kind: 'user', id: user.id, name: user.name, email: user.email },
+    sessionId: session.id,
   };
 }
+
+const LAST_SEEN_RESOLUTION_MS = 5 * 60_000;
+/** Reachable before required two-factor setup is done */
+const MFA_SETUP_PATHS = /^\/api\/v1\/auth\/(me|logout|2fa(\/|$|\?)|sessions|password\/change|verify-email)/;
 
 /** Pre-handler factory restricting a route to the given roles. */
 export function requireRole(...roles: Role[]) {
