@@ -133,6 +133,7 @@ export function serializeEnvelope(env: FullEnvelope) {
     estampResult: env.estampResult,
     certificateSha256: env.certificateSha256,
     departmentId: env.departmentId,
+    testMode: env.testMode,
     legalHold: env.legalHoldAt ? { since: env.legalHoldAt, reason: env.legalHoldReason } : null,
     approval: env.approvalStatus
       ? { status: env.approvalStatus, requestedAt: env.approvalRequestedAt, requestedBy: env.approvalRequestedBy, decidedBy: env.approvalDecidedBy, note: env.approvalNote }
@@ -299,6 +300,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
         sender: e.createdBy.name,
         folder: e.folder,
         approvalStatus: e.approvalStatus,
+        testMode: e.testMode,
         recipients: e.recipients.map((r) => ({ name: r.name, email: r.email, role: r.role, status: r.status })),
       })),
       nextCursor: hasMore ? items[q.limit - 1].id : null,
@@ -323,6 +325,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
           reminderDays: body.reminderDays ?? 2,
           expiresAt: body.expiresAt ?? null,
           departmentId: body.departmentId ?? null,
+          testMode: req.auth.testMode ?? false,
         },
       });
       await appendAudit(tx, {

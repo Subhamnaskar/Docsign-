@@ -10,6 +10,7 @@ import { ipAllowed, orgIpAllowlist } from '../governance/delivery.js';
 export const SESSION_COOKIE = 'ds_session';
 export const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 export const API_KEY_PREFIX = 'dsk_';
+export const TEST_KEY_PREFIX = 'dsk_test_';
 
 export type Role = 'OWNER' | 'ADMIN' | 'MEMBER';
 
@@ -23,6 +24,8 @@ export interface AuthContext {
   sessionId?: string;
   /** Departments this member manages (they see those agreements too) */
   managedDepartmentIds?: string[];
+  /** API keys only: true for test keys, false for live keys (sessions see both) */
+  testMode?: boolean;
 }
 
 declare module 'fastify' {
@@ -61,7 +64,8 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     const apiKey = await prisma.apiKey.findUnique({ where: { keyHash: sha256Hex(key) } });
     if (!apiKey || apiKey.revokedAt) throw unauthorized('Invalid API key');
     await assertIpAllowed(request, apiKey.orgId);
-    await assertFeature(apiKey.orgId, 'api');
+    // Test keys work on every plan so developers can build before buying
+    if (apiKey.mode !== 'test') await assertFeature(apiKey.orgId, 'api');
     // Best-effort usage tracking; not worth failing the request over
     prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
     // API calls act on behalf of the org's owner for attribution of created envelopes
@@ -71,6 +75,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
       userId: owner?.id ?? null,
       role: 'OWNER',
       actor: { kind: 'api_key', id: apiKey.id, name: apiKey.name },
+      testMode: apiKey.mode === 'test',
     };
     return;
   }

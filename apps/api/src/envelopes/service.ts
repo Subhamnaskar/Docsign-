@@ -31,7 +31,9 @@ export type FullEnvelope = Prisma.EnvelopeGetPayload<{ include: typeof envelopeI
 
 /** Members see the envelopes they created; admins and owners see the whole organisation's. */
 /** Members see their own agreements and those of departments they manage; admins see everything. */
-export function envelopeScope(auth: { orgId: string; userId: string | null; role: string; managedDepartmentIds?: string[] }): Prisma.EnvelopeWhereInput {
+export function envelopeScope(auth: { orgId: string; userId: string | null; role: string; managedDepartmentIds?: string[]; testMode?: boolean }): Prisma.EnvelopeWhereInput {
+  // API keys see only agreements of their own mode (test or live)
+  if (auth.testMode !== undefined) return { orgId: auth.orgId, testMode: auth.testMode };
   if (auth.role !== 'MEMBER') return { orgId: auth.orgId };
   const managed = auth.managedDepartmentIds ?? [];
   return managed.length
@@ -39,7 +41,7 @@ export function envelopeScope(auth: { orgId: string; userId: string | null; role
     : { orgId: auth.orgId, createdById: auth.userId ?? '-' };
 }
 
-export async function getVisibleEnvelope(auth: { orgId: string; userId: string | null; role: string; managedDepartmentIds?: string[] }, id: string): Promise<FullEnvelope> {
+export async function getVisibleEnvelope(auth: { orgId: string; userId: string | null; role: string; managedDepartmentIds?: string[]; testMode?: boolean }, id: string): Promise<FullEnvelope> {
   const env = await prisma.envelope.findFirst({ where: { id, ...envelopeScope(auth) }, include: envelopeInclude });
   if (!env) throw notFound('Envelope');
   return env;
@@ -119,7 +121,7 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
   if (problems.length) throw unprocessable('The envelope is not ready to send.', { problems });
   const policy = resolvePolicy(env.jurisdiction, env.documentType);
   if (!policy.allowed) throw unprocessable('This document cannot be sent under the selected compliance profile.', { problems: policy.blockers });
-  await assertCanSend(orgId);
+  if (!env.testMode) await assertCanSend(orgId);
   // Internal approval: the agreement waits as a draft until an approver approves it
   if (actor.kind === 'user' && (await approvalGate(env, actor.id)) === 'pending') return getEnvelope(orgId, id);
   if (actor.kind === 'user') {
@@ -181,7 +183,7 @@ export async function notifySigners(env: Envelope, recipients: Recipient[], kind
     });
     await sendMail({
       to: r.email,
-      subject: t(r.locale, kind === 'invite' ? 'inviteSubject' : 'reminderSubject', vars),
+      subject: `${env.testMode ? '[TEST] ' : ''}${t(r.locale, kind === 'invite' ? 'inviteSubject' : 'reminderSubject', vars)}`,
       html,
       text,
       orgId: env.orgId,
@@ -291,7 +293,7 @@ export async function finalizeEnvelope(envelopeId: string): Promise<void> {
     const rendered = await renderCompletedPdf(
       original,
       env.fields.filter((f) => f.documentId === doc.id),
-      { envelopeId: env.id, signedAt, attachmentNames, paymentLabels, embed },
+      { envelopeId: env.id, signedAt, attachmentNames, paymentLabels, embed, testMode: env.testMode },
     );
     const sealed = await sealPdf(Buffer.from(rendered), { reason });
     sealFormat = sealed.format;

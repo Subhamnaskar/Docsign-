@@ -279,7 +279,10 @@ function Dashboard() {
                     <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} aria-label={`Select ${e.title}`} />
                     <Link href={e.status === 'DRAFT' ? `/envelopes/${e.id}/edit` : `/envelopes/${e.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-4 py-3.5">
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium text-gray-900">{e.title}</div>
+                        <div className="truncate font-medium text-gray-900">
+                          {e.title}
+                          {e.testMode && <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-amber-800">Test</span>}
+                        </div>
                         <div className="truncate text-sm text-gray-500">
                           {signers.length ? `To: ${signers.map((r) => r.name).join(', ')}` : 'No recipients yet'}
                           {isAdmin && e.sender && <span className="text-gray-400"> · from {e.sender}</span>}

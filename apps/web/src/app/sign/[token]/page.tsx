@@ -18,7 +18,7 @@ import { SignerComments } from '@/components/SignerComments';
 interface SigningSession {
   state: 'ready' | 'waiting' | 'signed' | 'completed' | 'declined' | 'voided' | 'expired' | 'unavailable';
   verified: boolean;
-  envelope: { id: string; title: string; message: string | null; sender: { name: string; email: string }; organization: string; expiresAt: string | null };
+  envelope: { id: string; title: string; message: string | null; sender: { name: string; email: string }; organization: string; expiresAt: string | null; testMode?: boolean };
   recipient: {
     id: string;
     name: string;
@@ -902,6 +902,11 @@ export default function SignPage() {
       {paymentCancelled && (
         <div className="mx-auto mb-4 max-w-3xl">
           <Alert tone="warning">{tr('paymentCancelled')}</Alert>
+        </div>
+      )}
+      {session.envelope.testMode && (
+        <div className="mx-auto mb-4 max-w-3xl">
+          <Alert tone="warning" title="Test agreement">This was created in test mode. It is not legally binding.</Alert>
         </div>
       )}
       {mandateRejected && (

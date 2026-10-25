@@ -19,6 +19,7 @@ import { GovernanceSettings } from '@/components/settings/Governance';
 interface ApiKey {
   id: string;
   name: string;
+  mode?: 'live' | 'test';
   prefix: string;
   createdAt: string;
   lastUsedAt: string | null;
@@ -148,6 +149,8 @@ function Organization() {
 function ApiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [name, setName] = useState('');
+  const [mode, setMode] = useState<'live' | 'test'>('test');
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
   const load = useCallback(() => api<ApiKey[]>('/api-keys').then(setKeys), []);
   useEffect(() => {
@@ -156,10 +159,15 @@ function ApiKeys() {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    const res = await api<{ key: string }>('/api-keys', { method: 'POST', json: { name } });
-    setCreated(res.key);
-    setName('');
-    load();
+    setKeyError(null);
+    try {
+      const res = await api<{ key: string }>('/api-keys', { method: 'POST', json: { name, mode } });
+      setCreated(res.key);
+      setName('');
+      load();
+    } catch (err) {
+      setKeyError((err as Error).message);
+    }
   }
 
   return (
@@ -167,7 +175,14 @@ function ApiKeys() {
       <h2 className="font-semibold">API keys</h2>
       <p className="mt-1 text-sm text-gray-500">
         Use <code className="rounded bg-gray-100 px-1">Authorization: Bearer &lt;key&gt;</code> with any endpoint under <code className="rounded bg-gray-100 px-1">/api/v1</code>.
+        Test keys create watermarked agreements that aren&apos;t billed and work on every plan. See the{' '}
+        <a className="text-brand-700 hover:underline" href="/api/v1/openapi.json">OpenAPI spec</a> and the Node and Python SDKs.
       </p>
+      {keyError && (
+        <div className="mt-3">
+          <Alert>{keyError}</Alert>
+        </div>
+      )}
       {created && (
         <div className="mt-4">
           <Alert tone="success" title="Copy your key now. It won't be shown again.">
@@ -177,6 +192,10 @@ function ApiKeys() {
       )}
       <form onSubmit={create} className="mt-4 flex gap-2">
         <Input placeholder="Key name, e.g. CRM integration" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Select value={mode} onChange={(e) => setMode(e.target.value as 'live' | 'test')} aria-label="Key type" className="w-36">
+          <option value="test">Test key</option>
+          <option value="live">Live key</option>
+        </Select>
         <Button type="submit">Create key</Button>
       </form>
       {keys.length > 0 && (
@@ -184,7 +203,10 @@ function ApiKeys() {
           {keys.map((k) => (
             <li key={k.id} className="flex items-center gap-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <div className="font-medium">{k.name}</div>
+                <div className="font-medium">
+                  {k.name}
+                  {k.mode === 'test' && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Test</span>}
+                </div>
                 <div className="font-mono text-xs text-gray-400">
                   {k.prefix}… · created {formatDate(k.createdAt, false)} · {k.lastUsedAt ? `used ${relativeTime(k.lastUsedAt)}` : 'never used'}
                 </div>

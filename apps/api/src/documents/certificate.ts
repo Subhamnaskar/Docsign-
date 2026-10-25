@@ -170,6 +170,7 @@ export async function buildCertificate(input: CertificateInput): Promise<Uint8Ar
   w.text('Certificate of Completion', { size: 20, bold: true });
   w.gap(4);
   w.text(envelope.title, { size: 12, color: MUTED });
+  if ((envelope as { testMode?: boolean }).testMode) w.text('TEST AGREEMENT - created with a test API key. Not legally binding.', { size: 10, bold: true, color: rgb(0.8, 0.1, 0.1) });
   w.gap(6);
 
   w.heading('Envelope');

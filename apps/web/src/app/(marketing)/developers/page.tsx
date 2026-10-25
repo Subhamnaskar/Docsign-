@@ -202,6 +202,21 @@ def verify(raw_body: bytes, header: str, secret: str, tolerance=300) -> bool:
           </div>
         </div>
       </Section>
+      <Section>
+        <SectionHeading eyebrow="Tools" title="SDKs, OpenAPI and test mode" />
+        <div className="mt-8 grid gap-6 md:grid-cols-3">
+          {[
+            ['Node.js and Python SDKs', 'Typed clients with no dependencies, including webhook signature verification. Other languages can be generated from the OpenAPI spec.'],
+            ['OpenAPI 3.1', 'A machine-readable description of the API at /api/v1/openapi.json, for Postman, code generators and API gateways.'],
+            ['Test mode', 'Keys starting dsk_test_ create watermarked agreements that are not billed and work on every plan, so you can build before you buy.'],
+          ].map(([t, d]) => (
+            <div key={t} className="rounded-2xl border border-gray-200 p-6">
+              <h3 className="font-semibold text-gray-900">{t}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-600">{d}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
       <CtaBand title="Building an integration?" intro="Tell us about your product and volumes, and we will help you get set up with embedded signing." />
     </>
   );

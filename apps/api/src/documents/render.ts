@@ -52,6 +52,8 @@ export interface RenderOptions {
   paymentLabels?: Map<string, string>;
   /** Files embedded in the PDF before sealing, so the seal covers them too */
   embed?: { name: string; data: Buffer; mimeType: string; description: string }[];
+  /** Test-mode agreement: watermark every page */
+  testMode?: boolean;
 }
 
 /** Burns completed field values into the PDF and stamps the envelope ID on every page. */
@@ -112,6 +114,20 @@ export async function renderCompletedPdf(
     // Rotated pages are left unstamped rather than stamped sideways
     if (page.getRotation().angle % 360 !== 0) continue;
     page.drawText(stamp, { x: 12, y: page.getSize().height - 10, size: 6, font, color: rgb(0.45, 0.45, 0.5) });
+    if (opts.testMode) {
+      const { width, height } = page.getSize();
+      const mark = 'TEST - NOT LEGALLY BINDING';
+      const size = Math.min(width, height) / 12;
+      page.drawText(mark, {
+        x: width / 2 - (font.widthOfTextAtSize(mark, size) / 2) * Math.cos(Math.PI / 6),
+        y: height / 2 - (font.widthOfTextAtSize(mark, size) / 2) * Math.sin(Math.PI / 6),
+        size,
+        font,
+        color: rgb(0.85, 0.1, 0.1),
+        opacity: 0.25,
+        rotate: degrees(30),
+      });
+    }
   }
 
   return doc.save({ useObjectStreams: false });

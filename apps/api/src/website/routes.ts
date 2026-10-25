@@ -4,11 +4,15 @@ import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { layout, sendMail } from '../lib/mailer.js';
 import { parse } from '../lib/validate.js';
+import { openApiSpec } from '../developers/openapi.js';
 
 export const LEAD_INTERESTS = ['demo', 'pricing', 'partnership', 'api', 'other'] as const;
 
 /** Public website endpoints (no authentication). */
 export async function websiteRoutes(app: FastifyInstance) {
+  /** Public OpenAPI description, for API clients and code generators. */
+  app.get('/openapi.json', async () => openApiSpec());
+
   app.post('/leads', { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (req, reply) => {
     const body = parse(
       z.object({

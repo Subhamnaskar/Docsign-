@@ -148,6 +148,7 @@ export interface EnvelopeSummary {
   sender?: string;
   folder?: { id: string; name: string } | null;
   approvalStatus?: string | null;
+  testMode?: boolean;
   recipients: { name: string; email: string; role: string; status: RecipientStatus }[];
 }
 

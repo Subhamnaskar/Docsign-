@@ -108,7 +108,7 @@ export function entitlement(org: Organization, now = new Date()): Entitlement {
   };
 }
 
-export const envelopesUsed = (orgId: string, since: Date) => prisma.envelope.count({ where: { orgId, sentAt: { gte: since } } });
+export const envelopesUsed = (orgId: string, since: Date) => prisma.envelope.count({ where: { orgId, testMode: false, sentAt: { gte: since } } });
 
 /** Active users plus open invitations. */
 export async function seatsUsed(orgId: string) {

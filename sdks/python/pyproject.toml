@@ -1,0 +1,10 @@
+[project]
+name = "docsign"
+version = "1.0.0"
+description = "DocSign API client (standard library only)"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

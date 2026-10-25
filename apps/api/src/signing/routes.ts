@@ -191,6 +191,7 @@ export async function signingRoutes(app: FastifyInstance) {
         sender: env.createdBy,
         organization: env.org.name,
         expiresAt: env.expiresAt,
+        testMode: env.testMode,
       },
       recipient: {
         id: r.id,

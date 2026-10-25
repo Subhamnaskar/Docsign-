@@ -222,6 +222,8 @@ model ApiKey {
   // First characters of the key, shown in the UI so users can tell keys apart
   prefix     String
   keyHash    String       @unique
+  // live | test (test keys create watermarked test agreements that are not billed)
+  mode       String       @default("live")
   createdAt  DateTime     @default(now())
   lastUsedAt DateTime?
   revokedAt  DateTime?
@@ -257,6 +259,8 @@ model Envelope {
   routing           RoutingMode    @default(SEQUENTIAL)
   jurisdiction      String
   documentType      String         @default("general")
+  // Created with a test API key: watermarked, not legally binding, not billed
+  testMode          Boolean        @default(false)
   departmentId      String?
   department        Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   // Legal hold: never deleted by retention rules while set

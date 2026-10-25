@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { logActivity } from '../lib/activity.js';
-import { API_KEY_PREFIX, requireAuth, requireRole } from '../lib/auth.js';
+import { API_KEY_PREFIX, requireAuth, requireRole, TEST_KEY_PREFIX } from '../lib/auth.js';
 import { randomToken, sha256Hex } from '../lib/crypto.js';
 import { notFound } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
@@ -25,15 +25,15 @@ export async function developerRoutes(app: FastifyInstance) {
 
   /** The full key is returned once, at creation. */
   app.post('/api-keys', async (req, reply) => {
-    await assertFeature(req.auth.orgId, 'api');
-    const { name } = parse(z.object({ name: z.string().trim().min(1).max(80) }), req.body);
-    const key = `${API_KEY_PREFIX}${randomToken(24)}`;
+    const { name, mode } = parse(z.object({ name: z.string().trim().min(1).max(80), mode: z.enum(['live', 'test']).default('live') }), req.body);
+    if (mode === 'live') await assertFeature(req.auth.orgId, 'api');
+    const key = `${mode === 'test' ? TEST_KEY_PREFIX : API_KEY_PREFIX}${randomToken(24)}`;
     const created = await prisma.apiKey.create({
-      data: { orgId: req.auth.orgId, name, prefix: key.slice(0, 12), keyHash: sha256Hex(key) },
+      data: { orgId: req.auth.orgId, name, mode, prefix: key.slice(0, mode === 'test' ? 16 : 12), keyHash: sha256Hex(key) },
     });
-    await logActivity(req, 'api_key.created', { id: created.id, name, prefix: created.prefix });
+    await logActivity(req, 'api_key.created', { id: created.id, name, prefix: created.prefix, mode });
     reply.code(201);
-    return { id: created.id, name: created.name, prefix: created.prefix, createdAt: created.createdAt, key };
+    return { id: created.id, name: created.name, mode: created.mode, prefix: created.prefix, createdAt: created.createdAt, key };
   });
 
   app.delete('/api-keys/:id', async (req, reply) => {
