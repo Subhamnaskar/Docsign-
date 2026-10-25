@@ -14,6 +14,8 @@ export const brand = {
   supportEmail: 'support@docsign.example',
   /** Registered company details for the footer and legal pages. */
   legalEntity: 'NuronixAI',
+  /** Social profiles shown in the footer; leave empty until the accounts exist. */
+  social: { linkedin: '', x: '', youtube: '', github: '' } as Record<'linkedin' | 'x' | 'youtube' | 'github', string>,
 };
 
 /**

@@ -1,243 +1,251 @@
 import Link from 'next/link';
-import { HomeSolutions } from '@/components/marketing/HomeSolutions';
-import { AiMock, CodeMock, WorkflowMock } from '@/components/marketing/Mocks';
-import { CtaBand, GoldLink } from '@/components/marketing/Site';
+import { HeroShowcase } from '@/components/marketing/HeroShowcase';
+import { Icon, type IconName } from '@/components/marketing/Icons';
+import { CodeTabs, EmailStart, FeatureTabs } from '@/components/marketing/Landing';
+import { CtaBand } from '@/components/marketing/Site';
 import { brand } from '@/lib/brand';
 import { SOLUTIONS } from '@/lib/solutions';
 
-/** Tools the product connects to today (names only; no partner logos). */
-const WORKS_WITH = ['Google Drive', 'Dropbox', 'OneDrive', 'Microsoft Word', 'Outlook', 'Google Docs', 'Salesforce', 'HubSpot', 'Slack', 'Microsoft Teams', 'Zapier'];
-
-/** Facts about the product, not customer numbers. */
-const FACTS = [
-  { value: '4', label: 'legal frameworks built in', note: 'IT Act 2000 (India), ESIGN and UETA (US), Electronic Communications Act (UK), eIDAS (EU)' },
-  { value: '10', label: 'signer languages', note: 'Including Hindi and right-to-left Arabic, chosen per signer' },
-  { value: '100%', label: 'of signed PDFs sealed', note: 'PAdES digital seal, trusted timestamp and long-term validation data' },
-  { value: 'SHA-256', label: 'hash-chained audit trail', note: 'Every event linked to the one before, so tampering shows' },
+/** Integrations the product has today, shown as wordmarks in their own colours (no customer claim). */
+const WORKS_WITH: { name: string; className: string }[] = [
+  { name: 'slack', className: 'font-black lowercase tracking-tight text-[#4A154B]' },
+  { name: 'Google Drive', className: 'font-semibold text-[#4285F4]' },
+  { name: 'Microsoft 365', className: 'font-semibold text-gray-700' },
+  { name: 'Dropbox', className: 'font-bold text-[#0061FE]' },
+  { name: 'HubSpot', className: 'font-bold text-[#FF7A59]' },
+  { name: 'zapier', className: 'font-black lowercase text-[#FF4F00]' },
+  { name: 'Salesforce', className: 'font-bold text-[#00A1E0]' },
+  { name: 'OneDrive', className: 'font-semibold text-[#0364B8]' },
 ];
 
-const STANDARDS = ['IT Act 2000', 'eIDAS', 'ESIGN & UETA', 'PAdES (ETSI EN 319 142)', 'RFC 3161 timestamps', 'Data stored in India'];
+/** True statements only: encryption, sealing, audit, residency, laws. */
+const TRUST: { icon: IconName; title: string; note: string }[] = [
+  { icon: 'lock', title: '100%', note: 'Encrypted in transit and at rest' },
+  { icon: 'shield', title: 'PAdES', note: 'Digital seal and trusted timestamp' },
+  { icon: 'chart', title: 'SHA-256', note: 'Hash-chained audit trail' },
+  { icon: 'database', title: 'India', note: 'Data residency for Indian customers' },
+  { icon: 'globe', title: '4 laws', note: 'IT Act · eIDAS · ESIGN · UK ECA' },
+];
+
+const INDUSTRY_ICONS: Record<string, IconName> = {
+  sales: 'chart',
+  hr: 'users',
+  legal: 'document',
+  procurement: 'cart',
+  banking: 'bank',
+  'real-estate': 'home',
+  software: 'box',
+};
+
+const HUB: { label: string; className: string; text: string }[] = [
+  { label: 'Salesforce', className: 'bg-[#00A1E0] text-white', text: 'sf' },
+  { label: 'Google Drive', className: 'bg-white text-[#1FA463]', text: '▲' },
+  { label: 'Slack', className: 'bg-white text-[#4A154B]', text: '#' },
+  { label: 'HubSpot', className: 'bg-white text-[#FF7A59]', text: 'H' },
+];
 
 export default function Home() {
   return (
     <>
-      {/* Hero: start sign-up with just an email */}
-      <section className="relative overflow-hidden bg-night bg-dots text-white">
-        <div className="absolute -left-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-brand-500/25 blur-3xl" aria-hidden />
-        <div className="absolute -bottom-48 right-0 h-[30rem] w-[30rem] rounded-full bg-indigo-600/20 blur-3xl" aria-hidden />
-        <div className="relative mx-auto max-w-5xl px-4 pb-24 pt-20 text-center sm:px-6 sm:pt-28">
-          <h1 className="text-[2.75rem] font-black leading-[1.02] tracking-tight sm:text-7xl lg:text-[5.5rem]">
-            Everything you need <span className="block text-gold">to agree.</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-300 sm:text-xl">Send, sign and manage your agreements, with the right signature for every country. Free for 14 days.</p>
-          <form action="/register" method="get" className="mx-auto mt-10 flex max-w-xl flex-col gap-2 sm:flex-row sm:gap-0">
-            <label htmlFor="hero-email" className="sr-only">
-              Work email
-            </label>
-            <input
-              id="hero-email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="name@company.com"
-              className="h-14 w-full shrink-0 rounded-lg bg-white px-5 sm:w-auto sm:flex-1 text-base text-ink placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-400/40 sm:rounded-r-none"
-            />
-            <button type="submit" className="h-14 rounded-lg bg-gold px-7 text-base font-bold text-ink hover:brightness-105 sm:rounded-l-none">
-              Get started
-            </button>
-          </form>
-          <p className="mt-4 text-sm text-gray-400">
-            No credit card required. By continuing you agree to the{' '}
-            <Link href="/legal/terms" className="underline hover:text-white">
-              Terms
-            </Link>{' '}
-            and{' '}
-            <Link href="/legal/privacy" className="underline hover:text-white">
-              Privacy Policy
-            </Link>
-            .
-          </p>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-night text-white">
+        <HeroWaves />
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-14 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-20 lg:pt-20">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">Agreements for a faster tomorrow</p>
+            <h1 className="mt-5 text-[2.7rem] font-black leading-[1.03] tracking-tight sm:text-6xl lg:text-[3.5rem] xl:text-[3.9rem]">
+              <span className="lg:whitespace-nowrap">Send. Sign. Manage.</span>
+              <span className="block text-gold">All in one place.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-300">
+              {brand.name} helps modern teams create, send, sign and manage agreements with the right workflows, integrations and security to keep business moving.
+            </p>
+            <div className="mt-8 max-w-xl">
+              <EmailStart id="hero-email" />
+            </div>
+          </div>
+          <HeroShowcase />
         </div>
       </section>
 
       {/* Works with */}
-      <section className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-          <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Works with the tools you already use</p>
-          <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-9 gap-y-3">
-            {WORKS_WITH.map((n) => (
-              <li key={n} className="text-lg font-bold tracking-tight text-gray-400">
-                {n}
+      <section className="border-b border-gray-100 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+          <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Works with the tools your team already uses</p>
+          <ul className="mt-6 grid grid-cols-2 items-center justify-items-center gap-6 sm:grid-cols-4 lg:grid-cols-8">
+            {WORKS_WITH.map((w) => (
+              <li key={w.name} className={`text-xl ${w.className}`}>
+                {w.name}
               </li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* Statement + solution tabs */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-7xl px-4 pb-24 pt-20 sm:px-6">
+      {/* Features */}
+      <section id="features" className="scroll-mt-20 bg-cream">
+        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-black tracking-tight text-ink sm:text-5xl">One platform for every agreement</h2>
-            <p className="mt-5 text-lg leading-relaxed text-gray-600 sm:text-xl">
-              Prepare, sign, verify and manage agreements in one place, with identity checks, payments and the evidence courts expect.
-            </p>
-            <Link href="/product" className="mt-6 inline-flex items-center gap-1 text-lg font-semibold text-brand-700 hover:text-ink">
-              Explore the platform <span aria-hidden>›</span>
-            </Link>
+            <span className="inline-block rounded-full bg-brand-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-brand-700">Powerful features</span>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-ink sm:text-5xl">Everything you need to manage agreements</h2>
+            <p className="mt-4 text-lg text-gray-600">From e-signatures to automated workflows, {brand.name} gives you the tools to handle your contracts from start to finish.</p>
           </div>
-          <div className="mt-14">
-            <HomeSolutions />
-          </div>
-
-          {/* Workflow: wide card */}
-          <article className="mt-6 grid items-center gap-10 overflow-hidden rounded-2xl bg-brand-50 p-8 ring-1 ring-brand-100 sm:p-12 lg:grid-cols-2">
-            <div>
-              <h3 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Automate agreement processes</h3>
-              <p className="mt-4 text-[17px] leading-relaxed text-gray-600">
-                Generate documents from Word templates, route them for approval, and send them to each signer in the right order, with reminders and expiry dates handled for you.
-              </p>
-              <Link href="/product" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
-                Explore templates and approvals <span aria-hidden>›</span>
-              </Link>
-            </div>
-            <div className="flex justify-center py-4">
-              <WorkflowMock />
-            </div>
-          </article>
-
-          {/* Developers + AI */}
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <article className="flex flex-col overflow-hidden rounded-2xl bg-brand-50 ring-1 ring-brand-100">
-              <div className="p-8 sm:p-10">
-                <h3 className="text-2xl font-bold tracking-tight text-ink">Build with the API, SDKs and MCP</h3>
-                <p className="mt-4 text-[17px] leading-relaxed text-gray-600">
-                  Our own app runs on the same REST API you get. Embed signing, react to signed webhooks, and let AI agents work with agreements through the MCP server.
-                </p>
-                <Link href="/developers" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
-                  Explore developer tools <span aria-hidden>›</span>
-                </Link>
-              </div>
-              <div className="mt-auto translate-y-6 px-8 sm:px-10">
-                <CodeMock />
-              </div>
-            </article>
-            <article className="flex flex-col overflow-hidden rounded-2xl bg-brand-50 ring-1 ring-brand-100">
-              <div className="p-8 sm:p-10">
-                <h3 className="text-2xl font-bold tracking-tight text-ink">Let AI read the fine print</h3>
-                <p className="mt-4 text-[17px] leading-relaxed text-gray-600">
-                  Summaries, key terms and renewal dates pulled from your contracts, so nothing important is buried on page twelve. Off until your admin turns it on.
-                </p>
-                <Link href="/solutions/legal" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
-                  Explore AI features <span aria-hidden>›</span>
-                </Link>
-              </div>
-              <div className="mt-auto translate-y-6 px-8 sm:px-10">
-                <AiMock />
-              </div>
-            </article>
-          </div>
-
-          <div className="mt-16 flex flex-wrap items-center justify-center gap-6">
-            <GoldLink href="/pricing" className="rounded-lg px-7">
-              View plans and pricing
-            </GoldLink>
-            <Link href="/product" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
-              Explore all products <span aria-hidden>›</span>
-            </Link>
+          <div className="mt-10">
+            <FeatureTabs />
           </div>
         </div>
       </section>
 
-      {/* Integrations band */}
-      <section className="relative overflow-hidden bg-night bg-dots text-white">
-        <div className="absolute inset-x-0 -top-32 mx-auto h-64 w-[40rem] rounded-full bg-brand-500/20 blur-3xl" aria-hidden />
-        <div className="relative mx-auto max-w-4xl px-4 py-24 text-center sm:px-6">
-          <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Build your own agreement workflows</h2>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-gray-300 sm:text-xl">
-            Connect your CRM, cloud storage, Office and Google Docs, chat tools and thousands of apps through Zapier, or build exactly what you need with the API.
-          </p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <Link href="/partners" className="rounded-lg border border-white/40 px-7 py-3.5 font-bold hover:bg-white/10">
-              Explore integrations
-            </Link>
-            <Link href="/developers" className="rounded-lg px-7 py-3.5 font-bold text-brand-300 hover:text-brand-200">
-              API documentation ›
-            </Link>
+      {/* Integrate */}
+      <section className="relative overflow-hidden bg-night text-white">
+        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-brand-500/15 blur-3xl" aria-hidden />
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,1.1fr)] lg:py-24">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Connect your stack</p>
+            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">
+              Integrate. Automate.
+              <span className="block text-gold">Do more with {brand.name}.</span>
+            </h2>
+            <p className="mt-5 text-lg leading-relaxed text-gray-300">
+              Connect to your favourite tools, build custom workflows, or use our API to create powerful agreement experiences in your product.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/partners" className="inline-flex items-center gap-2 rounded-lg bg-gold px-6 py-3 font-bold text-ink hover:brightness-105">
+                Explore integrations <Icon name="arrow" className="h-4 w-4" />
+              </Link>
+              <Link href="/developers" className="rounded-lg border border-white/25 px-6 py-3 font-bold hover:bg-white/10">
+                View API docs
+              </Link>
+            </div>
           </div>
+          <IntegrationHub />
+          <CodeTabs />
         </div>
       </section>
 
       {/* Trust */}
-      <section className="bg-[#1b1530] text-white">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[1fr_2fr]">
-          <div>
-            <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Built for trust</h2>
-            <p className="mt-5 text-lg leading-relaxed text-gray-300">
-              We take your agreements as seriously as you do: every signature is verified, every event is recorded, and every signed PDF can be checked by anyone.
-            </p>
-            <Link href="/compliance" className="mt-6 inline-flex items-center gap-1 font-semibold text-brand-300 hover:text-brand-200">
-              Explore trust and security <span aria-hidden>›</span>
+      <section className="bg-white">
+        <div className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:pt-24">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-2xl">
+              <span className="inline-block rounded-full bg-brand-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-brand-700">Trust & security</span>
+              <h2 className="mt-4 text-3xl font-black tracking-tight text-ink sm:text-4xl">Your agreements are in safe hands</h2>
+              <p className="mt-3 text-lg text-gray-600">Encryption, sealed documents and a tamper-evident audit trail keep your data safe and your agreements defensible.</p>
+            </div>
+            <Link href="/compliance" className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-ink">
+              Learn about our security <Icon name="arrow" className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-5 sm:grid-cols-2">
-            {FACTS.map((f) => (
-              <div key={f.label} className="rounded-2xl bg-white p-7 text-ink">
-                <p className="text-gold text-4xl font-black tracking-tight">{f.value}</p>
-                <p className="mt-2 text-xl font-bold">{f.label}</p>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">{f.note}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Laws and standards supported</p>
-          <ul className="mt-5 grid gap-4 border-y border-white/15 py-6 sm:grid-cols-3 lg:grid-cols-6">
-            {STANDARDS.map((s) => (
-              <li key={s} className="flex items-center gap-3 text-lg">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-brand-300 text-sm text-brand-300" aria-hidden>
-                  ✓
+          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {TRUST.map((t) => (
+              <li key={t.title} className="flex items-center gap-4 rounded-2xl border border-gray-200 p-5">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500 ring-1 ring-brand-100">
+                  <Icon name={t.icon} className="h-6 w-6" />
                 </span>
-                {s}
+                <div>
+                  <p className="text-xl font-black text-ink">{t.title}</p>
+                  <p className="text-xs text-gray-500">{t.note}</p>
+                </div>
               </li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* Solutions grid */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-black tracking-tight text-ink sm:text-5xl">Built for teams where signatures carry weight</h2>
-            <p className="mt-5 text-lg text-gray-600 sm:text-xl">From a two-person agency to a bank&apos;s lending desk, {brand.name} fits the way your team already works.</p>
-          </div>
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Industries */}
+      <section id="industries" className="scroll-mt-20 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:py-24">
+          <span className="inline-block rounded-full bg-brand-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-brand-700">Built for every team</span>
+          <h2 className="mt-4 text-3xl font-black tracking-tight text-ink sm:text-4xl">Agreements for every industry</h2>
+          <p className="mt-3 text-lg text-gray-600">From fast-growing start-ups to large enterprises, {brand.name} adapts to the way your team works.</p>
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {SOLUTIONS.map((s) => (
-              <Link key={s.slug} href={`/solutions/${s.slug}`} className="group rounded-2xl border border-gray-200 p-7 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">{s.group === 'team' ? 'Team' : 'Industry'}</p>
-                <h3 className="mt-2 text-xl font-bold text-ink">{s.name}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.summary}</p>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 group-hover:text-ink">
-                  Learn more <span aria-hidden>›</span>
+              <Link key={s.slug} href={`/solutions/${s.slug}`} className="group flex gap-4 rounded-2xl border border-gray-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500 ring-1 ring-brand-100">
+                  <Icon name={INDUSTRY_ICONS[s.slug] ?? 'document'} className="h-6 w-6" />
                 </span>
+                <div>
+                  <h3 className="font-bold text-ink">{s.name}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-gray-500">{s.summary}</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+                    Learn more <Icon name="arrow" className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </div>
               </Link>
             ))}
-            <Link href="/contact" className="group flex flex-col justify-between rounded-2xl bg-night bg-dots p-7 text-white">
-              <div>
-                <h3 className="text-xl font-bold">Something else?</h3>
-                <p className="mt-2 text-sm text-gray-400">Tell us what you sign and we&apos;ll show you how it works.</p>
-              </div>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-300">
-                Talk to us <span aria-hidden>›</span>
+            <Link href="/contact" className="group flex gap-4 rounded-2xl bg-night p-6 text-white transition hover:-translate-y-0.5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-brand-300">
+                <Icon name="grid" className="h-6 w-6" />
               </span>
+              <div>
+                <h3 className="font-bold">And more</h3>
+                <p className="mt-1 text-sm leading-relaxed text-gray-400">{brand.name} works for any team that works with agreements.</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-300">
+                  Talk to us <Icon name="arrow" className="h-3.5 w-3.5" />
+                </span>
+              </div>
             </Link>
           </div>
         </div>
       </section>
 
-      <CtaBand title="See it on your own documents" intro="Start a free 14-day trial and send your first agreement in minutes, or talk to us about your compliance requirements." />
+      <CtaBand />
     </>
+  );
+}
+
+/** Flowing gold lines behind the hero. */
+function HeroWaves() {
+  return (
+    <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1440 760" preserveAspectRatio="xMidYMid slice" aria-hidden>
+      <defs>
+        <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#c9932e" stopOpacity="0" />
+          <stop offset="0.5" stopColor="#e8c170" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#c9932e" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id="hero-glow" cx="70%" cy="45%" r="50%">
+          <stop offset="0" stopColor="#3b2a4a" stopOpacity="0.8" />
+          <stop offset="1" stopColor="#0a0a12" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="1440" height="760" fill="url(#hero-glow)" />
+      {[0, 14, 28, 42, 56, 70].map((d, i) => (
+        <path
+          key={d}
+          d={`M-40 ${600 - d} C 300 ${470 - d}, 520 ${720 - d}, 860 ${560 - d} S 1300 ${360 - d}, 1500 ${430 - d}`}
+          fill="none"
+          stroke="url(#wave)"
+          strokeWidth={i === 2 ? 1.6 : 0.8}
+          opacity={1 - i * 0.12}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** Integrations flowing into the product mark. */
+function IntegrationHub() {
+  return (
+    <div className="relative mx-auto flex h-80 w-full max-w-[260px] items-center justify-between" aria-hidden>
+      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 260 320" fill="none">
+        {[40, 120, 200, 280].map((y) => (
+          <path key={y} d={`M64 ${y} C 120 ${y}, 120 160, 172 160`} stroke="#c9932e" strokeOpacity="0.7" strokeWidth="1.4" />
+        ))}
+      </svg>
+      <ul className="relative flex h-full flex-col justify-between py-1">
+        {HUB.map((h) => (
+          <li key={h.label} title={h.label} className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 bg-[#141626] shadow-lg">
+            <span className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-black ${h.className}`}>{h.text}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="relative flex h-24 w-24 items-center justify-center rounded-2xl border border-brand-400/50 bg-[#141626] shadow-[0_0_60px_rgba(201,147,46,0.45)]">
+        <svg viewBox="0 0 32 32" className="h-12 w-12" aria-hidden>
+          <rect width="32" height="32" rx="8" fill="#c9932e" />
+          <path d="M8 21c3-1 4.5-9 7-9s1 7 3 7 2.5-4 6-4" stroke="#14110b" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+    </div>
   );
 }

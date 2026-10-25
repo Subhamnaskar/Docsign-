@@ -77,7 +77,7 @@ export function SiteHeader() {
       aria-controls={`menu-${id}`}
       onClick={() => setMenu(menu === id ? null : id)}
       onMouseEnter={() => setMenu(id)}
-      className={cx('inline-flex items-center gap-1 rounded-md px-3 py-2 text-[15px] font-medium', menu === id ? 'text-brand-600' : 'text-gray-700 hover:text-ink')}
+      className={cx('inline-flex items-center gap-1 rounded-md px-3 py-2 text-[15px] font-medium', menu === id ? 'text-brand-300' : 'text-gray-200 hover:text-white')}
     >
       {label}
       <svg className={cx('h-3.5 w-3.5 transition', menu === id && 'rotate-180')} viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -88,55 +88,34 @@ export function SiteHeader() {
 
   return (
     <header ref={header} className="sticky top-0 z-40" onMouseLeave={() => setMenu(null)}>
-      <div className="hidden bg-night text-[13px] text-gray-300 md:block">
-        <div className="mx-auto flex h-9 max-w-7xl items-center gap-5 px-4 sm:px-6">
-          <Link href="/product" className="flex items-center gap-2 hover:text-white">
-            <span className="rounded bg-gold px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink">New</span>
-            Aadhaar eSign, e-NACH and stamp duty in one signing journey
-            <span aria-hidden>›</span>
-          </Link>
-          <nav className="ml-auto flex items-center gap-5" aria-label="Quick links">
-            <Link href="/contact" className="hover:text-white">
-              Sales
-            </Link>
-            <Link href="/help" className="hover:text-white">
-              Support
-            </Link>
-            <Link href="/verify" className="hover:text-white">
-              Verify a document
-            </Link>
-            <Link href="/login" className="font-semibold text-white hover:text-brand-200">
-              Log in
-            </Link>
-          </nav>
-        </div>
-      </div>
-
-      <div className="border-b border-gray-200/80 bg-white/95 backdrop-blur">
+      <div className="border-b border-white/10 bg-night/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
           <Link href="/" aria-label="Home" className="mr-2">
-            <Logo className="text-lg text-ink" />
+            <Logo className="text-lg text-white" />
           </Link>
           <nav className="hidden items-center lg:flex" aria-label="Main">
             {trigger('products', 'Products')}
             {trigger('solutions', 'Solutions')}
             {trigger('resources', 'Resources')}
-            <Link href="/developers" onMouseEnter={() => setMenu(null)} className={cx('rounded-md px-3 py-2 text-[15px] font-medium', pathname.startsWith('/developers') ? 'text-brand-600' : 'text-gray-700 hover:text-ink')}>
+            <Link href="/developers" onMouseEnter={() => setMenu(null)} className={cx('rounded-md px-3 py-2 text-[15px] font-medium', pathname.startsWith('/developers') ? 'text-brand-300' : 'text-gray-200 hover:text-white')}>
               Developers
             </Link>
-            <Link href="/pricing" onMouseEnter={() => setMenu(null)} className={cx('rounded-md px-3 py-2 text-[15px] font-medium', pathname.startsWith('/pricing') ? 'text-brand-600' : 'text-gray-700 hover:text-ink')}>
-              Plans and pricing
+            <Link href="/pricing" onMouseEnter={() => setMenu(null)} className={cx('rounded-md px-3 py-2 text-[15px] font-medium', pathname.startsWith('/pricing') ? 'text-brand-300' : 'text-gray-200 hover:text-white')}>
+              Pricing
             </Link>
           </nav>
           <div className="ml-auto hidden items-center gap-2 lg:flex">
-            <Link href="/contact" className="px-3 py-2 text-sm font-bold uppercase tracking-wide text-brand-700 hover:text-ink">
-              Contact sales
+            <Link href="/login" className="px-3 py-2 text-[15px] font-medium text-gray-200 hover:text-white">
+              Log in
             </Link>
-            <Link href="/register" className="rounded-lg bg-gold px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-ink shadow-sm hover:brightness-105">
-              Try for free
+            <Link href="/register" className="inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-bold text-ink shadow-sm hover:brightness-105">
+              Get started free
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
             </Link>
           </div>
-          <button className="ml-auto rounded-md p-2 text-gray-700 hover:bg-gray-100 lg:hidden" onClick={() => setMobile((o) => !o)} aria-expanded={mobile} aria-label="Menu">
+          <button className="ml-auto rounded-md p-2 text-gray-200 hover:bg-white/10 lg:hidden" onClick={() => setMobile((o) => !o)} aria-expanded={mobile} aria-label="Menu">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
               {mobile ? <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" /> : <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />}
             </svg>
@@ -182,7 +161,7 @@ export function SiteHeader() {
             <nav className="flex flex-col border-t border-gray-100 py-2">
               {[
                 ['/developers', 'Developers'],
-                ['/pricing', 'Plans and pricing'],
+                ['/pricing', 'Pricing'],
                 ['/verify', 'Verify a document'],
                 ['/login', 'Log in'],
               ].map(([href, label]) => (
@@ -196,7 +175,7 @@ export function SiteHeader() {
                 Contact sales
               </Link>
               <Link href="/register" className="rounded-lg bg-gold px-4 py-2.5 text-center text-sm font-bold text-ink">
-                Try for free
+                Get started free
               </Link>
             </div>
           </div>
