@@ -359,13 +359,13 @@ export function CommentThread({
       {canPost && (
         <div className="space-y-2 border-t border-gray-100 pt-3">
           <Textarea rows={2} placeholder="Add a comment, e.g. a change you need in clause 4" value={body} onChange={(e) => setBody(e.target.value)} aria-label="New comment" />
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-center">
             {documents.length > 0 && (
               <>
-                <Select value={docId} onChange={(e) => setDocId(e.target.value)} aria-label="Document" className="w-auto">
+                <Select value={docId} onChange={(e) => setDocId(e.target.value)} aria-label="Document">
                   {documents.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </Select>
-                <Input type="number" min={1} max={documents.find((d) => d.id === docId)?.pageCount} placeholder="Page" value={page} onChange={(e) => setPage(e.target.value)} className="w-24" aria-label="Page" />
+                <Input type="number" min={1} max={documents.find((d) => d.id === docId)?.pageCount} placeholder="Page" value={page} onChange={(e) => setPage(e.target.value)} aria-label="Page" />
               </>
             )}
             <Button size="sm" disabled={!body.trim()} onClick={() => post({ body: body.trim(), documentId: docId || undefined, page: page ? Number(page) - 1 : undefined }, () => { setBody(''); setPage(''); })}>
