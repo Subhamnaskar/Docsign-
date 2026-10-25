@@ -18,6 +18,7 @@ const PRODUCTS: { heading: string; links: MenuLink[] }[] = [
     heading: 'Sign',
     links: [
       { href: '/product', label: 'eSignature', note: 'Prepare, send and sign agreements on any device' },
+      { href: '/sign-yourself', label: 'Sign a document yourself', note: 'Free: sign a PDF you received and send it back' },
       { href: '/product', label: 'Templates and bulk send', note: 'Reuse layouts and send to hundreds from a CSV' },
       { href: '/product', label: 'Web forms and payments', note: 'Self-serve signing links that collect payments' },
     ],

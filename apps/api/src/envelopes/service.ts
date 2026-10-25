@@ -133,9 +133,10 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
   if (problems.length) throw unprocessable('The envelope is not ready to send.', { problems });
   const policy = resolvePolicy(env.jurisdiction, env.documentType);
   if (!policy.allowed) throw unprocessable('This document cannot be sent under the selected compliance profile.', { problems: policy.blockers });
-  if (!env.testMode) await assertCanSend(orgId);
+  // Signing your own document is free and needs nobody's approval
+  if (!env.testMode && !env.selfSign) await assertCanSend(orgId);
   // Internal approval: the agreement waits as a draft until an approver approves it
-  if (actor.kind === 'user' && (await approvalGate(env, actor.id)) === 'pending') return getEnvelope(orgId, id);
+  if (!env.selfSign && actor.kind === 'user' && (await approvalGate(env, actor.id)) === 'pending') return getEnvelope(orgId, id);
   if (actor.kind === 'user') {
     const sender = await prisma.user.findUnique({ where: { id: actor.id }, select: { emailVerifiedAt: true } });
     if (sender && !sender.emailVerifiedAt) throw new HttpError(403, 'Confirm your email address before sending. We sent you a link when you signed up.', 'email_unverified');
@@ -168,6 +169,8 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
     return active;
   });
 
+  // Self-signers sign straight away in their own browser; nobody needs an invitation
+  if (env.selfSign) return getEnvelope(orgId, id);
   await notifySigners(env, toNotify, 'invite');
   if (!env.testMode) await rememberRecipients(orgId, env.recipients).catch((err) => console.error('contacts update failed', err));
   return getEnvelope(orgId, id);

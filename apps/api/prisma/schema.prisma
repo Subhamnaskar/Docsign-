@@ -311,6 +311,8 @@ model Envelope {
   templateId        String?
   // Started by this workflow; workflows never trigger on these (prevents loops)
   createdByWorkflowId String?
+  // Signed by its creator alone ("Sign it yourself"): free, no approval, no invitation emails
+  selfSign          Boolean        @default(false)
   // e-Stamp request (state, article, duty, parties) and the issued certificate
   estamp            Json?
   estampResult      Json?
@@ -1187,4 +1189,14 @@ model WorkflowRun {
 
   @@index([status, nextAttemptAt])
   @@index([workflowId, createdAt])
+}
+
+/// One-time code for "Sign it yourself" without an account: proves the email
+/// before a personal (guest) account is created.
+model GuestCode {
+  email     String   @id
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }

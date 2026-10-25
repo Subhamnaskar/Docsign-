@@ -245,6 +245,18 @@ function AccountBanner({ me, wide }: { me: Me; wide?: boolean }) {
       </div>
     );
   }
+  if (u.guest) {
+    return (
+      <div className="border-b border-brand-100 bg-brand-50 text-sm text-brand-800">
+        <div className={cx('mx-auto flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:px-6', width)}>
+          <span>This is your free personal account. Set a password to sign in again and keep your signed documents.</span>
+          <Link href={`/forgot-password?email=${encodeURIComponent(u.email)}`} className="font-semibold underline">
+            Set a password
+          </Link>
+        </div>
+      </div>
+    );
+  }
   if (u.emailVerified !== false) return null;
   return (
     <div className="border-b border-brand-100 bg-brand-50 text-sm text-brand-800">

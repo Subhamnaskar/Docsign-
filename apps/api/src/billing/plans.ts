@@ -167,7 +167,8 @@ function planEntitlement(org: Organization, now: Date): Omit<Entitlement, 'featu
   };
 }
 
-export const envelopesUsed = (orgId: string, since: Date) => prisma.envelope.count({ where: { orgId, testMode: false, sentAt: { gte: since } } });
+/** Agreements sent this period; test agreements and documents people signed themselves are free. */
+export const envelopesUsed = (orgId: string, since: Date) => prisma.envelope.count({ where: { orgId, testMode: false, selfSign: false, sentAt: { gte: since } } });
 
 /** Active users plus open invitations. */
 export async function seatsUsed(orgId: string) {

@@ -76,6 +76,7 @@ function HomeView() {
 
   const actions: { label: string; note: string; icon: IconName; onClick?: () => void; href?: string; primary?: boolean }[] = [
     { label: 'New agreement', note: 'Upload a document and send it', icon: 'pen', onClick: newAgreement, primary: true },
+    { label: 'Sign it yourself', note: 'Sign a document you received', icon: 'check', href: '/sign-yourself' },
     { label: 'Use a template', note: 'Start from a saved layout', icon: 'layers', href: '/templates' },
     { label: 'Add a contact', note: 'Save someone you send to', icon: 'users', href: '/contacts?new=1' },
     { label: 'Create a workflow', note: 'Automate what happens next', icon: 'flow', href: admin ? '/workflows/new' : '/workflows' },
@@ -91,7 +92,7 @@ function HomeView() {
         <p className="mt-1 text-sm text-gray-500">{attentionCount ? `${attentionCount} thing${attentionCount === 1 ? '' : 's'} need your attention.` : 'You are all caught up.'}</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {actions.map((a) => {
           const body = (
             <>

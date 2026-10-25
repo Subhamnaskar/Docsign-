@@ -110,6 +110,8 @@ export async function authRoutes(app: FastifyInstance) {
         twoFactor: Boolean(user.totpEnabledAt),
         // The organisation requires two-factor and this password user hasn't set it up
         mfaSetupRequired: org.require2fa && !user.totpEnabledAt && !isSsoOnly(user),
+        // Personal account from "Sign it yourself" without a password yet
+        guest: user.passwordHash.startsWith('guest:'),
         // NuronixAI staff: show the platform console link (never inside a support session)
         platformAdmin: Boolean(req.auth.sessionId && !req.auth.support && (await platformRole(user))),
       },

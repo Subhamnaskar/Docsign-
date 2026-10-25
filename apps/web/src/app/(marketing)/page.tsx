@@ -62,6 +62,12 @@ export default function Home() {
             </p>
             <div className="mt-8 max-w-xl">
               <EmailStart id="hero-email" />
+              <p className="mt-4 text-sm text-gray-400">
+                Just need to sign something you received?{' '}
+                <Link href="/sign-yourself" className="font-semibold text-brand-300 hover:text-brand-200">
+                  Sign a document yourself, free →
+                </Link>
+              </p>
             </div>
           </div>
           <HeroShowcase />

@@ -89,9 +89,10 @@ function signerState(r: LoadedRecipient) {
   if (env.status === 'VOIDED') return 'voided';
   if (env.status === 'EXPIRED') return 'expired';
   if (env.status === 'DECLINED') return 'declined';
+  // Completed (sealed) wins over "signed", so signers can download the final copy
+  if (env.status === 'COMPLETED') return 'completed';
   if (r.status === 'SIGNED') return 'signed';
   if (r.status === 'DECLINED') return 'declined';
-  if (env.status === 'COMPLETED') return 'completed';
   if (env.status !== 'SENT') return 'unavailable';
   if (r.status === 'CREATED') return 'waiting';
   return 'ready';
@@ -194,6 +195,7 @@ export async function signingRoutes(app: FastifyInstance) {
         organization: env.org.name,
         expiresAt: env.expiresAt,
         testMode: env.testMode,
+        selfSign: env.selfSign,
       },
       recipient: {
         id: r.id,

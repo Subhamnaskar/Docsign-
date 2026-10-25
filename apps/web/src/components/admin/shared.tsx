@@ -161,6 +161,7 @@ export const LOGIN_METHODS: Record<string, string> = {
   invite: 'Accepted invite',
   register: 'Sign-up',
   office: 'Office add-in',
+  guest: 'Sign it yourself (guest)',
 };
 
 export const FAILURE_REASONS: Record<string, string> = {

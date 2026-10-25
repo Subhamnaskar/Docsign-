@@ -1,5 +1,6 @@
 import { zipSync } from 'fflate';
-import type { FastifyInstance } from 'fastify';
+import type { Recipient } from '@prisma/client';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { appendAudit } from '../audit/audit.js';
 import { prisma } from '../db.js';
@@ -24,6 +25,32 @@ export const csvCell = (v: unknown) => {
 };
 
 const fileSafe = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 80).trim() || 'agreement';
+
+/**
+ * Starts a verified signing session in this browser for a recipient signing
+ * in person (hosted by the signed-in user, or signing their own document).
+ */
+export async function startHostSession(req: FastifyRequest, reply: FastifyReply, envelopeId: string, r: Pick<Recipient, 'id' | 'name' | 'email' | 'tokenVersion'>) {
+  const session = randomToken();
+  await prisma.$transaction(async (tx) => {
+    await tx.recipient.update({ where: { id: r.id }, data: { verifiedAt: new Date(), signerSessionHash: sha256Hex(session) } });
+    await appendAudit(tx, {
+      envelopeId,
+      type: 'recipient.verified',
+      actor: { kind: 'recipient', id: r.id, name: r.name, email: r.email },
+      data: { method: 'in_person', host: req.auth.actor },
+      ...clientInfo(req),
+    });
+  });
+  reply.setCookie(cookieName(r.id), session, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: config.isProduction,
+    maxAge: SIGNER_SESSION_TTL_MS / 1000,
+  });
+  return { signPath: `/sign/${signingToken(r)}` };
+}
 
 export async function envelopeManageRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
@@ -82,25 +109,7 @@ export async function envelopeManageRoutes(app: FastifyInstance) {
     if (!r) throw notFound('Recipient');
     if (!r.hostUserId || r.hostUserId !== req.auth.userId) throw forbidden('Only the host can start in-person signing.');
     if (env.status !== 'SENT' || (r.status !== 'SENT' && r.status !== 'VIEWED')) throw conflict("It is not this signer's turn.");
-    const session = randomToken();
-    await prisma.$transaction(async (tx) => {
-      await tx.recipient.update({ where: { id: rid }, data: { verifiedAt: new Date(), signerSessionHash: sha256Hex(session) } });
-      await appendAudit(tx, {
-        envelopeId: id,
-        type: 'recipient.verified',
-        actor: { kind: 'recipient', id: r.id, name: r.name, email: r.email },
-        data: { method: 'in_person', host: req.auth.actor },
-        ...clientInfo(req),
-      });
-    });
-    reply.setCookie(cookieName(rid), session, {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: config.isProduction,
-      maxAge: SIGNER_SESSION_TTL_MS / 1000,
-    });
-    return { signPath: `/sign/${signingToken(r)}` };
+    return startHostSession(req, reply, id, r);
   });
 
   /**

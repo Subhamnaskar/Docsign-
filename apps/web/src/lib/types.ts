@@ -169,7 +169,7 @@ export interface AuditEvent {
 }
 
 export interface Me {
-  user: { id: string; name: string; email: string; role: string; emailVerified?: boolean; twoFactor?: boolean; mfaSetupRequired?: boolean; locale?: string; platformAdmin?: boolean } | null;
+  user: { id: string; name: string; email: string; role: string; emailVerified?: boolean; twoFactor?: boolean; mfaSetupRequired?: boolean; locale?: string; platformAdmin?: boolean; guest?: boolean } | null;
   organization: {
     id: string;
     name: string;

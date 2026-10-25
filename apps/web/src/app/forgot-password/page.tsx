@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthCard } from '@/components/AuthCard';
 import { Alert, Button, Input, Label } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -11,6 +11,11 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // The guest banner links here with ?email= to set a first password
+  useEffect(() => {
+    const e = new URLSearchParams(window.location.search).get('email');
+    if (e) setEmail(e);
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

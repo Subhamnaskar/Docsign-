@@ -18,7 +18,7 @@ import { SignerComments } from '@/components/SignerComments';
 interface SigningSession {
   state: 'ready' | 'waiting' | 'signed' | 'completed' | 'declined' | 'voided' | 'expired' | 'unavailable';
   verified: boolean;
-  envelope: { id: string; title: string; message: string | null; sender: { name: string; email: string }; organization: string; expiresAt: string | null; testMode?: boolean };
+  envelope: { id: string; title: string; message: string | null; sender: { name: string; email: string }; organization: string; expiresAt: string | null; testMode?: boolean; selfSign?: boolean };
   recipient: {
     id: string;
     name: string;
@@ -916,18 +916,9 @@ export default function SignPage() {
   }
 
   if (session.state !== 'ready') {
-    const [titleKey, bodyKey] = STATE_KEYS[session.state];
-    const good = session.state === 'signed' || session.state === 'completed';
     return (
       <Shell {...shell} title={session.envelope.title}>
-        <Card className="mx-auto max-w-md p-8 text-center">
-          <div className={cx('mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-xl', good ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
-            {good ? '✓' : 'i'}
-          </div>
-          <h1 className="text-lg font-semibold">{tr(titleKey)}</h1>
-          <p className="mt-2 text-sm text-gray-500">{tr(bodyKey)}</p>
-          <p className="mt-6 text-xs text-gray-400">{session.envelope.title}</p>
-        </Card>
+        <Finished token={token} session={session} tr={tr} onRefresh={load} />
       </Shell>
     );
   }
@@ -964,5 +955,115 @@ export default function SignPage() {
         <SignDocument session={session} token={token} onDone={load} onReassigned={setReassignedTo} tr={tr} />
       )}
     </Shell>
+  );
+}
+
+/**
+ * After signing: download the sealed PDF and certificate once everything is
+ * complete, and (for documents people signed themselves) email them back.
+ */
+function Finished({ token, session, tr, onRefresh }: { token: string; session: SigningSession; tr: Translate; onRefresh: () => void }) {
+  const [titleKey, bodyKey] = STATE_KEYS[session.state];
+  const good = session.state === 'signed' || session.state === 'completed';
+  const completed = session.state === 'completed';
+  // A self-signed document is sealed a moment after signing; check back until it is
+  useEffect(() => {
+    if (session.state !== 'signed' || !session.envelope.selfSign) return;
+    const t = setTimeout(onRefresh, 2000);
+    return () => clearTimeout(t);
+  }, [session, onRefresh]);
+
+  return (
+    <div className="mx-auto max-w-md space-y-4">
+      <Card className="p-8 text-center">
+        <div className={cx('mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-xl', good ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>{good ? '✓' : 'i'}</div>
+        <h1 className="text-lg font-semibold">{tr(titleKey)}</h1>
+        <p className="mt-2 text-sm text-gray-500">{session.envelope.selfSign && completed ? '' : tr(bodyKey)}</p>
+        {session.state === 'signed' && session.envelope.selfSign && <p className="mt-3 text-sm text-gray-500">{tr('sealing')}</p>}
+        {completed && (
+          <div className="mt-6 space-y-2">
+            {session.documents.map((d) => (
+              <a
+                key={d.id}
+                href={`/api/v1/signing/${token}/documents/${d.id}/file`}
+                download={`${d.name.replace(/\.[^.]+$/, '')} (signed).pdf`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+              >
+                ⬇ {tr('downloadSigned')}
+                {session.documents.length > 1 && <span className="truncate font-normal opacity-80">· {d.name}</span>}
+              </a>
+            ))}
+            <a
+              href={`/api/v1/signing/${token}/certificate`}
+              download="Certificate of Completion.pdf"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            >
+              ⬇ {tr('downloadCertificate')}
+            </a>
+          </div>
+        )}
+        <p className="mt-6 text-xs text-gray-400">{session.envelope.title}</p>
+      </Card>
+      {completed && session.envelope.selfSign && <SendBack token={token} tr={tr} />}
+      {session.envelope.selfSign && (
+        <p className="text-center text-sm">
+          <a href="/home" className="font-medium text-brand-700 hover:underline">
+            {tr('backHome')}
+          </a>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SendBack({ token, tr }: { token: string; tr: Translate }) {
+  const [to, setTo] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const list = to
+      .split(/[,;\s]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+    try {
+      await api(`/signing/${token}/share`, { method: 'POST', json: { to: list, message: message.trim() || undefined } });
+      setDone(tr('sendBackDone', { to: list.join(', ') }));
+      setTo('');
+      setMessage('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card className="p-6">
+      <h2 className="font-semibold">{tr('sendBackTitle')}</h2>
+      <p className="mt-1 text-sm text-gray-500">{tr('sendBackIntro')}</p>
+      {done && <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{done}</p>}
+      {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+      <form onSubmit={send} className="mt-4 space-y-3">
+        <div>
+          <label htmlFor="sb-to" className="mb-1 block text-sm font-medium text-gray-700">
+            {tr('sendBackTo')}
+          </label>
+          <input id="sb-to" type="text" inputMode="email" required value={to} onChange={(e) => setTo(e.target.value)} placeholder="hr@company.com" className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+        </div>
+        <div>
+          <label htmlFor="sb-msg" className="mb-1 block text-sm font-medium text-gray-700">
+            {tr('sendBackMessage')}
+          </label>
+          <textarea id="sb-msg" rows={2} value={message} onChange={(e) => setMessage(e.target.value)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+        </div>
+        <button type="submit" disabled={busy || !to.trim()} className="w-full rounded-lg bg-gold px-4 py-2.5 text-sm font-bold text-ink hover:brightness-105 disabled:opacity-50">
+          {tr('sendBackButton')}
+        </button>
+      </form>
+    </Card>
   );
 }
