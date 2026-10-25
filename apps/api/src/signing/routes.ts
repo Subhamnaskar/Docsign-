@@ -20,6 +20,7 @@ import { advanceEnvelope, notifySender, notifySigners } from '../envelopes/servi
 import { applyElectronicIncrement, isIncremental } from '../esign/service.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 import { assertKycComplete, kycSummary } from '../kyc/routes.js';
+import { attestationText, requireAttestation, witnessPrincipal } from './witness.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_MS = 30 * 1000;
@@ -209,6 +210,10 @@ export async function signingRoutes(app: FastifyInstance) {
         embedded: r.embedded,
         returnUrl: r.embedded ? r.embedReturnUrl : null,
         idChecks: verified ? await kycSummary(r) : r.idChecks.map((kind) => ({ kind, status: 'NOT_STARTED' })),
+        witness: await (async () => {
+          const p = await witnessPrincipal(r);
+          return p ? { name: p.name, signed: Boolean(p.signedAt), attestation: attestationText(p) } : null;
+        })(),
       },
       branding: await getBranding(env.orgId),
       aiAvailable: config.ai.enabled && Boolean((await prisma.organization.findUnique({ where: { id: env.orgId }, select: { aiEnabled: true } }))?.aiEnabled),
@@ -358,6 +363,8 @@ export async function signingRoutes(app: FastifyInstance) {
       z.object({
         consent: z.literal(true, { errorMap: () => ({ message: 'You must agree to sign electronically.' }) }),
         values: z.record(z.string(), z.string().max(MAX_SIGNATURE_BYTES * 1.4)),
+        /** Witnesses confirm they saw the other person sign */
+        attest: z.boolean().optional(),
       }),
       req.body,
     );
@@ -366,6 +373,7 @@ export async function signingRoutes(app: FastifyInstance) {
     requireSession(req, r);
     if (r.signatureMethod !== 'ELECTRONIC') throw badRequest('This document is signed with Aadhaar eSign or a DSC; use that option to sign.');
     await assertKycComplete(r);
+    const witness = await requireAttestation(r, body.attest);
     const [fields, others, attachments] = await Promise.all([
       prisma.field.findMany({ where: { recipientId: r.id } }),
       prisma.field.findMany({ where: { envelopeId: r.envelopeId, recipientId: { not: r.id } } }),
@@ -404,6 +412,7 @@ export async function signingRoutes(app: FastifyInstance) {
             .filter((a) => updates.some((u) => u.value === a.id))
             .map((a) => ({ name: a.name, sha256: a.sha256 })),
           identity: identityEvidence(r),
+          ...(witness ?? {}),
         },
         ...client,
       });

@@ -357,6 +357,8 @@ enum SignatureMethod {
   AADHAAR_ESIGN
   // Signer's own Digital Signature Certificate on a USB token (AES)
   DSC
+  // Qualified electronic signature through a QTSP's Cloud Signature Consortium API (eIDAS QES)
+  QES
 }
 
 enum AuthMethod {
@@ -420,6 +422,8 @@ model Recipient {
   signedUserAgent      String?
   // Identity checks the signer must pass before signing: PAN, BANK, DIGILOCKER, VIDEO
   idChecks             String[]        @default([])
+  // This signer witnesses another signer's signature (attests it was signed in their presence)
+  witnessForId         String?
   // Random words the signer reads aloud in the video check (short-lived)
   videoChallenge       String?
   videoChallengeAt     DateTime?
@@ -750,6 +754,8 @@ model EsignTransaction {
   status      String    @default("PENDING")
   // [{ documentId, preparedKey, contentsStart, contentsEnd, digest }]
   documents   Json
+  // Provider flow state (CSC: stage, credential, certificate chain, hashes to sign)
+  state       Json?
   error       String?
   createdAt   DateTime  @default(now())
   completedAt DateTime?

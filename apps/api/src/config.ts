@@ -91,6 +91,17 @@ export const config = {
       baseUrl: env('DIGILOCKER_BASE_URL', 'https://digilocker.meripehchaan.gov.in/public/oauth2'),
     },
   },
+  /** Qualified signatures through a QTSP's Cloud Signature Consortium API v2 */
+  csc: {
+    /** sandbox = built-in test trust service (NOT qualified) | production */
+    mode: env('CSC_MODE', 'sandbox') as 'sandbox' | 'production',
+    /** CSC API base, e.g. https://qtsp.example.com/csc/v2 */
+    apiUrl: process.env.CSC_API_URL ?? '',
+    /** OAuth 2.0 authorization server base (…/oauth2/authorize and …/oauth2/token) */
+    oauthUrl: process.env.CSC_OAUTH_URL ?? '',
+    clientId: process.env.CSC_CLIENT_ID ?? '',
+    clientSecret: process.env.CSC_CLIENT_SECRET ?? '',
+  },
   /** eNACH e-mandates: sandbox | razorpay (uses the Razorpay keys) */
   enach: { provider: env('ENACH_PROVIDER', 'sandbox') as 'sandbox' | 'razorpay' },
   /** CRM connections (HubSpot uses per-organisation private app tokens; Salesforce needs a connected app) */

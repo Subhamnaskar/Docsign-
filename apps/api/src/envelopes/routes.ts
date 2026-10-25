@@ -75,7 +75,9 @@ const recipientsInput = z
       /** Signs on the sender's device, hosted by the current user; no email is sent. */
       inPerson: z.boolean().default(false),
       authMethod: z.enum(['EMAIL_OTP', 'SMS_OTP', 'WHATSAPP_OTP', 'ACCESS_CODE']).default('EMAIL_OTP'),
-      signatureMethod: z.enum(['ELECTRONIC', 'AADHAAR_ESIGN', 'DSC']).default('ELECTRONIC'),
+      signatureMethod: z.enum(['ELECTRONIC', 'AADHAAR_ESIGN', 'DSC', 'QES']).default('ELECTRONIC'),
+      /** Email of the signer whose signature this recipient witnesses */
+      witnessFor: z.string().trim().toLowerCase().email().nullish(),
       phone: z.string().trim().regex(E164, 'Use international format, e.g. +919876543210').nullish(),
       /** Shared with the signer by the sender out of band; stored hashed. Omit to keep the current code. */
       accessCode: z.string().trim().min(4).max(32).nullish(),
@@ -168,6 +170,7 @@ export function serializeEnvelope(env: FullEnvelope) {
       clientUserId: r.clientUserId,
       signatureMethod: r.signatureMethod,
       idChecks: r.idChecks,
+      witnessForId: r.witnessForId,
       status: r.status,
       viewedAt: r.viewedAt,
       verifiedAt: r.verifiedAt,
@@ -480,6 +483,20 @@ export async function envelopeRoutes(app: FastifyInstance) {
       }
       // CC recipients and approvers don't fill in fields
       await tx.field.deleteMany({ where: { envelopeId: id, recipient: { role: { in: ['CC', 'APPROVER'] } } } });
+      // Witnesses point at the signer they witness (matched by email)
+      const saved = await tx.recipient.findMany({ where: { envelopeId: id } });
+      for (const r of list) {
+        const me = saved.find((x) => x.email === r.email && x.role === r.role)!;
+        let witnessForId: string | null = null;
+        if (r.witnessFor) {
+          if (r.role !== 'SIGNER') throw badRequest('Only signers can be witnesses.');
+          if (r.witnessFor === r.email) throw badRequest(`${r.name} cannot witness their own signature.`);
+          const principal = saved.find((x) => x.email === r.witnessFor && x.role === 'SIGNER');
+          if (!principal) throw badRequest(`${r.name} witnesses ${r.witnessFor}, who is not a signer of this agreement.`);
+          witnessForId = principal.id;
+        }
+        if (me.witnessForId !== witnessForId) await tx.recipient.update({ where: { id: me.id }, data: { witnessForId } });
+      }
     });
     return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });

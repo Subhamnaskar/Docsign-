@@ -35,10 +35,14 @@ When any signer signs with Aadhaar eSign or a DSC, the envelope switches to incr
 
 | Phase | Status in this repository | Still to do |
 |---|---|---|
-| 2. Trust | Aadhaar eSign 2.1 (sandbox ESP + production adapter), DSC tokens, SMS/WhatsApp/access-code identity, incremental signing, PAdES B-LT/B-LTA with archive-timestamp renewal | QES via QTSP partners (CSC API), ID document verification, native mobile apps, Salesforce/M365/Google integrations |
+| 2. Trust | Aadhaar eSign 2.1, DSC tokens, QES via any QTSP's CSC API (sandbox + adapter), witness signing, SMS/WhatsApp/access-code identity, PAN/bank/DigiLocker/video checks, incremental signing, PAdES B-LT/B-LTA, Word/Outlook/Google Docs add-ins, Salesforce and HubSpot, installable web app | ID document + liveness checks for non-Indian signers, native iOS/Android apps |
 | 3. Enterprise | Roles, OIDC SSO, SCIM, branding, activity log, reports, AI (Claude API), web forms, conditional and calculated fields, REST hooks, MCP server, contract repository with renewal reminders, Word template generation, comments and revisions, internal approval | Visual workflow builder, BYOK, dedicated cells, SOC 2 audit (see [compliance/soc2-readiness.md](compliance/soc2-readiness.md)) |
-| 4. Regulated | e-stamp interface with a sandbox provider, payments at signing | RON, real e-stamp vendor, FedRAMP cell, on-prem, ICP-Brasil, national eIDs |
+| 4. Regulated | e-stamp interface with a sandbox provider, payments and eNACH at signing, retention and legal hold, KMS keys, dedicated-cell deployment notes | Remote online notarisation (see below), real e-stamp vendor, FedRAMP cell, on-prem, ICP-Brasil, national eIDs |
 | 5. Full suite | — | Negotiation/redlining, marketplace, EUDI Wallet (see below), China stack |
+
+## Remote online notarisation (RON)
+
+Not built. RON needs a commissioned notary on a live, recorded audio-video session, identity proofing and credential analysis to state standards (for example in the US under each state's RON law), a notary's digital certificate and journal, and long retention of the recording. That depends on partnerships with notary networks and state approvals rather than code alone. Witness signing (a second signer attesting the first one signed in their presence) is available today.
 
 ## EU Digital Identity Wallet
 

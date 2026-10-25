@@ -32,8 +32,9 @@ interface SigningSession {
     maskedPhone: string | null;
     embedded: boolean;
     returnUrl: string | null;
-    signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
+    signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC' | 'QES';
     esignSandbox: boolean;
+    witness?: { name: string; signed: boolean; attestation: string } | null;
     idChecks?: IdCheckState[];
   };
   branding: { name: string; color: string | null; logoUrl: string | null };
@@ -314,6 +315,13 @@ function SignDocument({
 
   const [paying, setPaying] = useState(false);
   const [mandateField, setMandateField] = useState<Field | null>(null);
+  const [attested, setAttested] = useState(false);
+  const [qesNotice, setQesNotice] = useState<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('qes');
+    if (q === 'cancelled') setQesNotice('The trust service did not authorise the signature. Try again.');
+    if (q === 'failed') setQesNotice('The qualified signature could not be completed. Try again or contact the sender.');
+  }, []);
   const [commentsOpen, setCommentsOpen] = useState(false);
   async function startPayment(f: Field) {
     setPaying(true);
@@ -367,15 +375,25 @@ function SignDocument({
   }
 
   async function finish() {
+    if (session.recipient.witness && !attested) {
+      setError(`Tick the box to confirm you witnessed ${session.recipient.witness.name} signing.`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
+    const attest = session.recipient.witness ? { attest: true } : {};
     try {
       // Hidden (conditional) fields are not submitted
       const submitted = Object.fromEntries(Object.entries(values).filter(([id]) => shown.some((f) => f.id === id)));
+      if (method === 'QES') {
+        const res = await api<{ url: string }>(`/signing/${token}/qes/start`, { method: 'POST', json: { consent: true, values: submitted, ...attest } });
+        window.location.assign(res.url);
+        return;
+      }
       if (method === 'AADHAAR_ESIGN') {
         const res = await api<{ action: string; fields: Record<string, string> }>(`/signing/${token}/esign/start`, {
           method: 'POST',
-          json: { consent: true, values: submitted },
+          json: { consent: true, values: submitted, ...attest },
         });
         postForm(res.action, res.fields);
         return;
@@ -384,7 +402,7 @@ function SignDocument({
         await signWithDsc(submitted);
         return;
       }
-      await api(`/signing/${token}/complete`, { method: 'POST', json: { consent: true, values: submitted } });
+      await api(`/signing/${token}/complete`, { method: 'POST', json: { consent: true, values: submitted, ...attest } });
       onDone();
     } catch (err) {
       setError((err as Error).message);
@@ -400,7 +418,7 @@ function SignDocument({
   async function signWithDsc(submitted: Record<string, string>) {
     const prep = await api<{ txn: string; documents: { documentId: string; digest: string }[] }>(`/signing/${token}/dsc/prepare`, {
       method: 'POST',
-      json: { consent: true, values: submitted },
+      json: { consent: true, values: submitted, ...(session.recipient.witness ? { attest: true } : {}) },
     });
     setError(tr('dscSigning'));
     let signatures: { documentId: string; cms: string }[];
@@ -494,7 +512,7 @@ function SignDocument({
           </Button>
         ) : (
           <Button size="sm" onClick={finish} loading={submitting}>
-            {approving ? tr('approve') : method === 'AADHAAR_ESIGN' ? tr('signAadhaar') : method === 'DSC' ? tr('signDsc') : tr('finish')}
+            {approving ? tr('approve') : method === 'AADHAAR_ESIGN' ? tr('signAadhaar') : method === 'DSC' ? tr('signDsc') : method === 'QES' ? 'Sign with qualified signature' : tr('finish')}
           </Button>
         )}
       </div>
@@ -515,6 +533,23 @@ function SignDocument({
       {method === 'DSC' && (
         <div className="mb-4">
           <Alert tone="info">{tr('dscIntro')}</Alert>
+        </div>
+      )}
+      {method === 'QES' && (
+        <div className="mb-4">
+          <Alert tone="info">
+            You sign with a qualified electronic signature. You&apos;ll sign in to your trust service and confirm with your PIN or one-time code.
+            {qesNotice && <strong className="mt-1 block">{qesNotice}</strong>}
+          </Alert>
+        </div>
+      )}
+      {session.recipient.witness && (
+        <div className="mb-4 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm">
+          <p className="font-medium text-gray-900">You are signing as a witness for {session.recipient.witness.name}.</p>
+          <label className="mt-2 flex items-start gap-2">
+            <input type="checkbox" className="mt-0.5" checked={attested} onChange={(e) => setAttested(e.target.checked)} />
+            <span>{session.recipient.witness.attestation}</span>
+          </label>
         </div>
       )}
       {error && (
@@ -706,7 +741,7 @@ function SignDocument({
 
       <div className="mt-10 flex justify-center">
         <Button onClick={finish} loading={submitting} disabled={remaining.length > 0}>
-          {approving ? tr('approve') : method === 'AADHAAR_ESIGN' ? tr('signAadhaar') : method === 'DSC' ? tr('signDsc') : tr('finish')}
+          {approving ? tr('approve') : method === 'AADHAAR_ESIGN' ? tr('signAadhaar') : method === 'DSC' ? tr('signDsc') : method === 'QES' ? 'Sign with qualified signature' : tr('finish')}
         </Button>
       </div>
 

@@ -69,19 +69,30 @@ export function sendReadinessProblems(env: FullEnvelope): string[] {
   const policy = resolvePolicy(env.jurisdiction, env.documentType);
   if (policy.signatureLevel !== 'SES') {
     for (const s of signers.filter((x) => x.signatureMethod === 'ELECTRONIC')) {
-      problems.push(`${s.name} must sign with Aadhaar eSign or a DSC (${policy.signatureLevel} signature required for this document).`);
+      problems.push(
+        policy.signatureLevel === 'QES'
+          ? `${s.name} must sign with a qualified electronic signature (QES required for this document).`
+          : `${s.name} must sign with Aadhaar eSign, a DSC or a qualified signature (${policy.signatureLevel} signature required for this document).`,
+      );
     }
   }
   if (isIncremental(env.recipients)) {
     const actors = env.recipients.filter(actsOn);
     if (env.routing !== 'SEQUENTIAL' || new Set(actors.map((r) => r.routingOrder)).size !== actors.length) {
-      problems.push('With Aadhaar eSign or DSC, set a signing order with one person per step.');
+      problems.push('With Aadhaar eSign, DSC or qualified signatures, set a signing order with one person per step.');
     }
-    if (env.fields.some((f) => f.type === 'ATTACHMENT')) problems.push('Attachment fields are not available with Aadhaar eSign or DSC yet.');
+    if (env.fields.some((f) => f.type === 'ATTACHMENT')) problems.push('Attachment fields are not available with Aadhaar eSign, DSC or qualified signatures yet.');
+    if (env.recipients.some((r) => r.signatureMethod === 'QES' && (r.embedded || r.hostUserId))) problems.push('Qualified-signature signers cannot be embedded or in person.');
     if (env.recipients.some((r) => r.signatureMethod === 'AADHAAR_ESIGN') && env.jurisdiction !== 'IN') problems.push('Aadhaar eSign is only available for Indian agreements.');
     if (env.recipients.some((r) => r.signatureMethod === 'AADHAAR_ESIGN' && (r.embedded || r.hostUserId))) problems.push('Aadhaar eSign signers cannot be embedded or in person.');
   }
   if (policy.stampDutyRequired && !env.estamp) problems.push('Add e-stamp details (stamp duty is payable for this document).');
+  // Witnesses sign after the person whose signature they witness
+  for (const w of signers.filter((s) => s.witnessForId)) {
+    const principal = signers.find((s) => s.id === w.witnessForId);
+    if (!principal) problems.push(`${w.name} witnesses someone who is no longer a signer.`);
+    else if (env.routing === 'SEQUENTIAL' && w.routingOrder <= principal.routingOrder) problems.push(`${w.name} must sign after ${principal.name}, whose signature they witness.`);
+  }
   for (const s of signers) {
     if (!env.fields.some((f) => f.recipientId === s.id && f.type === 'SIGNATURE')) {
       problems.push(`Place at least one signature field for ${s.name}.`);

@@ -53,8 +53,9 @@ export interface Recipient {
   hasAccessCode?: boolean;
   embedded?: boolean;
   clientUserId?: string | null;
-  signatureMethod?: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
+  signatureMethod?: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC' | 'QES';
   idChecks?: IdCheck[];
+  witnessForId?: string | null;
   status: RecipientStatus;
   viewedAt: string | null;
   verifiedAt: string | null;

@@ -37,8 +37,10 @@ interface RecipientDraft {
   accessCode: string;
   hasAccessCode: boolean;
   embedded: boolean;
-  signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC';
+  signatureMethod: 'ELECTRONIC' | 'AADHAAR_ESIGN' | 'DSC' | 'QES';
   idChecks: IdCheck[];
+  /** Email of the signer this person witnesses */
+  witnessFor: string;
 }
 
 const ID_CHECK_LABELS: Record<IdCheck, string> = { PAN: 'PAN', BANK: 'Bank account', DIGILOCKER: 'Aadhaar via DigiLocker', VIDEO: 'Video selfie' };
@@ -493,7 +495,7 @@ function RecipientsStep({
   const add = (r?: Partial<RecipientDraft>) =>
     setDrafts([
       ...drafts,
-      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, authMethod: 'EMAIL_OTP', phone: '', accessCode: '', hasAccessCode: false, embedded: false, idChecks: [], signatureMethod: env.jurisdiction === 'IN' && env.policy.signatureLevel !== 'SES' ? 'AADHAAR_ESIGN' : 'ELECTRONIC', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
+      { key: newKey(), name: '', email: '', role: 'SIGNER', locale: 'en', inPerson: false, authMethod: 'EMAIL_OTP', phone: '', accessCode: '', hasAccessCode: false, embedded: false, idChecks: [], witnessFor: '', signatureMethod: env.jurisdiction === 'IN' && env.policy.signatureLevel !== 'SES' ? 'AADHAAR_ESIGN' : 'ELECTRONIC', routingOrder: Math.max(0, ...drafts.map((d) => d.routingOrder)) + 1, ...r },
     ]);
 
   return (
@@ -564,6 +566,22 @@ function RecipientsStep({
                   <option value="ELECTRONIC">Electronic signature</option>
                   {env.jurisdiction === 'IN' && <option value="AADHAAR_ESIGN">Aadhaar eSign</option>}
                   <option value="DSC">DSC token</option>
+                  <option value="QES">Qualified signature (eIDAS)</option>
+                </Select>
+              </div>
+            )}
+            {d.role === 'SIGNER' && drafts.filter((o) => o.key !== d.key && o.role === 'SIGNER' && o.email).length > 0 && (
+              <div className="w-56">
+                <Label>Witness for</Label>
+                <Select value={d.witnessFor} onChange={(e) => update(d.key, { witnessFor: e.target.value })}>
+                  <option value="">Not a witness</option>
+                  {drafts
+                    .filter((o) => o.key !== d.key && o.role === 'SIGNER' && o.email)
+                    .map((o) => (
+                      <option key={o.key} value={o.email.trim().toLowerCase()}>
+                        {o.name || o.email}
+                      </option>
+                    ))}
                 </Select>
               </div>
             )}
@@ -750,6 +768,7 @@ function Builder() {
         embedded: Boolean(r.embedded),
         signatureMethod: r.signatureMethod ?? 'ELECTRONIC',
         idChecks: r.idChecks ?? [],
+        witnessFor: e.recipients.find((x) => x.id === r.witnessForId)?.email ?? '',
       })),
     );
     setFields(e.fields);
@@ -781,7 +800,7 @@ function Builder() {
         adopt(
           await api<Envelope>(`/envelopes/${id}/recipients`, {
             method: 'PUT',
-            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson, authMethod, phone, accessCode, embedded, signatureMethod, idChecks }) => ({
+            json: drafts.map(({ id: rid, name, email, role, routingOrder, locale, inPerson, authMethod, phone, accessCode, embedded, signatureMethod, idChecks, witnessFor }) => ({
               id: rid,
               name: name.trim(),
               email: email.trim(),
@@ -795,6 +814,7 @@ function Builder() {
               accessCode: accessCode.trim() || null,
               signatureMethod: role === 'SIGNER' ? signatureMethod : 'ELECTRONIC',
               idChecks: role === 'CC' ? [] : idChecks,
+              witnessFor: role === 'SIGNER' && witnessFor ? witnessFor : null,
             })),
           }),
         );

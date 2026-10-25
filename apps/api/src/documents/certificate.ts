@@ -201,7 +201,8 @@ export async function buildCertificate(input: CertificateInput): Promise<Uint8Ar
   const signers = input.recipients.filter((r) => r.role !== 'CC').sort((a, b) => a.routingOrder - b.routingOrder);
   for (const r of signers) {
     w.text(`${r.name} <${r.email}>`, { bold: true });
-    w.row('Role', r.role === 'APPROVER' ? 'Approver' : r.hostUserId ? 'Signer (in person)' : 'Signer');
+    const principal = (r as { witnessForId?: string | null }).witnessForId ? signers.find((x) => x.id === (r as { witnessForId?: string | null }).witnessForId) : null;
+    w.row('Role', r.role === 'APPROVER' ? 'Approver' : principal ? `Witness to ${principal.name}` : r.hostUserId ? 'Signer (in person)' : 'Signer');
     w.row('Status', r.role === 'APPROVER' && r.status === 'SIGNED' ? 'APPROVED' : r.status);
     w.row('Identity verified', fmt(r.verifiedAt));
     w.row('Signed', fmt(r.signedAt));

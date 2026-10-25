@@ -18,7 +18,7 @@ import { addSignatureField, embedCms, incrementalUpdate, prepareByteRange, type 
 import { paidLabels } from '../envelopes/service.js';
 import { enqueueWebhook } from '../webhooks/dispatcher.js';
 
-export type CryptoMethod = 'AADHAAR_ESIGN' | 'DSC';
+export type CryptoMethod = 'AADHAAR_ESIGN' | 'DSC' | 'QES';
 
 /** Envelopes where any signer signs cryptographically use the incremental (append-only) pipeline. */
 export const isIncremental = (recipients: Pick<Recipient, 'signatureMethod'>[]) => recipients.some((r) => r.signatureMethod !== 'ELECTRONIC');
@@ -144,7 +144,7 @@ export async function createSigningTransaction(r: Recipient, method: CryptoMetho
     if (!d.workingKey) throw conflict('This envelope is not set up for cryptographic signing.');
     const mine = fields.filter((f) => f.documentId === d.id);
     const sigField = mine.find((f) => f.type === 'SIGNATURE');
-    const label = method === 'AADHAAR_ESIGN' ? 'Aadhaar eSign' : 'Digital Signature Certificate';
+    const label = method === 'AADHAAR_ESIGN' ? 'Aadhaar eSign' : method === 'QES' ? 'Qualified electronic signature' : 'Digital Signature Certificate';
     const withPlaceholder = await incrementalUpdate(await getObject(d.workingKey), async (doc) => {
       await addFieldAnnotations(
         doc,
@@ -155,7 +155,7 @@ export async function createSigningTransaction(r: Recipient, method: CryptoMetho
         fieldName: `${r.name} (${r.id.slice(-6)})`,
         reason: `Signed with ${label}`,
         name: r.name,
-        location: 'India',
+        location: method === 'QES' ? 'EU' : 'India',
         contactInfo: r.email,
         appearance: sigField
           ? {
@@ -184,7 +184,7 @@ export async function createSigningTransaction(r: Recipient, method: CryptoMetho
       id: txn,
       envelopeId: r.envelopeId,
       recipientId: r.id,
-      provider: method === 'AADHAAR_ESIGN' ? 'aadhaar-esign' : 'dsc',
+      provider: method === 'AADHAAR_ESIGN' ? 'aadhaar-esign' : method === 'QES' ? 'csc' : 'dsc',
       documents: prepared as unknown as Prisma.JsonArray,
     },
   });
@@ -285,7 +285,8 @@ export async function completeTransaction(
       signedContent: Buffer.concat([preparedPdf.subarray(0, d.contentsStart), preparedPdf.subarray(d.contentsEnd)]),
     };
     const { cert, chain, info } = await verifyCmsOver(cms, prepared.signedContent);
-    const { chainVerified } = txn.provider === 'dsc' ? await checkDscCertificate(cert, chain) : { chainVerified: true };
+    // QES certificates chain to EU trusted lists, which are not checked here
+    const { chainVerified } = txn.provider === 'dsc' ? await checkDscCertificate(cert, chain) : { chainVerified: txn.provider !== 'csc' };
     const signedPdf = embedCms(prepared, cms);
     const workingKey = `envelopes/${txn.envelopeId}/working/${d.documentId}-${Date.now()}.pdf`;
     await putObject(workingKey, signedPdf, 'application/pdf');
@@ -307,7 +308,7 @@ export async function completeTransaction(
       actor: { kind: 'recipient', id: r.id, name: r.name, email: r.email },
       data: {
         method: txn.provider,
-        sandbox: txn.provider === 'aadhaar-esign' && config.esign.mode === 'sandbox',
+        sandbox: (txn.provider === 'aadhaar-esign' && config.esign.mode === 'sandbox') || (txn.provider === 'csc' && config.csc.mode === 'sandbox'),
         certificate: results[0].cert,
         chainVerified: results.every((x) => x.chainVerified),
         documents: results.map((x) => ({ documentId: x.documentId, certificateSha256: x.cert.sha256 })),

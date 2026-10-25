@@ -21,6 +21,7 @@ import { aspKeys, issueCertificate, sandboxCa, sandboxEspKeys } from './keys.js'
 import { completeTransaction, createSigningTransaction, failTransaction, type CryptoMethod } from './service.js';
 import { buildEsignRequest, buildEsignResponse, parseEsignRequest, parseEsignResponse, verifyEnveloped } from './xml.js';
 import { assertKycComplete } from '../kyc/routes.js';
+import { requireAttestation } from '../signing/witness.js';
 
 const pemToDer = (pem: string) => Buffer.from(forge.asn1.toDer(forge.pki.certificateToAsn1(forge.pki.certificateFromPem(pem))).getBytes(), 'binary');
 const pemToBase64Der = (pem: string) => pemToDer(pem).toString('base64');
@@ -43,38 +44,43 @@ const espCertPem = () => (config.esign.mode === 'production' ? readFileSync(conf
 const startBody = z.object({
   consent: z.literal(true, { errorMap: () => ({ message: 'You must agree to sign electronically.' }) }),
   values: z.record(z.string(), z.string().max(600_000)),
+  attest: z.boolean().optional(),
 });
+
+/** Saves the signer's field values and consent, then opens a signing transaction. */
+export async function beginCryptoSigning(req: FastifyRequest, method: CryptoMethod) {
+  const { token } = req.params as { token: string };
+  const body = parse(startBody, req.body);
+  const r = await loadByToken(token);
+  requireReady(r);
+  requireSession(req, r);
+  if (r.signatureMethod !== method) throw badRequest('This signing request uses a different signing method.');
+  await assertKycComplete(r);
+  const witness = await requireAttestation(r, body.attest);
+  const [fields, others] = await Promise.all([
+    prisma.field.findMany({ where: { recipientId: r.id } }),
+    prisma.field.findMany({ where: { envelopeId: r.envelopeId, recipientId: { not: r.id } } }),
+  ]);
+  const updates = resolveFieldValues(r, fields, others, body.values, [], { crypto: true });
+  const policy = (r.envelope.policy as unknown as ResolvedPolicy | null) ?? resolvePolicy(r.envelope.jurisdiction, r.envelope.documentType);
+  await prisma.$transaction(async (tx) => {
+    for (const u of updates) await tx.field.update({ where: { id: u.id }, data: { value: u.value } });
+    await appendAudit(tx, {
+      envelopeId: r.envelopeId,
+      type: 'recipient.consented',
+      actor: actorOf(r),
+      data: { consentTextSha256: sha256Hex(policy.consentText), method, ...(witness ?? {}) },
+      ...clientInfo(req),
+    });
+  });
+  return { r, txn: await createSigningTransaction(r, method) };
+}
+
+const begin = beginCryptoSigning;
 
 export async function esignRoutes(app: FastifyInstance) {
   await app.register(formbody);
 
-  /** Saves the signer's field values and consent, then opens a signing transaction. */
-  async function begin(req: FastifyRequest, method: CryptoMethod) {
-    const { token } = req.params as { token: string };
-    const body = parse(startBody, req.body);
-    const r = await loadByToken(token);
-    requireReady(r);
-    requireSession(req, r);
-    if (r.signatureMethod !== method) throw badRequest('This signing request uses a different signing method.');
-    await assertKycComplete(r);
-    const [fields, others] = await Promise.all([
-      prisma.field.findMany({ where: { recipientId: r.id } }),
-      prisma.field.findMany({ where: { envelopeId: r.envelopeId, recipientId: { not: r.id } } }),
-    ]);
-    const updates = resolveFieldValues(r, fields, others, body.values, [], { crypto: true });
-    const policy = (r.envelope.policy as unknown as ResolvedPolicy | null) ?? resolvePolicy(r.envelope.jurisdiction, r.envelope.documentType);
-    await prisma.$transaction(async (tx) => {
-      for (const u of updates) await tx.field.update({ where: { id: u.id }, data: { value: u.value } });
-      await appendAudit(tx, {
-        envelopeId: r.envelopeId,
-        type: 'recipient.consented',
-        actor: actorOf(r),
-        data: { consentTextSha256: sha256Hex(policy.consentText), method },
-        ...clientInfo(req),
-      });
-    });
-    return { r, txn: await createSigningTransaction(r, method) };
-  }
 
   // --- Aadhaar eSign ---------------------------------------------------------
   app.post('/signing/:token/esign/start', async (req) => {
