@@ -17,9 +17,7 @@ import {
   FEATURE_NAMES,
   PLANS,
   seatsUsed,
-  TRIAL_DAYS,
-  TRIAL_ENVELOPES,
-  TRIAL_SEATS,
+  TRIAL,
   YEARLY_MONTHS,
 } from './plans.js';
 import { verifyRazorpayWebhook } from './providers.js';
@@ -51,7 +49,7 @@ export function billingBrief(org: Organization) {
     trialEndsAt: ent.plan.id === 'trial' ? org.trialEndsAt : null,
     cancelAtPeriodEnd: org.cancelAtPeriodEnd,
     periodEnd: ent.periodEnd,
-    features: ent.plan.features,
+    features: ent.features,
   };
 }
 
@@ -75,7 +73,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
   /** Public: the pricing page and the in-app plan picker read this. */
   app.get('/billing/plans', async () => ({
-    trial: { days: TRIAL_DAYS, envelopes: TRIAL_ENVELOPES, seats: TRIAL_SEATS },
+    trial: { ...TRIAL },
     yearlyMonths: YEARLY_MONTHS,
     currencies: CURRENCIES,
     gstRate: config.billing.gstRate,

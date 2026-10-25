@@ -6,8 +6,10 @@ import { HttpError } from '../lib/errors.js';
  * Plans, limits and prices: the single source for the API, the in-app billing
  * page and the public pricing page.
  *
- * Prices are PLACEHOLDERS until the business sets them. They are per user per
- * month, in minor units, before tax. Yearly billing charges 10 months.
+ * The values below are defaults. NuronixAI staff change them in the platform
+ * console (PlanSetting rows), which loadPlanSettings() layers on top. Prices
+ * are per user per month, in minor units, before tax. Yearly billing charges
+ * 10 months.
  */
 
 export type PlanId = 'trial' | 'starter' | 'business' | 'enterprise';
@@ -28,17 +30,61 @@ export interface Plan {
   price: Record<Currency, number> | null;
 }
 
-export const TRIAL_DAYS = 14;
-export const TRIAL_ENVELOPES = 25;
-export const TRIAL_SEATS = 5;
 export const YEARLY_MONTHS = 10;
+export const FEATURES: Feature[] = ['api', 'bulkSend', 'sso'];
 
-export const PLANS: Record<PlanId, Plan> = {
-  trial: { id: 'trial', name: 'Free trial', envelopesPerSeat: null, maxSeats: TRIAL_SEATS, features: ['api', 'bulkSend', 'sso'], price: null },
+/** Trial terms: length, agreements for the whole trial and users (null = unlimited). */
+export interface TrialTerms {
+  days: number;
+  envelopes: number | null;
+  seats: number | null;
+}
+
+export const DEFAULT_TRIAL: TrialTerms = { days: 14, envelopes: 25, seats: 5 };
+
+export const DEFAULT_PLANS: Record<PlanId, Plan> = {
+  trial: { id: 'trial', name: 'Free trial', envelopesPerSeat: null, maxSeats: DEFAULT_TRIAL.seats, features: ['api', 'bulkSend', 'sso'], price: null },
   starter: { id: 'starter', name: 'Starter', envelopesPerSeat: 25, maxSeats: 5, features: [], price: { INR: 499_00, USD: 10_00 } },
   business: { id: 'business', name: 'Business', envelopesPerSeat: 100, maxSeats: null, features: ['api', 'bulkSend'], price: { INR: 1_299_00, USD: 25_00 } },
   enterprise: { id: 'enterprise', name: 'Enterprise', envelopesPerSeat: null, maxSeats: null, features: ['api', 'bulkSend', 'sso'], price: null },
 };
+
+/** Current terms. Same objects for the life of the process; loadPlanSettings() updates them in place. */
+export const PLANS: Record<PlanId, Plan> = structuredClone(DEFAULT_PLANS);
+export const TRIAL: TrialTerms = { ...DEFAULT_TRIAL };
+
+const isFeature = (f: string): f is Feature => (FEATURES as string[]).includes(f);
+
+/** Applies the console's plan settings over the defaults. Called at start-up, every minute and after an edit. */
+export async function loadPlanSettings() {
+  const rows = await prisma.planSetting.findMany();
+  for (const id of Object.keys(DEFAULT_PLANS) as PlanId[]) Object.assign(PLANS[id], structuredClone(DEFAULT_PLANS[id]));
+  Object.assign(TRIAL, DEFAULT_TRIAL);
+  for (const r of rows) {
+    if (!isPlanId(r.id)) continue;
+    const p = PLANS[r.id];
+    p.name = r.name;
+    p.features = r.features.filter(isFeature);
+    if (r.id === 'trial') {
+      Object.assign(TRIAL, { days: r.trialDays ?? DEFAULT_TRIAL.days, envelopes: r.envelopesPerSeat, seats: r.maxSeats });
+      p.maxSeats = r.maxSeats;
+    } else {
+      p.price = (r.price as Record<Currency, number> | null) ?? null;
+      p.envelopesPerSeat = r.envelopesPerSeat;
+      p.maxSeats = r.maxSeats;
+    }
+  }
+}
+
+/** Deal-specific limits on one organisation (Organization.customLimits). A present key replaces the plan's value. */
+export interface CustomLimits {
+  envelopeLimit?: number | null;
+  seatLimit?: number | null;
+  features?: Feature[];
+  note?: string;
+}
+
+export const customLimitsOf = (org: Pick<Organization, 'customLimits'>): CustomLimits => (org.customLimits as CustomLimits | null) ?? {};
 
 export const FEATURE_NAMES: Record<Feature, string> = {
   api: 'The API, webhooks and integrations',
@@ -75,10 +121,23 @@ export interface Entitlement {
   periodEnd: Date | null;
   envelopeLimit: number | null;
   seatLimit: number | null;
+  /** The plan's features plus any granted to this organisation */
+  features: Feature[];
 }
 
-/** What the organisation may do right now. Pure: no database access. */
+/** What the organisation may do right now, including its custom limits. Pure: no database access. */
 export function entitlement(org: Organization, now = new Date()): Entitlement {
+  const base = planEntitlement(org, now);
+  const custom = customLimitsOf(org);
+  return {
+    ...base,
+    ...('envelopeLimit' in custom && { envelopeLimit: custom.envelopeLimit ?? null }),
+    ...('seatLimit' in custom && { seatLimit: custom.seatLimit ?? null }),
+    features: [...new Set([...base.plan.features, ...(custom.features ?? []).filter(isFeature)])],
+  };
+}
+
+function planEntitlement(org: Organization, now: Date): Omit<Entitlement, 'features'> {
   const plan = planOf(org);
   if (plan.id === 'trial') {
     const expired = org.trialEndsAt <= now;
@@ -89,8 +148,8 @@ export function entitlement(org: Organization, now = new Date()): Entitlement {
       blockedReason: expired ? 'Your free trial has ended. Choose a plan to keep sending.' : null,
       periodStart: org.createdAt,
       periodEnd: org.trialEndsAt,
-      envelopeLimit: TRIAL_ENVELOPES,
-      seatLimit: TRIAL_SEATS,
+      envelopeLimit: TRIAL.envelopes,
+      seatLimit: TRIAL.seats,
     };
   }
   const ended = org.billingStatus === 'CANCELED' || (org.cancelAtPeriodEnd && org.currentPeriodEnd !== null && org.currentPeriodEnd <= now);
@@ -139,10 +198,9 @@ export async function assertSeatAvailable(orgId: string) {
   }
 }
 
-/** Refuses a feature the plan doesn't include. */
+/** Refuses a feature the plan (and the organisation's custom limits) don't include. */
 export async function assertFeature(orgId: string, feature: Feature) {
-  const plan = planOf(await loadOrg(orgId));
-  if (!plan.features.includes(feature)) {
+  if (!entitlement(await loadOrg(orgId)).features.includes(feature)) {
     const needed = feature === 'sso' ? 'Enterprise' : 'Business';
     throw new HttpError(402, `${FEATURE_NAMES[feature]} needs the ${needed} plan.`, 'plan_feature');
   }

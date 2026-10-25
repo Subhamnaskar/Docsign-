@@ -84,6 +84,10 @@ model Organization {
   suspendedReason    String?
   // The customer lets NuronixAI support view the account (read-only) until then
   supportAccessUntil DateTime?
+  // Deal-specific limits set from the platform console, on top of the plan:
+  // { envelopeLimit?: number | null, seatLimit?: number | null, features?: string[], note?: string }
+  // (a key that is present replaces the plan's value; null = unlimited)
+  customLimits       Json?
   creditNotes        CreditNote[]
   // Printed on invoices
   billingName        String?
@@ -1084,4 +1088,23 @@ model CreditNote {
 
   @@index([orgId, createdAt])
   @@index([invoiceId])
+}
+
+/// Plan terms edited in the platform console; overrides the defaults in
+/// src/billing/plans.ts. No row = the default.
+model PlanSetting {
+  // trial | starter | business | enterprise
+  id               String   @id
+  name             String
+  // Per user per month in minor units, e.g. { "INR": 49900, "USD": 1000 }; null = not sold online
+  price            Json?
+  // Agreements per user per period (trial: for the whole trial); null = unlimited
+  envelopesPerSeat Int?
+  // Most users the plan allows (trial: the trial's seats); null = no cap
+  maxSeats         Int?
+  features         String[]
+  // Trial only: length in days
+  trialDays        Int?
+  updatedBy        String
+  updatedAt        DateTime @updatedAt
 }

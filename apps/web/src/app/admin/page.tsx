@@ -20,6 +20,7 @@ import {
   type PlatformRole,
 } from '@/components/admin/shared';
 import { Alert, Button, Card, cx, Input, Label, PageLoader, Select } from '@/components/ui';
+import { usePlatformRole } from '@/components/admin/shared';
 import { api, ApiError, fileUrl } from '@/lib/api';
 import { formatDate, formatMoney, relativeTime } from '@/lib/format';
 
@@ -65,6 +66,7 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'customers', label: 'Customers' },
   { id: 'logins', label: 'Sign-ins' },
+  { id: 'plans', label: 'Plans' },
   { id: 'team', label: 'Team' },
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
@@ -127,6 +129,7 @@ function Console() {
         {tab === 'overview' && <OverviewTab />}
         {tab === 'customers' && <CustomersTab />}
         {tab === 'logins' && <LoginsTab />}
+        {tab === 'plans' && <PlansTab />}
         {tab === 'team' && <TeamTab />}
       </div>
     </>
@@ -402,8 +405,8 @@ function CustomersTab() {
           <PageLoader />
         ) : (
           <SimpleTable
-            head={['Organisation', 'Plan', 'Status', 'Users / seats', 'Agreements this month', 'MRR', 'Last sign-in', 'Signed up']}
-            align={['left', 'left', 'left', 'right', 'right', 'right', 'left', 'left']}
+            head={['Organisation', 'Plan', 'Status', 'Users / seats', 'Agreements this month', 'MRR', 'Last sign-in', 'Signed up', '']}
+            align={['left', 'left', 'left', 'right', 'right', 'right', 'left', 'left', 'right']}
             rows={data.organizations.map((o) => [
               <div key="o" className="min-w-0">
                 <Link href={`/admin/orgs/${o.id}`} className="font-medium text-ink hover:underline">
@@ -429,6 +432,9 @@ function CustomersTab() {
               <span key="c" className="whitespace-nowrap text-gray-600">
                 {formatDate(o.createdAt, false)}
               </span>,
+              <Link key="m" href={`/admin/orgs/${o.id}`} className="inline-flex rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:brightness-105">
+                Manage
+              </Link>,
             ])}
           />
         )}
@@ -765,5 +771,227 @@ function TeamTab() {
         </Card>
       )}
     </div>
+  );
+}
+
+// --- Plans -------------------------------------------------------------------
+
+interface PlanRow {
+  id: 'trial' | 'starter' | 'business' | 'enterprise';
+  name: string;
+  envelopesPerSeat: number | null;
+  maxSeats: number | null;
+  features: string[];
+  price: Money | null;
+  defaults: { name: string; envelopesPerSeat: number | null; maxSeats: number | null; features: string[]; price: Money | null };
+  customized: boolean;
+  updatedBy: string | null;
+  updatedAt: string | null;
+  organizations: number;
+}
+interface PlansData {
+  features: { id: string; name: string }[];
+  yearlyMonths: number;
+  trial: { days: number; envelopes: number | null; seats: number | null };
+  defaultTrial: { days: number; envelopes: number | null; seats: number | null };
+  plans: PlanRow[];
+}
+
+function PlansTab() {
+  const role = usePlatformRole();
+  const [data, setData] = useState<PlansData | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const load = () => api<PlansData>('/admin/plans').then(setData);
+  useEffect(() => {
+    load();
+  }, []);
+  if (!data) return <PageLoader />;
+  const canChange = role === 'owner' || role === 'admin';
+  return (
+    <div className="space-y-6">
+      <Alert tone="info" title="How plan changes apply">
+        Changes apply at once to the pricing page (within 5 minutes), new checkouts and every customer&apos;s limits and features. Subscriptions already running at Stripe or Razorpay keep their old
+        price until the customer changes plan or seats. For one customer&apos;s special deal, use Custom limits on their page instead.
+      </Alert>
+      {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {data.plans.map((p) => (
+          <PlanEditor
+            key={`${p.id}-${p.updatedAt ?? 'default'}`}
+            plan={p}
+            data={data}
+            canChange={canChange}
+            onSaved={(text, tone = 'success') => {
+              setNotice({ tone, text });
+              if (tone === 'success') load();
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const toMajor = (minor: number | null | undefined) => (minor === null || minor === undefined ? '' : String(minor / 100));
+const toMinor = (major: string) => Math.round(Number(major) * 100);
+const blankOr = (v: number | null) => (v === null ? '' : String(v));
+
+function PlanEditor({ plan, data, canChange, onSaved }: { plan: PlanRow; data: PlansData; canChange: boolean; onSaved: (text: string, tone?: 'success' | 'error') => void }) {
+  const trial = plan.id === 'trial';
+  const [name, setName] = useState(plan.name);
+  const [sold, setSold] = useState(Boolean(plan.price));
+  const [inr, setInr] = useState(toMajor(plan.price?.INR));
+  const [usd, setUsd] = useState(toMajor(plan.price?.USD));
+  const [envelopes, setEnvelopes] = useState(blankOr(trial ? data.trial.envelopes : plan.envelopesPerSeat));
+  const [seats, setSeats] = useState(blankOr(trial ? data.trial.seats : plan.maxSeats));
+  const [days, setDays] = useState(String(data.trial.days));
+  const [features, setFeatures] = useState<string[]>(plan.features);
+  const [busy, setBusy] = useState(false);
+  const num = (v: string) => (v.trim() === '' ? null : Math.round(Number(v)));
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api(`/admin/plans/${plan.id}`, {
+        method: 'PUT',
+        json: {
+          name,
+          price: !trial && sold ? { INR: toMinor(inr), USD: toMinor(usd) } : null,
+          envelopesPerSeat: num(envelopes),
+          maxSeats: num(seats),
+          features,
+          ...(trial && { trialDays: Number(days) }),
+        },
+      });
+      onSaved(`${name} saved.`);
+    } catch (e) {
+      onSaved(e instanceof ApiError ? e.message : 'Could not save the plan.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reset() {
+    if (!window.confirm(`Put ${plan.name} back to its default terms?`)) return;
+    await api(`/admin/plans/${plan.id}`, { method: 'DELETE' });
+    onSaved(`${plan.defaults.name} is back to its default terms.`);
+  }
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold tracking-tight">{plan.name}</h2>
+            {plan.customized && <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">Customised</span>}
+          </div>
+          <p className="text-xs text-gray-500">
+            {n(plan.organizations)} organisation{plan.organizations === 1 ? '' : 's'} on this plan
+            {plan.updatedBy && ` · changed by ${plan.updatedBy} ${relativeTime(plan.updatedAt)}`}
+          </p>
+        </div>
+        {!trial && <span className="font-mono text-xs text-gray-400">{plan.id}</span>}
+      </div>
+
+      <fieldset disabled={!canChange} className="mt-4 space-y-4">
+        <div>
+          <Label htmlFor={`${plan.id}-name`}>Name</Label>
+          <Input id={`${plan.id}-name`} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+
+        {trial ? (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label htmlFor="trial-days">Length (days)</Label>
+              <Input id="trial-days" type="number" min={1} max={90} value={days} onChange={(e) => setDays(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="trial-envelopes" hint="blank = unlimited">
+                Agreements
+              </Label>
+              <Input id="trial-envelopes" type="number" min={1} value={envelopes} onChange={(e) => setEnvelopes(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="trial-seats" hint="blank = no cap">
+                Users
+              </Label>
+              <Input id="trial-seats" type="number" min={1} value={seats} onChange={(e) => setSeats(e.target.value)} />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={sold} onChange={(e) => setSold(e.target.checked)} />
+                Sold online with a price
+              </label>
+              <p className="ml-6 text-xs text-gray-500">{sold ? 'Customers can buy it themselves on the pricing page and in Billing.' : 'Shown as "Contact sales"; you put customers on it from their page.'}</p>
+            </div>
+            {sold && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor={`${plan.id}-inr`} hint="per user / month, before GST">
+                    Price ₹
+                  </Label>
+                  <Input id={`${plan.id}-inr`} type="number" min={0} step="1" value={inr} onChange={(e) => setInr(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor={`${plan.id}-usd`} hint="per user / month">
+                    Price $
+                  </Label>
+                  <Input id={`${plan.id}-usd`} type="number" min={0} step="0.01" value={usd} onChange={(e) => setUsd(e.target.value)} />
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor={`${plan.id}-envelopes`} hint="blank = unlimited">
+                  Agreements per user / month
+                </Label>
+                <Input id={`${plan.id}-envelopes`} type="number" min={1} value={envelopes} onChange={(e) => setEnvelopes(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor={`${plan.id}-seats`} hint="blank = no cap">
+                  Most users
+                </Label>
+                <Input id={`${plan.id}-seats`} type="number" min={1} value={seats} onChange={(e) => setSeats(e.target.value)} />
+              </div>
+            </div>
+            {sold && inr && (
+              <p className="text-xs text-gray-500">
+                Yearly billing charges {data.yearlyMonths} months: {formatMoney(toMinor(inr) * data.yearlyMonths, 'INR')} per user per year.
+              </p>
+            )}
+          </>
+        )}
+
+        <div>
+          <div className="text-sm font-medium text-gray-700">Features</div>
+          <div className="mt-1 space-y-1">
+            {data.features.map((f) => (
+              <label key={f.id} className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={features.includes(f.id)}
+                  onChange={(e) => setFeatures(e.target.checked ? [...features, f.id] : features.filter((x) => x !== f.id))}
+                />
+                {f.name}
+              </label>
+            ))}
+          </div>
+        </div>
+      </fieldset>
+
+      {canChange && (
+        <div className="mt-5 flex items-center justify-between gap-2 border-t border-gray-100 pt-4">
+          <Button variant="ghost" size="sm" disabled={!plan.customized} onClick={reset}>
+            Reset to default
+          </Button>
+          <Button disabled={busy || !name.trim() || (sold && !trial && (!inr || !usd))} onClick={save}>
+            Save {plan.name}
+          </Button>
+        </div>
+      )}
+    </Card>
   );
 }

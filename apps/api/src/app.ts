@@ -38,9 +38,12 @@ import { helpRoutes } from './help/routes.js';
 import { crmRoutes } from './crm/routes.js';
 import { qesRoutes } from './qes/routes.js';
 import { platformRoutes } from './platform/routes.js';
+import { loadPlanSettings } from './billing/plans.js';
 import { supportRoutes } from './platform/support.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
+const PLAN_REFRESH_MS = 60_000;
+
 export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] } = {}) {
   const app = Fastify({
     logger: opts.logger ?? { level: config.isProduction ? 'info' : 'debug' },
@@ -52,6 +55,12 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
   await app.register(cors, { origin: config.corsOrigins, credentials: true });
   await app.register(multipart);
   await app.register(rateLimit, { global: false });
+
+  // Plan terms edited in the platform console; refreshed so every instance agrees within a minute
+  await loadPlanSettings();
+  const planRefresh = setInterval(() => loadPlanSettings().catch((err) => app.log.error({ err }, 'plan settings refresh failed')), PLAN_REFRESH_MS);
+  planRefresh.unref();
+  app.addHook('onClose', async () => clearInterval(planRefresh));
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof HttpError) {

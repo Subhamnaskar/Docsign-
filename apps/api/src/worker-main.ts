@@ -1,4 +1,5 @@
 import pino from 'pino';
+import { loadPlanSettings } from './billing/plans.js';
 import { prisma } from './db.js';
 import { ensureBucket } from './lib/storage.js';
 import { sealKeyProvider } from './trust/keys.js';
@@ -9,6 +10,8 @@ const log = pino({ name: 'worker' });
 
 await ensureBucket();
 sealKeyProvider();
+await loadPlanSettings();
+setInterval(() => loadPlanSettings().catch((err) => log.error({ err }, 'plan settings refresh failed')), 60_000).unref();
 const stop = startWorker(log);
 log.info('worker started');
 

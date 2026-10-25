@@ -21,6 +21,9 @@ interface Detail extends Omit<OrgRow, 'users'> {
   suspendedAt: string | null;
   suspendedReason: string | null;
   supportAccessUntil: string | null;
+  customLimits: { envelopeLimit?: number | null; seatLimit?: number | null; features?: string[]; note?: string } | null;
+  planLimits: { envelopesPerSeat: number | null; maxSeats: number | null; features: string[] };
+  features: string[];
   users: {
     id: string;
     name: string;
@@ -54,7 +57,11 @@ const ACTION_LABELS: Record<string, string> = {
   'platform.credit_issued': 'Credit issued',
   'platform.support_session_started': 'Support session started',
   'platform.support_session_ended': 'Support session ended',
+  'platform.limits_changed': 'Custom limits set',
+  'platform.limits_cleared': 'Custom limits removed',
 };
+
+const FEATURE_LABELS: Record<string, string> = { api: 'API, webhooks and integrations', bulkSend: 'Bulk send', sso: 'Single sign-on and SCIM' };
 
 function actionDetail(a: Detail['actions'][number]): string {
   const d = a.data;
@@ -72,6 +79,14 @@ function actionDetail(a: Detail['actions'][number]): string {
       return `${amount} · ${String(d.creditNote)}`;
     case 'platform.support_session_started':
       return `as ${String(d.viewingAs)}`;
+    case 'platform.limits_changed':
+      return [
+        'envelopeLimit' in d && `agreements ${d.envelopeLimit ?? 'unlimited'}`,
+        'seatLimit' in d && `users ${d.seatLimit ?? 'unlimited'}`,
+        Array.isArray(d.features) && d.features.length > 0 && `+ ${d.features.map((f) => FEATURE_LABELS[String(f)] ?? f).join(', ')}`,
+      ]
+        .filter(Boolean)
+        .join(' · ');
     default:
       return typeof d.email === 'string' ? d.email : '';
   }
@@ -223,6 +238,9 @@ function OrgDetail() {
             </Row>
             <p className="text-xs text-gray-500">Refunds: use the Refund button next to an invoice below.</p>
           </ActionCard>
+          <div className="xl:col-span-3">
+            <CustomLimitsCard key={JSON.stringify(org.customLimits)} org={org} onDone={(text, tone) => (setNotice({ tone, text }), tone === 'success' && load())} />
+          </div>
         </div>
       )}
 
@@ -598,5 +616,120 @@ function ReasonDialog({
         </Button>
       </div>
     </Modal>
+  );
+}
+
+type LimitMode = 'plan' | 'number' | 'unlimited';
+
+function LimitField({
+  id,
+  label,
+  mode,
+  setMode,
+  value,
+  setValue,
+  planText,
+}: {
+  id: string;
+  label: string;
+  mode: LimitMode;
+  setMode: (m: LimitMode) => void;
+  value: string;
+  setValue: (v: string) => void;
+  planText: string;
+}) {
+  return (
+    <div>
+      <Label htmlFor={`${id}-mode`}>{label}</Label>
+      <div className="flex gap-2">
+        <div className="w-52">
+          <Select id={`${id}-mode`} value={mode} onChange={(e) => setMode(e.target.value as LimitMode)}>
+            <option value="plan">From the plan ({planText})</option>
+            <option value="number">Custom number</option>
+            <option value="unlimited">Unlimited</option>
+          </Select>
+        </div>
+        {mode === 'number' && (
+          <div className="w-28">
+            <Input aria-label={`${label} number`} type="number" min={1} value={value} onChange={(e) => setValue(e.target.value)} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Deal-specific limits for this organisation, on top of its plan. */
+function CustomLimitsCard({ org, onDone }: { org: Detail; onDone: (text: string, tone: 'success' | 'error') => void }) {
+  const c = org.customLimits ?? {};
+  const modeOf = (key: 'envelopeLimit' | 'seatLimit'): LimitMode => (!(key in c) ? 'plan' : c[key] === null ? 'unlimited' : 'number');
+  const [envMode, setEnvMode] = useState<LimitMode>(modeOf('envelopeLimit'));
+  const [envValue, setEnvValue] = useState(c.envelopeLimit ? String(c.envelopeLimit) : '');
+  const [seatMode, setSeatMode] = useState<LimitMode>(modeOf('seatLimit'));
+  const [seatValue, setSeatValue] = useState(c.seatLimit ? String(c.seatLimit) : '');
+  const [extra, setExtra] = useState<string[]>(c.features ?? []);
+  const [note, setNote] = useState(c.note ?? '');
+  const [busy, setBusy] = useState(false);
+
+  const planEnvelopes = org.planLimits.envelopesPerSeat === null ? 'unlimited' : `${org.planLimits.envelopesPerSeat} per user`;
+  const planSeats = org.planLimits.maxSeats === null ? 'no cap' : `up to ${org.planLimits.maxSeats}`;
+
+  async function save(clear = false) {
+    setBusy(true);
+    const limit = (mode: LimitMode, value: string) => (mode === 'plan' ? undefined : mode === 'unlimited' ? null : Number(value));
+    try {
+      await api(`/admin/orgs/${org.id}/limits`, {
+        method: 'PUT',
+        json: clear ? {} : { envelopeLimit: limit(envMode, envValue), seatLimit: limit(seatMode, seatValue), features: extra, note },
+      });
+      onDone(clear ? 'Custom limits removed. The plan applies again.' : 'Custom limits saved.', 'success');
+    } catch (e) {
+      onDone(e instanceof ApiError ? e.message : 'Could not save the limits.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="font-semibold">Custom limits</h2>
+          <p className="text-sm text-gray-500">For a special deal with this customer: replaces the plan&apos;s limits and adds features, without changing the plan for anyone else.</p>
+        </div>
+        {org.customLimits && <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">Custom deal active</span>}
+      </div>
+      <div className="mt-4 grid gap-5 lg:grid-cols-3">
+        <LimitField id="env" label="Agreements per period (whole account)" mode={envMode} setMode={setEnvMode} value={envValue} setValue={setEnvValue} planText={planEnvelopes} />
+        <LimitField id="seat" label="Users" mode={seatMode} setMode={setSeatMode} value={seatValue} setValue={setSeatValue} planText={planSeats} />
+        <div>
+          <div className="mb-1 text-sm font-medium text-gray-700">Extra features</div>
+          {Object.entries(FEATURE_LABELS).map(([id, label]) => {
+            const inPlan = org.planLimits.features.includes(id);
+            return (
+              <label key={id} className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" disabled={inPlan} checked={inPlan || extra.includes(id)} onChange={(e) => setExtra(e.target.checked ? [...extra, id] : extra.filter((x) => x !== id))} />
+                {label}
+                {inPlan && <span className="text-xs text-gray-400">(in plan)</span>}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-4">
+        <Label htmlFor="limits-note" hint="optional">
+          Deal note
+        </Label>
+        <Input id="limits-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Pilot until March: 40 users, unlimited agreements" />
+      </div>
+      <div className="mt-4 flex justify-between gap-2">
+        <Button variant="ghost" size="sm" disabled={busy || !org.customLimits} onClick={() => save(true)}>
+          Remove custom limits
+        </Button>
+        <Button disabled={busy || (envMode === 'number' && !envValue) || (seatMode === 'number' && !seatValue)} onClick={() => save()}>
+          Save custom limits
+        </Button>
+      </div>
+    </Card>
   );
 }

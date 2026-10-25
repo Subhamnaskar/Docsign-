@@ -12,6 +12,7 @@ import { ssoOrgForEmail } from '../sso/routes.js';
 import { parse } from '../lib/validate.js';
 import { JURISDICTIONS } from '../policy/jurisdictions.js';
 import { billingBrief } from '../billing/routes.js';
+import { TRIAL } from '../billing/plans.js';
 import { platformRole } from '../platform/access.js';
 import { isSsoOnly, passwordSchema } from './security.js';
 import { issueToken, sendVerificationEmail } from './tokens.js';
@@ -51,7 +52,7 @@ export async function authRoutes(app: FastifyInstance) {
         role: 'OWNER',
         locale: body.locale,
         org: {
-          create: { name: body.organizationName, jurisdiction: body.jurisdiction, dataRegion: config.cellRegion },
+          create: { name: body.organizationName, jurisdiction: body.jurisdiction, dataRegion: config.cellRegion, trialEndsAt: new Date(Date.now() + TRIAL.days * 86_400_000) },
         },
       },
     });

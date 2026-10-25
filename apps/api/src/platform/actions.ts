@@ -1,8 +1,9 @@
+import { Prisma } from '@prisma/client';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { sendPasswordReset } from '../auth/tokens.js';
 import { isSsoOnly } from '../auth/security.js';
-import { CURRENCIES } from '../billing/plans.js';
+import { CURRENCIES, type CustomLimits, DEFAULT_PLANS, DEFAULT_TRIAL, FEATURE_NAMES, FEATURES, isPlanId, loadPlanSettings, PLANS, TRIAL, YEARLY_MONTHS } from '../billing/plans.js';
 import { billingProvider } from '../billing/providers.js';
 import { creditNoteNumber, currencyOf, hasLiveSubscription, invoiceNumber } from '../billing/service.js';
 import { config } from '../config.js';
@@ -209,6 +210,89 @@ export async function platformActions(app: FastifyInstance) {
     const { userId } = parse(z.object({ userId: z.string().optional() }), req.body ?? {});
     const started = await startSupportSession(req, reply, org.id, userId);
     return { ...started, redirect: '/dashboard' };
+  });
+
+  // --- Plans -------------------------------------------------------------------
+
+  /** Current plan terms, the code defaults and how many organisations are on each plan. */
+  app.get('/admin/plans', async () => {
+    const [rows, counts] = await Promise.all([prisma.planSetting.findMany(), prisma.organization.groupBy({ by: ['plan'], _count: true })]);
+    return {
+      features: FEATURES.map((id) => ({ id, name: FEATURE_NAMES[id] })),
+      yearlyMonths: YEARLY_MONTHS,
+      trial: { ...TRIAL },
+      defaultTrial: DEFAULT_TRIAL,
+      plans: Object.values(PLANS).map((p) => {
+        const row = rows.find((r) => r.id === p.id);
+        return {
+          ...p,
+          defaults: DEFAULT_PLANS[p.id],
+          customized: Boolean(row),
+          updatedBy: row?.updatedBy ?? null,
+          updatedAt: row?.updatedAt ?? null,
+          organizations: counts.find((c) => c.plan === p.id)?._count ?? 0,
+        };
+      }),
+    };
+  });
+
+  const money = z.object({ INR: z.number().int().min(0).max(100_000_000), USD: z.number().int().min(0).max(100_000_000) });
+  const planTerms = z.object({
+    name: z.string().trim().min(1).max(40),
+    price: money.nullable(),
+    envelopesPerSeat: z.number().int().min(1).max(1_000_000).nullable(),
+    maxSeats: z.number().int().min(1).max(100_000).nullable(),
+    features: z.array(z.enum(FEATURES as [string, ...string[]])).max(FEATURES.length),
+    trialDays: z.number().int().min(1).max(90).optional(),
+  });
+
+  /**
+   * Changes a plan's name, price, limits or features. New checkouts, the pricing
+   * page and every organisation's limits follow at once; subscriptions already
+   * running at Stripe/Razorpay keep their old price until their plan changes.
+   */
+  app.put('/admin/plans/:id', async (req) => {
+    assertCanChange(req);
+    const id = (req.params as { id: string }).id;
+    if (!isPlanId(id)) throw notFound('Plan');
+    const body = parse(planTerms, req.body);
+    if (id === 'trial' && body.price) throw badRequest('The free trial cannot have a price.');
+    if (id !== 'trial' && body.trialDays !== undefined) throw badRequest('Only the free trial has a length in days.');
+    const data = { ...body, price: body.price ?? Prisma.DbNull, trialDays: id === 'trial' ? (body.trialDays ?? DEFAULT_TRIAL.days) : null, updatedBy: staffEmail(req) };
+    await prisma.planSetting.upsert({ where: { id }, create: { id, ...data }, update: data });
+    await loadPlanSettings();
+    await logActivity(req, 'platform.plan_terms_changed', { plan: id, ...body });
+    return PLANS[id];
+  });
+
+  app.delete('/admin/plans/:id', async (req) => {
+    assertCanChange(req);
+    const id = (req.params as { id: string }).id;
+    if (!isPlanId(id)) throw notFound('Plan');
+    await prisma.planSetting.deleteMany({ where: { id } });
+    await loadPlanSettings();
+    await logActivity(req, 'platform.plan_terms_reset', { plan: id });
+    return PLANS[id];
+  });
+
+  /** Deal-specific limits for one organisation. Omit a key to use the plan's value; null means unlimited. */
+  app.put('/admin/orgs/:id/limits', async (req) => {
+    assertCanChange(req);
+    const org = await findOrg((req.params as { id: string }).id);
+    const body = parse(
+      z.object({
+        envelopeLimit: z.number().int().min(0).max(10_000_000).nullable().optional(),
+        seatLimit: z.number().int().min(1).max(100_000).nullable().optional(),
+        features: z.array(z.enum(FEATURES as [string, ...string[]])).max(FEATURES.length).optional(),
+        note: z.string().trim().max(500).optional(),
+      }),
+      req.body,
+    );
+    const limits = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined && !(Array.isArray(v) && v.length === 0) && v !== '')) as CustomLimits;
+    const empty = Object.keys(limits).length === 0;
+    await prisma.organization.update({ where: { id: org.id }, data: { customLimits: empty ? Prisma.DbNull : (limits as Prisma.JsonObject) } });
+    await record(req, org.id, empty ? 'platform.limits_cleared' : 'platform.limits_changed', { ...limits });
+    return { customLimits: empty ? null : limits };
   });
 
   // --- Console team --------------------------------------------------------------
