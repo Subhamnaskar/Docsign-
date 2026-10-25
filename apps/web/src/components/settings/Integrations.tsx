@@ -57,6 +57,7 @@ export function IntegrationsSettings() {
       {(['slack', 'teams'] as const).map((format) => (
         <ChatCard key={format} format={format} endpoints={endpoints.filter((e) => e.format === format)} onChange={load} />
       ))}
+      <CrmCards />
       <Card className="p-5">
         <h2 className="font-semibold">Cloud storage</h2>
         <p className="mt-1 text-sm text-gray-500">Senders can pick documents straight from these services when preparing an agreement.</p>
@@ -175,6 +176,114 @@ function ChatCard({ format, endpoints, onChange }: { format: 'slack' | 'teams'; 
           Connect {info.name}
         </Button>
       </form>
+    </Card>
+  );
+}
+
+interface CrmState {
+  salesforceAvailable: boolean;
+  connections: { provider: 'hubspot' | 'salesforce'; accountLabel: string | null; settings: { attachPdf?: boolean }; lastSyncAt: string | null; lastError: string | null }[];
+}
+
+/** HubSpot (private app token) and Salesforce (OAuth) activity sync. */
+function CrmCards() {
+  const [state, setState] = useState<CrmState | null>(null);
+  const [token, setToken] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const load = useCallback(() => api<CrmState>('/integrations/crm').then(setState), []);
+  useEffect(() => {
+    load().catch(() => {});
+    const sf = new URLSearchParams(window.location.search).get('salesforce');
+    if (sf === 'connected') setNotice('Salesforce connected.');
+    else if (sf) setError(`Salesforce connection ${sf.replace(/_/g, ' ')}.`);
+  }, [load]);
+  if (!state) return null;
+  const conn = (p: 'hubspot' | 'salesforce') => state.connections.find((c) => c.provider === p);
+
+  async function run(name: string, fn: () => Promise<unknown>, done?: string) {
+    setBusy(name);
+    setError(null);
+    setNotice(null);
+    try {
+      await fn();
+      await load();
+      if (done) setNotice(done);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const status = (c: CrmState['connections'][number]) => (
+    <div className="text-xs text-gray-500">
+      Connected{c.accountLabel ? ` to ${c.accountLabel}` : ''}
+      {c.lastSyncAt ? ` · last sync ${relativeTime(c.lastSyncAt)}` : ' · waiting for the first agreement event'}
+      {c.lastError && <div className="mt-1 text-red-600">Last error: {c.lastError}</div>}
+    </div>
+  );
+  const attachToggle = (p: 'hubspot' | 'salesforce', c: CrmState['connections'][number]) => (
+    <label className="flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={c.settings.attachPdf !== false} onChange={(e) => run(`att-${p}`, () => api(`/integrations/${p}`, { method: 'PATCH', json: { attachPdf: e.target.checked } }))} />
+      Attach signed PDFs
+    </label>
+  );
+
+  const hs = conn('hubspot');
+  const sf = conn('salesforce');
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold">CRM</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        Log agreement activity (sent, signed, declined, completed) on the signer&apos;s contact, and on a linked deal or record when the agreement is created with its ID over the API.
+      </p>
+      {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+      {notice && <div className="mt-3"><Alert tone="success">{notice}</Alert></div>}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border border-gray-200 p-4">
+          <div className="font-medium">HubSpot</div>
+          {hs ? (
+            <div className="mt-2 space-y-2">
+              {status(hs)}
+              {attachToggle('hubspot', hs)}
+              <Button size="sm" variant="ghost" className="text-red-600" onClick={() => run('hs-del', () => api('/integrations/hubspot', { method: 'DELETE' }))}>Disconnect</Button>
+            </div>
+          ) : (
+            <form
+              className="mt-2 space-y-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                run('hs', () => api('/integrations/hubspot', { method: 'PUT', json: { token: token.trim() } }).then(() => setToken('')), 'HubSpot connected.');
+              }}
+            >
+              <Label htmlFor="hs-token" hint="(private app with contacts, deals and files scopes)">Private app token</Label>
+              <Input id="hs-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="pat-na1-…" />
+              <Button size="sm" type="submit" loading={busy === 'hs'} disabled={token.trim().length < 20}>Connect HubSpot</Button>
+            </form>
+          )}
+        </div>
+        <div className="rounded-lg border border-gray-200 p-4">
+          <div className="font-medium">Salesforce</div>
+          {sf ? (
+            <div className="mt-2 space-y-2">
+              {status(sf)}
+              {attachToggle('salesforce', sf)}
+              <Button size="sm" variant="ghost" className="text-red-600" onClick={() => run('sf-del', () => api('/integrations/salesforce', { method: 'DELETE' }))}>Disconnect</Button>
+            </div>
+          ) : state.salesforceAvailable ? (
+            <div className="mt-2">
+              <p className="text-xs text-gray-500">You&apos;ll be asked to sign in to Salesforce and allow access.</p>
+              <Button size="sm" className="mt-2" loading={busy === 'sf'} onClick={() => run('sf', async () => window.location.assign((await api<{ url: string }>('/integrations/salesforce/connect', { method: 'POST' })).url))}>
+                Connect Salesforce
+              </Button>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-500">Not set up on this server yet (needs a Salesforce connected app).</p>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }

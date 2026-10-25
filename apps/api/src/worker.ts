@@ -7,6 +7,7 @@ import { renewSandboxSubscriptions } from './billing/service.js';
 import { renewArchiveTimestamps } from './trust/archive.js';
 import { sendRenewalReminders } from './contracts/routes.js';
 import { purgeExpired } from './governance/retention.js';
+import { deliverCrmEvents } from './crm/routes.js';
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -59,6 +60,7 @@ export function startWorker(log: FastifyBaseLogger) {
     running = true;
     try {
       await deliverPendingWebhooks();
+      await deliverCrmEvents();
       await expireEnvelopes();
       await sendReminders();
       await retryFinalization();

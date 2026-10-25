@@ -48,6 +48,8 @@ const envelopeInput = z.object({
   expiresAt: z.coerce.date().nullish(),
   /** Department (workspace) the agreement belongs to */
   departmentId: z.string().nullish(),
+  /** Links to records in connected systems: hubspotDealId, salesforceRecordId, or your own ids */
+  externalRefs: z.record(z.string().max(60), z.string().max(200)).refine((r) => Object.keys(r).length <= 20, 'At most 20 references').nullish(),
   /** India: buy an e-stamp for this agreement when it is sent */
   estamp: z
     .object({
@@ -134,6 +136,7 @@ export function serializeEnvelope(env: FullEnvelope) {
     certificateSha256: env.certificateSha256,
     departmentId: env.departmentId,
     testMode: env.testMode,
+    externalRefs: env.externalRefs,
     legalHold: env.legalHoldAt ? { since: env.legalHoldAt, reason: env.legalHoldReason } : null,
     approval: env.approvalStatus
       ? { status: env.approvalStatus, requestedAt: env.approvalRequestedAt, requestedBy: env.approvalRequestedBy, decidedBy: env.approvalDecidedBy, note: env.approvalNote }
@@ -326,6 +329,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
           expiresAt: body.expiresAt ?? null,
           departmentId: body.departmentId ?? null,
           testMode: req.auth.testMode ?? false,
+          externalRefs: body.externalRefs ?? undefined,
         },
       });
       await appendAudit(tx, {
@@ -350,11 +354,15 @@ export async function envelopeRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const env = await getVisibleEnvelope(req.auth, id);
     assertDraft(env);
-    const { estamp, ...body } = parse(envelopeInput.partial(), req.body);
+    const { estamp, externalRefs, ...body } = parse(envelopeInput.partial(), req.body);
     if (body.departmentId) await assertDepartmentUsable(req.auth, body.departmentId);
     await prisma.envelope.update({
       where: { id },
-      data: { ...body, ...(estamp !== undefined ? { estamp: estamp ?? Prisma.DbNull } : {}) },
+      data: {
+        ...body,
+        ...(estamp !== undefined ? { estamp: estamp ?? Prisma.DbNull } : {}),
+        ...(externalRefs !== undefined ? { externalRefs: externalRefs ?? Prisma.DbNull } : {}),
+      },
     });
     return serializeEnvelope(await getVisibleEnvelope(req.auth, id));
   });

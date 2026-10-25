@@ -93,6 +93,12 @@ export const config = {
   },
   /** eNACH e-mandates: sandbox | razorpay (uses the Razorpay keys) */
   enach: { provider: env('ENACH_PROVIDER', 'sandbox') as 'sandbox' | 'razorpay' },
+  /** CRM connections (HubSpot uses per-organisation private app tokens; Salesforce needs a connected app) */
+  crm: {
+    salesforceClientId: process.env.SALESFORCE_CLIENT_ID ?? '',
+    salesforceClientSecret: process.env.SALESFORCE_CLIENT_SECRET ?? '',
+    salesforceLoginUrl: env('SALESFORCE_LOGIN_URL', 'https://login.salesforce.com'),
+  },
   /** Cloud file pickers (public client identifiers; leave empty to hide a provider) */
   cloud: {
     googleClientId: process.env.GOOGLE_PICKER_CLIENT_ID ?? '',

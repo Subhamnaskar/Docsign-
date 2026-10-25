@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma, type Tx } from '../db.js';
 import { hmacSha256Hex } from '../lib/crypto.js';
 import { chatBody, describeEvent } from './chat.js';
+import { enqueueCrmEvents } from '../crm/routes.js';
 
 export const WEBHOOK_EVENTS = [
   'envelope.sent',
@@ -23,6 +24,7 @@ export async function enqueueWebhook(
   event: WebhookEvent,
   data: Record<string, unknown>,
 ): Promise<void> {
+  await enqueueCrmEvents(tx, orgId, event, data);
   const endpoints = await tx.webhookEndpoint.findMany({ where: { orgId, active: true } });
   const payload = { event, createdAt: new Date().toISOString(), data } as Prisma.JsonObject;
   const targets = endpoints.filter((e) => e.events.length === 0 || e.events.includes(event));

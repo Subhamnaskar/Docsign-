@@ -87,6 +87,7 @@ model Organization {
   createdAt          DateTime          @default(now())
   users              User[]
   departments        Department[]
+  crmConnections     CrmConnection[]
   envelopes          Envelope[]
   apiKeys            ApiKey[]
   webhooks           WebhookEndpoint[]
@@ -263,6 +264,8 @@ model Envelope {
   documentType      String         @default("general")
   // Created with a test API key: watermarked, not legally binding, not billed
   testMode          Boolean        @default(false)
+  // Links to records in connected systems, e.g. { "hubspotDealId": "123", "salesforceRecordId": "006…" }
+  externalRefs      Json?
   departmentId      String?
   department        Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   // Legal hold: never deleted by retention rules while set
@@ -955,4 +958,41 @@ model SupportRequest {
   message   String
   page      String?
   createdAt DateTime @default(now())
+}
+
+/// A connected CRM (HubSpot private app token, Salesforce OAuth).
+model CrmConnection {
+  id             String       @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  // hubspot | salesforce
+  provider       String
+  // Sealed JSON: tokens (and refresh token / instance URL for Salesforce)
+  credentialsEnc String
+  // e.g. { "attachPdf": true }
+  settings       Json         @default("{}")
+  accountLabel   String?
+  lastSyncAt     DateTime?
+  lastError      String?
+  createdAt      DateTime     @default(now())
+  events         CrmEvent[]
+
+  @@unique([orgId, provider])
+}
+
+/// Outbox of agreement events to push to a CRM, delivered by the worker with retries.
+model CrmEvent {
+  id            String         @id @default(cuid())
+  connectionId  String
+  connection    CrmConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  event         String
+  envelopeId    String
+  payload       Json
+  status        DeliveryStatus @default(PENDING)
+  attempts      Int            @default(0)
+  nextAttemptAt DateTime       @default(now())
+  lastError     String?
+  createdAt     DateTime       @default(now())
+
+  @@index([status, nextAttemptAt])
 }
