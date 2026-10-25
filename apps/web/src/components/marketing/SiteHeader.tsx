@@ -11,6 +11,7 @@ export const SITE_NAV = [
   { href: '/developers', label: 'Developers' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/partners', label: 'Partners' },
+  { href: '/help', label: 'Help' },
 ];
 
 export function SiteHeader() {

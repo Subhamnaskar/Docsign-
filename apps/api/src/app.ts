@@ -34,6 +34,7 @@ import { contractRoutes } from './contracts/routes.js';
 import { negotiationRoutes } from './negotiation/routes.js';
 import { governanceRoutes } from './governance/routes.js';
 import { departmentRoutes } from './governance/departments.js';
+import { helpRoutes } from './help/routes.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
 export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] } = {}) {
@@ -72,6 +73,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(signingRoutes);
       await v1.register(verifyRoutes);
       await v1.register(websiteRoutes);
+      await v1.register(helpRoutes);
       await v1.register(envelopeRoutes);
       await v1.register(templateRoutes);
       await v1.register(docgenRoutes);

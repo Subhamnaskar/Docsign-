@@ -33,6 +33,7 @@ const FOOTER = [
   {
     title: 'Company',
     links: [
+      { href: '/help', label: 'Help centre' },
       { href: '/partners', label: 'Partners' },
       { href: '/contact', label: 'Contact' },
       { href: '/legal/terms', label: 'Terms' },

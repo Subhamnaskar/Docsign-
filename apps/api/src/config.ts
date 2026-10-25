@@ -36,6 +36,7 @@ export const config = {
   },
   appSecret: env('APP_SECRET', 'change-me-to-a-long-random-string-at-least-32-chars'),
   salesEmail: env('SALES_EMAIL', 'sales@docsign.local'),
+  supportEmail: env('SUPPORT_EMAIL', 'support@docsign.local'),
   messaging: {
     /** console (development, shows in Mailpit) | twilio | msg91 */
     smsProvider: env('SMS_PROVIDER', 'console'),

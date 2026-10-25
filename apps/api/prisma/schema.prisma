@@ -137,6 +137,8 @@ model User {
   // Hashed single-use recovery codes
   recoveryCodeHashes String[]     @default([])
   authTokens   AuthToken[]
+  // Getting-started checklist hidden by the user
+  onboardingDismissedAt DateTime?
   departments  DepartmentMember[]
   createdAt    DateTime     @default(now())
 }
@@ -941,4 +943,16 @@ model DepartmentMember {
 
   @@id([departmentId, userId])
   @@index([userId])
+}
+
+/// A help request from the in-app Help panel or the website.
+model SupportRequest {
+  id        String   @id @default(cuid())
+  orgId     String?
+  userId    String?
+  email     String
+  subject   String
+  message   String
+  page      String?
+  createdAt DateTime @default(now())
 }

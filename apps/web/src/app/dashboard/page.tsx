@@ -8,6 +8,7 @@ import { Alert, Button, Card, cx, EmptyState, Input, Select, Spinner, StatusBadg
 import { api, fileUrl } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
 import type { Envelope, EnvelopeStatus, EnvelopeSummary } from '@/lib/types';
+import { OnboardingChecklist } from '@/components/Onboarding';
 
 const FILTERS: { label: string; status?: EnvelopeStatus }[] = [
   { label: 'All' },
@@ -182,6 +183,7 @@ function Dashboard() {
 
   return (
     <>
+      <OnboardingChecklist />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Agreements</h1>

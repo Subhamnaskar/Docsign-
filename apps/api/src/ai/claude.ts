@@ -48,7 +48,8 @@ function checkStop(stop: string | null, details: { category?: string | null } | 
  */
 export async function structuredCall<S extends z.ZodType>(opts: {
   schema: S;
-  system: string;
+  /** Text blocks allow a cache breakpoint on long, reused instructions */
+  system: string | Anthropic.Beta.BetaTextBlockParam[];
   content: Anthropic.Beta.BetaContentBlockParam[];
   effort: 'low' | 'medium' | 'high';
   maxTokens?: number;

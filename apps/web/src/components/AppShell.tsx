@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { api, ApiError } from '@/lib/api';
 import type { Me } from '@/lib/types';
 import { cx, Logo, PageLoader } from './ui';
+import { HelpPanel } from './HelpPanel';
 
 const MeContext = createContext<Me | null>(null);
 export const useMe = () => useContext(MeContext);
@@ -24,6 +25,7 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
   const router = useRouter();
   const pathname = usePathname();
   const [me, setMe] = useState<Me | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     api<Me>('/auth/me')
@@ -70,12 +72,16 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
                 <span className="block text-xs">{me.organization.name}</span>
               </span>
             )}
+            <button onClick={() => setHelpOpen(true)} className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
+              Help
+            </button>
             <button onClick={logout} className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
               Sign out
             </button>
           </div>
         </div>
       </header>
+      <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
       {me && <AccountBanner me={me} wide={wide} />}
       {me && <BillingBanner me={me} wide={wide} />}
       <main className={cx('mx-auto px-4 py-6 sm:px-6 sm:py-8', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
