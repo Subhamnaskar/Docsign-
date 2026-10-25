@@ -17,8 +17,9 @@ import {
   Stat,
   STATUS_OPTIONS,
   StateBadge,
+  type PlatformRole,
 } from '@/components/admin/shared';
-import { Alert, Button, Card, cx, Input, PageLoader, Select } from '@/components/ui';
+import { Alert, Button, Card, cx, Input, Label, PageLoader, Select } from '@/components/ui';
 import { api, ApiError, fileUrl } from '@/lib/api';
 import { formatDate, formatMoney, relativeTime } from '@/lib/format';
 
@@ -64,6 +65,7 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'customers', label: 'Customers' },
   { id: 'logins', label: 'Sign-ins' },
+  { id: 'team', label: 'Team' },
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
@@ -125,6 +127,7 @@ function Console() {
         {tab === 'overview' && <OverviewTab />}
         {tab === 'customers' && <CustomersTab />}
         {tab === 'logins' && <LoginsTab />}
+        {tab === 'team' && <TeamTab />}
       </div>
     </>
   );
@@ -413,6 +416,7 @@ function CustomersTab() {
               <PlanBadge key="p" plan={o.plan} name={o.planName} />,
               <div key="s">
                 <StateBadge state={o.state} />
+                {o.suspended && <span className="ml-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">Suspended</span>}
                 {o.trialEndsAt && o.state === 'trialing' && <div className="mt-0.5 text-xs text-gray-500">ends {formatDate(o.trialEndsAt, false)}</div>}
                 {o.cancelAtPeriodEnd && <div className="mt-0.5 text-xs text-amber-700">cancelling</div>}
               </div>,
@@ -607,6 +611,159 @@ function LoginsTab() {
           </div>
         </div>
       </Card>
+    </div>
+  );
+}
+
+// --- Team --------------------------------------------------------------------
+
+interface Team {
+  you: { email: string; role: PlatformRole };
+  twoFactorRequired: boolean;
+  members: {
+    email: string;
+    role: PlatformRole;
+    alerts: boolean;
+    addedBy: string;
+    createdAt: string | null;
+    account: { name: string; emailVerified: boolean; twoFactor: boolean; lastLoginAt: string | null } | null;
+  }[];
+}
+
+const ROLE_INFO: Record<PlatformRole, string> = {
+  owner: 'Everything, including managing the team. Set in PLATFORM_ADMINS.',
+  admin: 'Everything except managing the team.',
+  viewer: 'Can look at everything, cannot change anything.',
+};
+
+function TeamTab() {
+  const [team, setTeam] = useState<Team | null>(null);
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const load = () => api<Team>('/admin/team').then(setTeam);
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function call(path: string, init: Parameters<typeof api>[1], done: string) {
+    setNotice(null);
+    try {
+      await api(path, init);
+      setNotice({ tone: 'success', text: done });
+      await load();
+    } catch (e) {
+      setNotice({ tone: 'error', text: e instanceof ApiError ? e.message : 'That did not work.' });
+    }
+  }
+
+  if (!team) return <PageLoader />;
+  const owner = team.you.role === 'owner';
+  const path = (e: string) => `/admin/team/${encodeURIComponent(e)}`;
+  return (
+    <div className="space-y-6">
+      {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+      <Card className="p-5">
+        <h2 className="font-semibold">Console team</h2>
+        <p className="text-sm text-gray-500">
+          Everyone here needs their own account with a confirmed email{team.twoFactorRequired ? ' and two-factor authentication' : ''}. Alerts email them about failed payments, cancellations, new paying
+          customers and bursts of failed sign-ins.
+        </p>
+        <div className="mt-4">
+          <SimpleTable
+            head={['Person', 'Role', 'Account', 'Alerts', '']}
+            rows={team.members.map((m) => {
+              const self = m.email === team.you.email;
+              return [
+                <div key="p">
+                  <div className="font-medium text-ink">
+                    {m.account?.name ?? m.email} {self && <span className="text-xs font-normal text-gray-500">(you)</span>}
+                  </div>
+                  <div className="text-xs text-gray-500">{m.email}</div>
+                </div>,
+                owner && m.role !== 'owner' ? (
+                  <div key="r" className="w-28">
+                    <Select value={m.role} aria-label={`Role for ${m.email}`} onChange={(e) => call(path(m.email), { method: 'PATCH', json: { role: e.target.value } }, `${m.email} is now ${e.target.value}.`)}>
+                      <option value="admin">Admin</option>
+                      <option value="viewer">Viewer</option>
+                    </Select>
+                  </div>
+                ) : (
+                  <span key="r" title={ROLE_INFO[m.role]} className="capitalize">
+                    {m.role}
+                  </span>
+                ),
+                m.account ? (
+                  <span key="a" className="text-xs text-gray-600">
+                    {m.account.emailVerified ? 'Email confirmed' : 'Email not confirmed'} · 2FA {m.account.twoFactor ? 'on' : 'off'}
+                    <br />
+                    {m.account.lastLoginAt ? `Signed in ${relativeTime(m.account.lastLoginAt)}` : 'Never signed in'}
+                  </span>
+                ) : (
+                  <span key="a" className="text-xs text-amber-700">
+                    No account yet: ask them to sign up with this email
+                  </span>
+                ),
+                m.role === 'owner' ? (
+                  'Always'
+                ) : (
+                  <label key="al" className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={m.alerts}
+                      disabled={!owner && !self}
+                      onChange={(e) => call(path(m.email), { method: 'PATCH', json: { alerts: e.target.checked } }, `Alerts ${e.target.checked ? 'on' : 'off'} for ${m.email}.`)}
+                    />
+                    Email
+                  </label>
+                ),
+                owner && m.role !== 'owner' ? (
+                  <Button
+                    key="x"
+                    size="sm"
+                    variant="ghost"
+                    className="text-red-700"
+                    onClick={() => window.confirm(`Remove ${m.email} from the console team?`) && call(path(m.email), { method: 'DELETE' }, `${m.email} was removed.`)}
+                  >
+                    Remove
+                  </Button>
+                ) : (
+                  ''
+                ),
+              ];
+            })}
+          />
+        </div>
+      </Card>
+      {owner && (
+        <Card className="p-5">
+          <h2 className="font-semibold">Add someone</h2>
+          <form
+            className="mt-3 flex flex-wrap items-end gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              await call('/admin/team', { method: 'POST', json: { email, role } }, `${email} was added as ${role}.`);
+              setEmail('');
+            }}
+          >
+            <div className="w-full sm:w-72">
+              <Label htmlFor="team-email">Work email</Label>
+              <Input id="team-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@nuronixai.in" />
+            </div>
+            <div className="w-32">
+              <Label htmlFor="team-role">Role</Label>
+              <Select id="team-role" value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'viewer')}>
+                <option value="viewer">Viewer</option>
+                <option value="admin">Admin</option>
+              </Select>
+            </div>
+            <Button type="submit">Add to team</Button>
+          </form>
+          <p className="mt-3 text-xs text-gray-500">
+            Admin: {ROLE_INFO.admin} Viewer: {ROLE_INFO.viewer}
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

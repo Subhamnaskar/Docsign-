@@ -28,6 +28,7 @@ import {
   cancel,
   checkout,
   completeSandboxCheckout,
+  creditNoteNumber,
   currencyOf,
   invoiceNumber,
   quote,
@@ -91,10 +92,11 @@ export async function billingRoutes(app: FastifyInstance) {
     r.get('/billing', async (req) => {
       const org = await prisma.organization.findUniqueOrThrow({ where: { id: req.auth.orgId } });
       const ent = entitlement(org);
-      const [used, seats, invoices] = await Promise.all([
+      const [used, seats, invoices, creditNotes] = await Promise.all([
         envelopesUsed(org.id, ent.periodStart),
         seatsUsed(org.id),
         prisma.invoice.findMany({ where: { orgId: org.id }, orderBy: { seq: 'desc' }, take: 100 }),
+        prisma.creditNote.findMany({ where: { orgId: org.id }, orderBy: { seq: 'desc' }, take: 100 }),
       ]);
       return {
         ...billingBrief(org),
@@ -115,6 +117,16 @@ export async function billingRoutes(app: FastifyInstance) {
           paidAt: i.paidAt,
           periodStart: i.periodStart,
           periodEnd: i.periodEnd,
+        })),
+        creditNotes: creditNotes.map((c) => ({
+          id: c.id,
+          number: creditNoteNumber(c),
+          kind: c.kind,
+          amount: c.amount,
+          currency: c.currency,
+          reason: c.reason,
+          invoice: invoices.find((i) => i.id === c.invoiceId) ? invoiceNumber(invoices.find((i) => i.id === c.invoiceId)!) : null,
+          createdAt: c.createdAt,
         })),
       };
     });

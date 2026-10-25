@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, Input, Label } from '@/components/ui';
+import { useMe } from '@/components/AppShell';
+import { Alert, Button, Card, Input, Label, Select } from '@/components/ui';
 import { api } from '@/lib/api';
-import { relativeTime } from '@/lib/format';
+import { formatDate, relativeTime } from '@/lib/format';
 
 interface TwoFactor {
   enabled: boolean;
@@ -55,6 +56,7 @@ export function SecuritySettings({ onTwoFactorChange }: { onTwoFactorChange?: ()
         />
       )}
       <Sessions />
+      <SupportAccess />
     </>
   );
 }
@@ -324,6 +326,72 @@ function Sessions() {
           </li>
         ))}
       </ul>
+    </Card>
+  );
+}
+
+interface SupportAccessState {
+  until: string | null;
+  sessions: { by: string; viewingAs: string; until: string }[];
+}
+
+/** Owners and admins let NuronixAI support look at the account (read-only) for a limited time. */
+function SupportAccess() {
+  const me = useMe();
+  const admin = me?.user?.role === 'OWNER' || me?.user?.role === 'ADMIN';
+  const [state, setState] = useState<SupportAccessState | null>(null);
+  const [hours, setHours] = useState(72);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => api<SupportAccessState>('/organization/support-access').then(setState), []);
+  useEffect(() => {
+    if (admin && !me?.support) load();
+  }, [admin, me?.support, load]);
+  if (!admin || !state) return null;
+
+  async function change(method: 'POST' | 'DELETE') {
+    setBusy(true);
+    try {
+      await api('/organization/support-access', method === 'POST' ? { method, json: { hours } } : { method });
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold">NuronixAI support access</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        Let our support team look at your account to help with a problem. They see what your users see, including agreements, but cannot change anything. Every visit is recorded in your activity
+        log and emailed to your admins.
+      </p>
+      {state.until ? (
+        <div className="mt-4 space-y-3">
+          <Alert tone="info">Support access is on until {formatDate(state.until)}.</Alert>
+          {state.sessions.map((s) => (
+            <p key={s.by + s.until} className="text-sm text-gray-700">
+              <strong>{s.by}</strong> is viewing as {s.viewingAs} until {formatDate(s.until)}.
+            </p>
+          ))}
+          <Button variant="secondary" disabled={busy} onClick={() => change('DELETE')}>
+            Turn off support access
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <Label htmlFor="support-hours">Allow for</Label>
+            <Select id="support-hours" value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+              <option value={24}>24 hours</option>
+              <option value={72}>3 days</option>
+              <option value={168}>7 days</option>
+            </Select>
+          </div>
+          <Button disabled={busy} onClick={() => change('POST')}>
+            Allow support access
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

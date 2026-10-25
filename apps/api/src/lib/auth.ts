@@ -27,6 +27,8 @@ export interface AuthContext {
   managedDepartmentIds?: string[];
   /** API keys only: true for test keys, false for live keys (sessions see both) */
   testMode?: boolean;
+  /** Read-only NuronixAI support session started from the platform console */
+  support?: { userId: string; email: string };
 }
 
 declare module 'fastify' {
@@ -47,14 +49,22 @@ export async function issueSessionToken(request: FastifyRequest, userId: string,
       ip: request.ip,
       userAgent: label ?? (typeof ua === 'string' ? ua.slice(0, 300) : null),
     },
-    include: { user: { select: { email: true, orgId: true } } },
+    include: { user: { select: { email: true, orgId: true, org: { select: { suspendedAt: true } } } } },
   });
+  if (session.user.org.suspendedAt) {
+    await prisma.session.delete({ where: { id: session.id } });
+    await recordLogin(request, { email: session.user.email, method, success: false, userId, orgId: session.user.orgId, reason: 'suspended' });
+    throw suspended();
+  }
   await recordLogin(request, { email: session.user.email, method, success: true, userId, orgId: session.user.orgId });
   return token;
 }
 
 export async function createSession(reply: FastifyReply, userId: string, method: LoginMethod = 'password') {
-  const token = await issueSessionToken(reply.request, userId, undefined, method);
+  setSessionCookie(reply, await issueSessionToken(reply.request, userId, undefined, method));
+}
+
+export function setSessionCookie(reply: FastifyReply, token: string) {
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -73,6 +83,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     const apiKey = await prisma.apiKey.findUnique({ where: { keyHash: sha256Hex(key) } });
     if (!apiKey || apiKey.revokedAt) throw unauthorized('Invalid API key');
     await assertIpAllowed(request, apiKey.orgId);
+    if ((await prisma.organization.findUnique({ where: { id: apiKey.orgId }, select: { suspendedAt: true } }))?.suspendedAt) throw suspended();
     // Test keys work on every plan so developers can build before buying
     if (apiKey.mode !== 'test') await assertFeature(apiKey.orgId, 'api');
     // Best-effort usage tracking; not worth failing the request over
@@ -95,11 +106,16 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
   if (!token) throw unauthorized();
   const session = await prisma.session.findUnique({
     where: { tokenHash: sha256Hex(token) },
-    include: { user: { include: { org: { select: { require2fa: true } } } } },
+    include: { user: { include: { org: { select: { require2fa: true, suspendedAt: true } } } } },
   });
   if (!session || session.expiresAt < new Date()) throw unauthorized('Session expired');
   const { user } = session;
   if (user.disabledAt) throw unauthorized('This account has been deactivated.');
+  if (user.org.suspendedAt) throw suspended();
+  // Support sessions look but never change anything (ending the session is the one exception)
+  if (session.impersonatorUserId && !['GET', 'HEAD'].includes(request.method) && !SUPPORT_WRITE_PATHS.test(request.url)) {
+    throw new HttpError(403, 'This is a read-only NuronixAI support session.', 'support_read_only');
+  }
   await assertIpAllowed(request, user.orgId);
   // Organisation policy: password users must set up two-factor before doing anything else
   if (user.org.require2fa && !user.totpEnabledAt && !user.passwordHash.startsWith('sso:') && !MFA_SETUP_PATHS.test(request.url)) {
@@ -107,7 +123,8 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
   }
   if (Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_RESOLUTION_MS) {
     prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
-    markActive(user.id, user.orgId);
+    // Staff looking around in a support session don't count as customer activity
+    if (!session.impersonatorUserId) markActive(user.id, user.orgId);
   }
   request.auth = {
     orgId: user.orgId,
@@ -115,6 +132,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     role: user.role,
     actor: { kind: 'user', id: user.id, name: user.name, email: user.email },
     sessionId: session.id,
+    support: session.impersonatorUserId ? { userId: session.impersonatorUserId, email: session.impersonatorEmail ?? '' } : undefined,
     managedDepartmentIds:
       user.role === 'MEMBER'
         ? (await prisma.departmentMember.findMany({ where: { userId: user.id, role: 'manager' }, select: { departmentId: true } })).map((d) => d.departmentId)
@@ -129,6 +147,10 @@ async function assertIpAllowed(request: FastifyRequest, orgId: string) {
 }
 
 const LAST_SEEN_RESOLUTION_MS = 5 * 60_000;
+const SUPPORT_WRITE_PATHS = /^\/api\/v1\/auth\/(support\/end|logout)/;
+
+export const suspended = () =>
+  new HttpError(403, 'This organisation has been suspended. Contact NuronixAI support to restore access.', 'org_suspended');
 /** Reachable before required two-factor setup is done */
 const MFA_SETUP_PATHS = /^\/api\/v1\/auth\/(me|logout|2fa(\/|$|\?)|sessions|password\/change|verify-email)/;
 

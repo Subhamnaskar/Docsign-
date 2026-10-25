@@ -42,6 +42,7 @@ interface BillingState {
   usage: { envelopes: number; envelopeLimit: number | null; seats: number; seatLimit: number | null };
   details: { billingName: string | null; billingEmail: string | null; billingAddress: string | null; taxId: string | null };
   invoices: { id: string; number: string; description: string; currency: Currency; total: number; paidAt: string }[];
+  creditNotes: { id: string; number: string; kind: 'refund' | 'credit'; amount: number; currency: Currency; reason: string; invoice: string | null; createdAt: string }[];
 }
 
 interface Quote {
@@ -214,6 +215,36 @@ export function BillingSettings() {
           </div>
         )}
       </Card>
+
+      {b.creditNotes.length > 0 && (
+        <Card className="p-5">
+          <h2 className="font-semibold">Refunds and credits</h2>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="py-2 font-medium">Credit note</th>
+                  <th className="py-2 font-medium">Date</th>
+                  <th className="py-2 font-medium">Details</th>
+                  <th className="py-2 text-right font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {b.creditNotes.map((c) => (
+                  <tr key={c.id}>
+                    <td className="py-2.5 font-mono text-xs">{c.number}</td>
+                    <td className="py-2.5 text-gray-600">{formatDate(c.createdAt)}</td>
+                    <td className="py-2.5 text-gray-600">
+                      {c.kind === 'refund' ? `Refund${c.invoice ? ` of ${c.invoice}` : ''}` : 'Account credit'}: {c.reason}
+                    </td>
+                    <td className="py-2.5 text-right font-medium">{money(c.amount, c.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

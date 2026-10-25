@@ -12,7 +12,7 @@ import { ssoOrgForEmail } from '../sso/routes.js';
 import { parse } from '../lib/validate.js';
 import { JURISDICTIONS } from '../policy/jurisdictions.js';
 import { billingBrief } from '../billing/routes.js';
-import { isPlatformAdmin } from '../platform/routes.js';
+import { platformRole } from '../platform/access.js';
 import { isSsoOnly, passwordSchema } from './security.js';
 import { issueToken, sendVerificationEmail } from './tokens.js';
 
@@ -109,8 +109,8 @@ export async function authRoutes(app: FastifyInstance) {
         twoFactor: Boolean(user.totpEnabledAt),
         // The organisation requires two-factor and this password user hasn't set it up
         mfaSetupRequired: org.require2fa && !user.totpEnabledAt && !isSsoOnly(user),
-        // NuronixAI staff: show the platform console link
-        platformAdmin: Boolean(req.auth.sessionId) && isPlatformAdmin(user),
+        // NuronixAI staff: show the platform console link (never inside a support session)
+        platformAdmin: Boolean(req.auth.sessionId && !req.auth.support && (await platformRole(user))),
       },
       organization: {
         id: org.id,
@@ -124,6 +124,8 @@ export async function authRoutes(app: FastifyInstance) {
         approvalPolicy: org.approvalPolicy,
         approverIds: org.approverIds,
       },
+      // Read-only NuronixAI support session: the app shows a banner with a way out
+      support: req.auth.support ? { by: req.auth.support.email, endsAt: (await prisma.session.findUnique({ where: { id: req.auth.sessionId! } }))?.expiresAt ?? null } : null,
       cell: config.cellRegion,
       features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode },
       billing: billingBrief(org),

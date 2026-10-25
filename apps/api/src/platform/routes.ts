@@ -1,15 +1,17 @@
-import type { Organization, Prisma, User } from '@prisma/client';
+import type { Organization, Prisma } from '@prisma/client';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { applyManualPlan } from '../billing/manual-plan.js';
 import { CURRENCIES, type Currency, defaultCurrency, entitlement, isPlanId, planOf, PLANS, YEARLY_MONTHS } from '../billing/plans.js';
-import { invoiceNumber } from '../billing/service.js';
+import { creditNoteNumber, hasLiveSubscription, invoiceNumber } from '../billing/service.js';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { csvCell } from '../envelopes/manage.js';
 import { requireAuth } from '../lib/auth.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
+import { type PlatformRole, platformRole } from './access.js';
+import { platformActions } from './actions.js';
 
 /**
  * Platform console for NuronixAI staff: every customer organisation, plan,
@@ -20,21 +22,24 @@ import { parse } from '../lib/validate.js';
 const DAY_MS = 24 * 3600 * 1000;
 const BILLING_STATUSES = ['TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELED'] as const;
 
-/** Staff listed in PLATFORM_ADMINS, with a confirmed email (and two-factor in production). */
-export function isPlatformAdmin(user: Pick<User, 'email' | 'emailVerifiedAt' | 'totpEnabledAt' | 'disabledAt'>): boolean {
-  return (
-    config.platformAdmins.includes(user.email.toLowerCase()) &&
-    Boolean(user.emailVerifiedAt) &&
-    !user.disabledAt &&
-    (!config.isProduction || Boolean(user.totpEnabledAt))
-  );
+declare module 'fastify' {
+  interface FastifyRequest {
+    platformRole?: PlatformRole;
+  }
 }
 
-/** Signed-in staff only; API keys never qualify. Answers 404 so the console's existence isn't revealed. */
+/** Signed-in console staff only; API keys and support sessions never qualify. Answers 404 so the console's existence isn't revealed. */
 async function requirePlatformAdmin(req: FastifyRequest) {
   await requireAuth(req);
-  const user = req.auth.sessionId && req.auth.userId ? await prisma.user.findUnique({ where: { id: req.auth.userId } }) : null;
-  if (!user || !isPlatformAdmin(user)) throw notFound('Page');
+  const user = req.auth.sessionId && req.auth.userId && !req.auth.support ? await prisma.user.findUnique({ where: { id: req.auth.userId } }) : null;
+  const role = user && (await platformRole(user));
+  if (!role) throw notFound('Page');
+  req.platformRole = role;
+}
+
+/** Changes need admin or owner; viewers only look. */
+export function assertCanChange(req: FastifyRequest) {
+  if (req.platformRole === 'viewer') throw forbidden('Viewers can look but not make changes. Ask a console owner for admin access.');
 }
 
 const utcDay = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -154,15 +159,31 @@ async function orgRows(orgs: (Organization & { _count: { users: number } })[]) {
       envelopesThisMonth: sent.find((r) => r.orgId === o.id)?._count ?? 0,
       mrr: mrrOf(o),
       revenue: paid,
+      suspended: Boolean(o.suspendedAt),
     };
   });
 }
 
+/** Support actions are recorded in the customer's own activity log. */
+export const record = (req: FastifyRequest, orgId: string, type: string, data: Record<string, unknown>) =>
+  prisma.activityLog.create({
+    data: {
+      orgId,
+      type,
+      actor: req.auth.actor as Prisma.JsonObject,
+      data: { ...data, via: 'platform console' } as Prisma.JsonObject,
+      ip: req.ip,
+    },
+  });
+
 export async function platformRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requirePlatformAdmin);
+  // Users, suspension, billing, support sessions and the console team (inherits the hook above)
+  await app.register(platformActions);
 
   app.get('/admin/me', async (req) => ({
     admin: true,
+    role: req.platformRole,
     email: req.auth.actor.kind === 'user' ? req.auth.actor.email : null,
   }));
 
@@ -382,7 +403,7 @@ export async function platformRoutes(app: FastifyInstance) {
     if (!org) throw notFound('Organisation');
     const ent = entitlement(org);
     const [row] = await orgRows([org]);
-    const [users, invoices, envelopesThisPeriod, envelopesAllTime, logins, actions] = await Promise.all([
+    const [users, invoices, envelopesThisPeriod, envelopesAllTime, logins, actions, creditNotes] = await Promise.all([
       prisma.user.findMany({
         where: { orgId: id },
         orderBy: { createdAt: 'asc' },
@@ -422,7 +443,9 @@ export async function platformRoutes(app: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
         take: 25,
       }),
+      prisma.creditNote.findMany({ where: { orgId: id }, orderBy: { seq: 'desc' } }),
     ]);
+    const refunded = (invoiceId: string) => creditNotes.filter((c) => c.invoiceId === invoiceId).reduce((n, c) => n + c.amount, 0);
     return {
       ...row,
       dataRegion: org.dataRegion,
@@ -437,6 +460,10 @@ export async function platformRoutes(app: FastifyInstance) {
       envelopesAllTime,
       billingProvider: org.billingProvider,
       billingEmail: org.billingEmail,
+      liveSubscription: hasLiveSubscription(org),
+      suspendedAt: org.suspendedAt,
+      suspendedReason: org.suspendedReason,
+      supportAccessUntil: org.supportAccessUntil && org.supportAccessUntil > new Date() ? org.supportAccessUntil : null,
       users: users.map(({ _count, totpEnabledAt, emailVerifiedAt, disabledAt, ...u }) => ({
         ...u,
         twoFactor: Boolean(totpEnabledAt),
@@ -451,6 +478,21 @@ export async function platformRoutes(app: FastifyInstance) {
         currency: i.currency,
         total: i.total,
         paidAt: i.paidAt,
+        provider: i.provider,
+        refunded: refunded(i.id),
+      })),
+      creditNotes: creditNotes.map((c) => ({
+        id: c.id,
+        number: creditNoteNumber(c),
+        kind: c.kind,
+        amount: c.amount,
+        currency: c.currency,
+        reason: c.reason,
+        provider: c.provider,
+        providerRef: c.providerRef,
+        invoiceId: c.invoiceId,
+        createdBy: c.createdBy,
+        createdAt: c.createdAt,
       })),
       logins: logins.map((l) => ({
         id: l.id,
@@ -471,20 +513,9 @@ export async function platformRoutes(app: FastifyInstance) {
     };
   });
 
-  /** Support actions. Each one is recorded in the customer's own activity log. */
-  const record = (req: FastifyRequest, orgId: string, type: string, data: Record<string, unknown>) =>
-    prisma.activityLog.create({
-      data: {
-        orgId,
-        type,
-        actor: req.auth.actor as Prisma.JsonObject,
-        data: { ...data, via: 'platform console' } as Prisma.JsonObject,
-        ip: req.ip,
-      },
-    });
-
   app.post('/admin/orgs/:id/extend-trial', async (req) => {
     const { id } = req.params as { id: string };
+    assertCanChange(req);
     const { days } = parse(z.object({ days: z.coerce.number().int().min(1).max(90) }), req.body);
     const org = await prisma.organization.findUnique({ where: { id } });
     if (!org) throw notFound('Organisation');
@@ -500,6 +531,7 @@ export async function platformRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/orgs/:id/plan', async (req) => {
+    assertCanChange(req);
     const { id } = req.params as { id: string };
     const body = parse(
       z.object({

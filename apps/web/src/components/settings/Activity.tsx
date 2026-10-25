@@ -29,6 +29,20 @@ const LABELS: Record<string, string> = {
   'sso.updated': 'Changed single sign-on',
   'platform.trial_extended': 'NuronixAI support extended the free trial',
   'platform.plan_changed': 'NuronixAI support changed the plan',
+  'platform.user_signed_out': 'NuronixAI support signed a user out',
+  'platform.user_deactivated': 'NuronixAI support deactivated a user',
+  'platform.user_reactivated': 'NuronixAI support reactivated a user',
+  'platform.password_reset_sent': 'NuronixAI support sent a password reset',
+  'platform.org_suspended': 'NuronixAI suspended the organisation',
+  'platform.org_reactivated': 'NuronixAI reactivated the organisation',
+  'platform.org_signed_out': 'NuronixAI support signed everyone out',
+  'platform.subscription_canceled': 'NuronixAI support cancelled the subscription',
+  'platform.refund_issued': 'NuronixAI issued a refund',
+  'platform.credit_issued': 'NuronixAI issued an account credit',
+  'platform.support_session_started': 'NuronixAI support started viewing the account',
+  'platform.support_session_ended': 'NuronixAI support stopped viewing the account',
+  'support_access.granted': 'Allowed NuronixAI support access',
+  'support_access.revoked': 'Turned off NuronixAI support access',
 };
 
 function summary(e: Entry): string {

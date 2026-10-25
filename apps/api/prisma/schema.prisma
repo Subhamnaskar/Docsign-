@@ -78,6 +78,13 @@ model Organization {
   billingProvider    String?
   // Subscription id at the provider (Stripe sub_..., Razorpay sub_...)
   subscriptionRef    String?           @unique
+  // --- Platform console (NuronixAI staff) ---
+  // Suspended organisations can't sign in, use the API or open signing links
+  suspendedAt        DateTime?
+  suspendedReason    String?
+  // The customer lets NuronixAI support view the account (read-only) until then
+  supportAccessUntil DateTime?
+  creditNotes        CreditNote[]
   // Printed on invoices
   billingName        String?
   billingEmail       String?
@@ -220,6 +227,9 @@ model Session {
   userAgent  String?
   lastSeenAt DateTime @default(now())
   createdAt DateTime @default(now())
+  // Read-only support session started from the platform console by this staff member
+  impersonatorUserId String?
+  impersonatorEmail  String?
 }
 
 model ApiKey {
@@ -1038,4 +1048,40 @@ model ActiveDay {
 
   @@id([userId, day])
   @@index([day])
+}
+
+/// Console staff added from the platform console. People listed in
+/// PLATFORM_ADMINS are owners and manage this list.
+model PlatformAdmin {
+  email     String   @id
+  // admin (everything except managing staff) | viewer (read-only)
+  role      String   @default("viewer")
+  // Email alerts: failed payments, cancellations, new customers, sign-in attacks
+  alerts    Boolean  @default(true)
+  addedBy   String
+  createdAt DateTime @default(now())
+}
+
+/// Refund or credit against a customer's billing, issued from the platform console.
+model CreditNote {
+  id          String       @id @default(cuid())
+  // Printed as CN-<year>-<seq>
+  seq         Int          @unique @default(autoincrement())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invoiceId   String?
+  // refund (money back to the card/account) | credit (towards future charges)
+  kind        String
+  // Minor units, tax included
+  amount      Int
+  currency    String
+  reason      String
+  provider    String?
+  // Refund id at Stripe/Razorpay when the refund went through the provider
+  providerRef String?
+  createdBy   String
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([invoiceId])
 }

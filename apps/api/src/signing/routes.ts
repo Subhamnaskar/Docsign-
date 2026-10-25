@@ -55,12 +55,13 @@ export async function loadByToken(token: string) {
         include: {
           documents: { orderBy: { order: 'asc' } },
           createdBy: { select: { name: true, email: true } },
-          org: { select: { name: true } },
+          org: { select: { name: true, suspendedAt: true } },
         },
       },
     },
   });
   if (!recipient || recipient.role === 'CC' || !signingTokenMatches(recipient, parsed.mac)) throw notFound('Signing request');
+  if (recipient.envelope.org.suspendedAt) throw new HttpError(403, 'This signing request is not available. Contact the sender.', 'org_suspended');
   return recipient;
 }
 

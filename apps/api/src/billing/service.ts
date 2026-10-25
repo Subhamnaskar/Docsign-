@@ -16,6 +16,7 @@ import {
   planOf,
   seatsUsed,
 } from './plans.js';
+import { notifyPlatform } from '../platform/access.js';
 import { billingProvider } from './providers.js';
 
 export interface Quote {
@@ -75,7 +76,10 @@ async function validateChoice(org: Organization, plan: string, seats: number) {
 }
 
 /** True when the organisation has a running paid subscription to change in place. */
-const hasLiveSubscription = (org: Organization) =>
+export const creditNoteNumber = (cn: { seq: number; createdAt: Date }) => `CN-${cn.createdAt.getUTCFullYear()}-${String(cn.seq).padStart(6, '0')}`;
+
+/** A self-serve subscription at Stripe, Razorpay or the sandbox that hasn't ended. */
+export const hasLiveSubscription = (org: Organization) =>
   org.plan !== 'trial' && org.billingProvider !== null && org.billingProvider !== 'manual' && entitlement(org).state !== 'canceled';
 
 export async function recordInvoice(
@@ -181,7 +185,8 @@ export async function completeCheckout(checkoutId: string, subscriptionRef: stri
   if (!c) return null;
   if (claimed.count === 0) return prisma.organization.findUnique({ where: { id: c.orgId } });
   const now = new Date();
-  return prisma.organization.update({
+  const wasPaying = (await prisma.organization.findUniqueOrThrow({ where: { id: c.orgId } })).plan !== 'trial';
+  const org = await prisma.organization.update({
     where: { id: c.orgId },
     data: {
       plan: c.plan,
@@ -196,6 +201,13 @@ export async function completeCheckout(checkoutId: string, subscriptionRef: stri
       currentPeriodEnd: addInterval(now, c.interval as Interval),
     },
   });
+  if (!wasPaying) {
+    await notifyPlatform(`New paying customer: ${org.name}`, [`${org.name} subscribed to ${planOf(org).name} with ${org.seats} seat(s), billed per ${c.interval}, in ${c.currency}.`], {
+      label: 'Open customer',
+      path: `/admin/orgs/${org.id}`,
+    });
+  }
+  return org;
 }
 
 /** Sandbox purchase: activate and invoice the first period. */
@@ -244,10 +256,18 @@ export async function recordProviderCharge(
 }
 
 export async function setSubscriptionStatus(subscriptionRef: string, status: 'PAST_DUE' | 'CANCELED' | 'ACTIVE', cancelAtPeriodEnd?: boolean) {
+  const before = await prisma.organization.findUnique({ where: { subscriptionRef } });
   await prisma.organization.updateMany({
     where: { subscriptionRef },
     data: { billingStatus: status, ...(cancelAtPeriodEnd === undefined ? {} : { cancelAtPeriodEnd }) },
   });
+  if (before && before.billingStatus !== status && status !== 'ACTIVE') {
+    await notifyPlatform(
+      status === 'PAST_DUE' ? `Payment failed: ${before.name}` : `Subscription ended: ${before.name}`,
+      [status === 'PAST_DUE' ? `The latest ${planOf(before).name} payment for ${before.name} failed. The provider will retry; follow up if it keeps failing.` : `${before.name}'s ${planOf(before).name} subscription has ended.`],
+      { label: 'Open customer', path: `/admin/orgs/${before.id}` },
+    );
+  }
 }
 
 export async function cancel(orgId: string) {
@@ -255,7 +275,12 @@ export async function cancel(orgId: string) {
   if (!hasLiveSubscription(org)) throw badRequest('There is no active subscription to cancel.');
   if (org.cancelAtPeriodEnd) return org;
   await billingProvider(org.billingProvider!).cancel(org.subscriptionRef!, true);
-  return prisma.organization.update({ where: { id: orgId }, data: { cancelAtPeriodEnd: true } });
+  const updated = await prisma.organization.update({ where: { id: orgId }, data: { cancelAtPeriodEnd: true } });
+  await notifyPlatform(`Cancellation: ${org.name}`, [`${org.name} cancelled ${planOf(org).name}. It stays active until ${org.currentPeriodEnd?.toISOString().slice(0, 10) ?? 'the end of the period'}.`], {
+    label: 'Open customer',
+    path: `/admin/orgs/${org.id}`,
+  });
+  return updated;
 }
 
 export async function resume(orgId: string) {

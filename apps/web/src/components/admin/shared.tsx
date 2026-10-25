@@ -1,7 +1,8 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Card, cx } from '@/components/ui';
+import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 
 /** Shared pieces of the NuronixAI platform console (/admin). */
@@ -30,6 +31,7 @@ export interface OrgRow {
   envelopesThisMonth: number;
   mrr: { currency: 'INR' | 'USD'; amount: number } | null;
   revenue: Money;
+  suspended: boolean;
 }
 
 export const PLAN_OPTIONS = [
@@ -169,3 +171,16 @@ export const FAILURE_REASONS: Record<string, string> = {
   bad_code: 'Wrong 2FA code',
   unknown: 'Other',
 };
+
+export type PlatformRole = 'owner' | 'admin' | 'viewer';
+
+/** The signed-in staff member's console role (null while loading or without access). */
+export function usePlatformRole(): PlatformRole | null {
+  const [role, setRole] = useState<PlatformRole | null>(null);
+  useEffect(() => {
+    api<{ role: PlatformRole }>('/admin/me')
+      .then((r) => setRole(r.role))
+      .catch(() => setRole(null));
+  }, []);
+  return role;
+}

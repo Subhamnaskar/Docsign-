@@ -37,6 +37,8 @@ export interface BillingProvider {
   change(subscriptionRef: string, change: SubscriptionChange): Promise<void>;
   cancel(subscriptionRef: string, atPeriodEnd: boolean): Promise<void>;
   resume(subscriptionRef: string): Promise<void>;
+  /** Refunds (part of) a charge we invoiced; `chargeRef` is the invoice's providerRef. Returns the refund id. */
+  refund(chargeRef: string, amount: number): Promise<string>;
 }
 
 const withParam = (url: string, kv: string) => `${url}${url.includes('?') ? '&' : '?'}${kv}`;
@@ -50,6 +52,9 @@ const sandbox: BillingProvider = {
   async change() {},
   async cancel() {},
   async resume() {},
+  async refund(chargeRef) {
+    return `sbx_refund_${chargeRef}_${Date.now()}`;
+  },
 };
 
 // --- Stripe -------------------------------------------------------------------
@@ -106,6 +111,13 @@ const stripeProvider: BillingProvider = {
   async resume(ref) {
     await stripe('POST', `/subscriptions/${ref}`, { cancel_at_period_end: 'false' });
   },
+  async refund(invoiceRef, amount) {
+    // Our providerRef for Stripe charges is the invoice id; refunds target its payment
+    const inv = await stripe<{ payment_intent?: string | null; charge?: string | null }>('GET', `/invoices/${invoiceRef}`);
+    const target: Record<string, string> | null = inv.payment_intent ? { payment_intent: inv.payment_intent } : inv.charge ? { charge: inv.charge } : null;
+    if (!target) throw new HttpError(400, 'Stripe has no payment for this invoice to refund.', 'billing_error');
+    return (await stripe<{ id: string }>('POST', '/refunds', { ...target, amount: String(amount) })).id;
+  },
 };
 
 // --- Razorpay -----------------------------------------------------------------
@@ -153,6 +165,9 @@ const razorpayProvider: BillingProvider = {
   },
   async resume() {
     throw new HttpError(400, 'Razorpay cannot undo a scheduled cancellation. Start a new subscription after it ends.', 'billing_unsupported');
+  },
+  async refund(paymentRef, amount) {
+    return (await razorpay<{ id: string }>('POST', `/payments/${paymentRef}/refund`, { amount })).id;
   },
 };
 

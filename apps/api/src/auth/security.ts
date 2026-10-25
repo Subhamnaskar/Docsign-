@@ -15,7 +15,7 @@ import { open, seal } from '../lib/secretbox.js';
 import { newRecoveryCodes, newTotpSecret, normalizeRecoveryCode, otpauthUri, verifyTotp } from '../lib/totp.js';
 import { parse } from '../lib/validate.js';
 import { ssoOrgForEmail } from '../sso/routes.js';
-import { consumeToken, issueToken, MFA_MAX_ATTEMPTS, peekToken, sendSecurityNotice, sendVerificationEmail } from './tokens.js';
+import { consumeToken, issueToken, MFA_MAX_ATTEMPTS, peekToken, sendPasswordReset, sendSecurityNotice, sendVerificationEmail } from './tokens.js';
 
 export const passwordSchema = z.string().min(10, 'Use at least 10 characters').max(200);
 const code = z.string().trim().min(6).max(20);
@@ -64,13 +64,7 @@ export async function securityRoutes(app: FastifyInstance) {
         });
         await sendMail({ to: email, subject: 'How to sign in', html, text });
       } else {
-        const token = await issueToken(user.id, 'RESET_PASSWORD');
-        const { html, text } = layout({
-          heading: 'Reset your password',
-          paragraphs: [`Hi ${user.name}, use the button below to choose a new password. The link expires in 1 hour.`, "If you didn't ask for this, you can ignore this email."],
-          button: { label: 'Choose a new password', url: `${config.appUrl}/reset-password/${token}` },
-        });
-        await sendMail({ to: email, subject: 'Reset your password', html, text });
+        await sendPasswordReset(user);
       }
     }
     return { ok: true };

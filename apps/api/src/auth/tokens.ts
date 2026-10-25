@@ -47,6 +47,16 @@ export async function sendVerificationEmail(user: Pick<User, 'id' | 'email' | 'n
   await sendMail({ to: user.email, subject: 'Confirm your email address', html, text });
 }
 
+export async function sendPasswordReset(user: Pick<User, 'id' | 'email' | 'name'>) {
+  const token = await issueToken(user.id, 'RESET_PASSWORD');
+  const { html, text } = layout({
+    heading: 'Reset your password',
+    paragraphs: [`Hi ${user.name}, use the button below to choose a new password. The link expires in 1 hour.`, "If you didn't ask for this, you can ignore this email."],
+    button: { label: 'Choose a new password', url: `${config.appUrl}/reset-password/${token}` },
+  });
+  await sendMail({ to: user.email, subject: 'Reset your password', html, text });
+}
+
 /** Security notices (password changed, two-factor turned on or off). */
 export async function sendSecurityNotice(user: Pick<User, 'email' | 'name'>, what: string) {
   const { html, text } = layout({

@@ -98,6 +98,7 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
         </div>
       </header>
       <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {me?.support && <SupportBanner me={me} wide={wide} />}
       {me && <AccountBanner me={me} wide={wide} />}
       {me && <BillingBanner me={me} wide={wide} />}
       <main className={cx('mx-auto px-4 py-6 sm:px-6 sm:py-8', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
@@ -105,6 +106,30 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
       </main>
     </MeContext.Provider>
     </AppLocaleContext.Provider>
+  );
+}
+
+/** Shown to NuronixAI staff while they view a customer's account read-only. */
+function SupportBanner({ me, wide }: { me: Me; wide?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  async function end() {
+    setBusy(true);
+    const { redirect } = await api<{ redirect: string }>('/auth/support/end', { method: 'POST' });
+    window.location.href = redirect;
+  }
+  const ends = me.support?.endsAt ? new Date(me.support.endsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : null;
+  return (
+    <div className="border-b border-ink bg-ink text-sm text-white">
+      <div className={cx('mx-auto flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:px-6', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
+        <span className="rounded bg-gold px-1.5 py-0.5 text-xs font-bold text-ink">Support session</span>
+        <span>
+          Viewing <strong>{me.organization.name}</strong> as {me.user?.email}, read-only{ends ? `, until ${ends}` : ''}.
+        </span>
+        <button onClick={end} disabled={busy} className="ml-auto rounded-full bg-white px-3 py-1 text-xs font-semibold text-ink hover:bg-brand-50 disabled:opacity-60">
+          End support session
+        </button>
+      </div>
+    </div>
   );
 }
 

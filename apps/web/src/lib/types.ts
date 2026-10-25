@@ -180,6 +180,8 @@ export interface Me {
     approvalPolicy?: 'off' | 'members' | 'all';
     approverIds?: string[];
   };
+  /** Read-only NuronixAI support session */
+  support?: { by: string; endsAt: string | null } | null;
   cell: string;
   features?: { ai: boolean; aadhaarEsign: string };
   billing?: {
