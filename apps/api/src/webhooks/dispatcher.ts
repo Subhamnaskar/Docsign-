@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma, type Tx } from '../db.js';
 import { hmacSha256Hex } from '../lib/crypto.js';
+import { chatBody, describeEvent } from './chat.js';
 
 export const WEBHOOK_EVENTS = [
   'envelope.sent',
@@ -50,20 +51,40 @@ export async function deliverPendingWebhooks(limit = 20): Promise<number> {
   return due.length;
 }
 
+/** Body and headers for an endpoint: signed JSON, or a Slack/Teams chat message. */
+type Payload = { data?: Record<string, unknown>; [key: string]: unknown };
+
+export async function renderDelivery(
+  endpoint: { format: string; secret: string },
+  id: string,
+  event: string,
+  payload: Payload,
+): Promise<{ body: string; headers: Record<string, string> }> {
+  if (endpoint.format === 'slack' || endpoint.format === 'teams') {
+    const body = JSON.stringify(chatBody(endpoint.format, await describeEvent(event, payload.data ?? {})));
+    return { body, headers: { 'Content-Type': 'application/json', 'User-Agent': 'DocSign-Webhooks/1.0' } };
+  }
+  const body = JSON.stringify({ id, ...payload });
+  return {
+    body,
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'DocSign-Webhooks/1.0',
+      'X-DocSign-Event': event,
+      'X-DocSign-Delivery': id,
+      'X-DocSign-Signature': signPayload(endpoint.secret, body),
+    },
+  };
+}
+
 async function deliverOne(d: Prisma.WebhookDeliveryGetPayload<{ include: { endpoint: true } }>) {
-  const body = JSON.stringify({ id: d.id, ...(d.payload as object) });
   let responseCode: number | null = null;
   let error: string | null = null;
   try {
+    const { body, headers } = await renderDelivery(d.endpoint, d.id, d.event, d.payload as Payload);
     const res = await fetch(d.endpoint.url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'DocSign-Webhooks/1.0',
-        'X-DocSign-Event': d.event,
-        'X-DocSign-Delivery': d.id,
-        'X-DocSign-Signature': signPayload(d.endpoint.secret, body),
-      },
+      headers,
       body,
       signal: AbortSignal.timeout(10_000),
     });

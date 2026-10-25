@@ -7,7 +7,7 @@ import { randomToken, sha256Hex } from '../lib/crypto.js';
 import { notFound } from '../lib/errors.js';
 import { parse } from '../lib/validate.js';
 import { listAdapters } from '../adapters/registry.js';
-import { signPayload, WEBHOOK_EVENTS } from '../webhooks/dispatcher.js';
+import { renderDelivery, WEBHOOK_EVENTS } from '../webhooks/dispatcher.js';
 import { assertFeature } from '../billing/plans.js';
 
 export async function developerRoutes(app: FastifyInstance) {
@@ -86,18 +86,9 @@ export async function developerRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const endpoint = await prisma.webhookEndpoint.findFirst({ where: { id, orgId: req.auth.orgId } });
     if (!endpoint) throw notFound('Webhook endpoint');
-    const body = JSON.stringify({ id: 'test', event: 'ping', createdAt: new Date().toISOString(), data: {} });
     try {
-      const res = await fetch(endpoint.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-DocSign-Event': 'ping',
-          'X-DocSign-Signature': signPayload(endpoint.secret, body),
-        },
-        body,
-        signal: AbortSignal.timeout(10_000),
-      });
+      const { body, headers } = await renderDelivery(endpoint, 'test', 'ping', { event: 'ping', createdAt: new Date().toISOString(), data: {} });
+      const res = await fetch(endpoint.url, { method: 'POST', headers, body, signal: AbortSignal.timeout(10_000) });
       return { ok: res.ok, status: res.status };
     } catch (err) {
       return { ok: false, error: (err as Error).message };

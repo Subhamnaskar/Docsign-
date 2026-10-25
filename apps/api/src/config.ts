@@ -65,6 +65,14 @@ export const config = {
     stripe: { secretKey: process.env.STRIPE_SECRET_KEY ?? '', webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '' },
     razorpay: { keyId: process.env.RAZORPAY_KEY_ID ?? '', keySecret: process.env.RAZORPAY_KEY_SECRET ?? '' },
   },
+  /** Cloud file pickers (public client identifiers; leave empty to hide a provider) */
+  cloud: {
+    googleClientId: process.env.GOOGLE_PICKER_CLIENT_ID ?? '',
+    googleApiKey: process.env.GOOGLE_PICKER_API_KEY ?? '',
+    googleAppId: process.env.GOOGLE_PICKER_APP_ID ?? '',
+    dropboxAppKey: process.env.DROPBOX_APP_KEY ?? '',
+    onedriveClientId: process.env.ONEDRIVE_CLIENT_ID ?? '',
+  },
   billing: {
     /** sandbox (built-in test checkout) | stripe | razorpay. Uses the Stripe/Razorpay keys above. */
     provider: env('BILLING_PROVIDER', 'sandbox') as 'sandbox' | 'stripe' | 'razorpay',

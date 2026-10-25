@@ -5,6 +5,7 @@ import { AppShell, useMe } from '@/components/AppShell';
 import { ActivityLog } from '@/components/settings/Activity';
 import { BillingSettings } from '@/components/settings/Billing';
 import { BrandingSettings } from '@/components/settings/Branding';
+import { IntegrationsSettings } from '@/components/settings/Integrations';
 import { SecuritySettings } from '@/components/settings/Security';
 import { SsoSettings } from '@/components/settings/Sso';
 import { Team } from '@/components/settings/Team';
@@ -26,6 +27,7 @@ interface WebhookEndpoint {
   url: string;
   secret: string;
   events: string[];
+  format?: string;
   active: boolean;
   createdAt: string;
   deliveries: { id: string; event: string; status: string; attempts: number; responseCode: number | null; lastError: string | null; createdAt: string }[];
@@ -232,7 +234,7 @@ function Webhooks() {
         </div>
       </form>
       <ul className="mt-4 space-y-3">
-        {data?.endpoints.map((ep) => (
+        {data?.endpoints.filter((ep) => !ep.format || ep.format === 'json').map((ep) => (
           <li key={ep.id} className="rounded-lg border border-gray-200 p-3 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <span className="min-w-0 flex-1 truncate font-medium">{ep.url}</span>
@@ -289,6 +291,7 @@ const TABS = [
   { id: 'billing', label: 'Billing', admin: true },
   { id: 'branding', label: 'Branding', admin: true },
   { id: 'sso', label: 'Single sign-on', admin: true },
+  { id: 'integrations', label: 'Integrations', admin: true },
   { id: 'developers', label: 'API & webhooks', admin: true },
   { id: 'activity', label: 'Activity', admin: true },
 ] as const;
@@ -341,6 +344,7 @@ function Settings() {
             <Webhooks />
           </>
         )}
+        {tab === 'integrations' && <IntegrationsSettings />}
         {tab === 'activity' && <ActivityLog />}
       </div>
     </>

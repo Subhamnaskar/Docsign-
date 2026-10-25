@@ -8,7 +8,7 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 
 | Area | Implemented |
 |---|---|
-| Documents | PDF upload, Office/ODT/RTF/TXT → PDF conversion (Gotenberg), import from a public share link (SSRF-safe), ClamAV malware scanning, SHA-256 fingerprint, multi-document envelopes |
+| Documents | PDF upload, Office/ODT/RTF/TXT → PDF conversion (Gotenberg), import from Google Drive, Dropbox and OneDrive pickers or any public share link (SSRF-safe), ClamAV malware scanning, SHA-256 fingerprint, multi-document envelopes |
 | Templates & forms | Templates with named roles, create-from-template, bulk send from CSV (100 rows per batch), public web forms (`/f/<slug>`) that create and route an agreement when someone fills them in |
 | Languages | Per-recipient language for emails and the signing page: English, Hindi, Spanish, French, German, Portuguese, Italian, Dutch, Arabic (RTL), Japanese |
 | Workflow | Sequential or parallel routing, signers + CC, reminders, expiry, void, decline, duplicate, correct a recipient after sending (old link stops working), signer-initiated reassign, folders, bulk ZIP download, CSV export |
@@ -24,7 +24,7 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 | Account security | Email verification before sending, password reset and change, TOTP two-factor authentication with recovery codes, organisation-wide 2FA requirement, signed-in device list with remote sign-out, security notification emails |
 | Teams & admin | Owner / admin / member roles (members see only their own agreements), invitations, OIDC single sign-on with optional enforcement, SCIM 2.0 user provisioning, branding (logo, colour, email footer), organisation activity log, reports dashboard |
 | AI (opt-in) | On the Claude API: document summaries for signers, contract review for senders, field detection, Q&A over an agreement. Off until an admin turns it on for the organisation |
-| API & integrations | REST API (`/api/v1`), API keys, HMAC-signed webhooks with retries, REST hooks (Zapier style), MCP server at `/api/v1/mcp` so AI assistants can look up, send (from templates), remind and void agreements |
+| API & integrations | REST API (`/api/v1`), API keys, HMAC-signed webhooks with retries, REST hooks (Zapier style), Slack and Microsoft Teams channel notifications, MCP server at `/api/v1/mcp` so AI assistants can look up, send (from templates), remind and void agreements |
 
 ## Sandbox vs production providers
 
@@ -39,6 +39,7 @@ Everything that depends on an outside contract ships with a working sandbox so t
 | Payments | Built-in test checkout at `/api/v1/dev/pay/...` | Stripe Checkout, Razorpay Payment Links | Stripe or Razorpay keys and webhook secret |
 | Subscriptions | Built-in test checkout at `/api/v1/dev/billing/...`; renewals run in the worker | Stripe Billing, Razorpay Subscriptions | Same keys plus `STRIPE_BILLING_WEBHOOK_SECRET` or `RAZORPAY_WEBHOOK_SECRET`; seller name, address and GSTIN for invoices |
 | Single sign-on | — | Any OIDC provider (Okta, Entra ID, Google) | An app registration at your identity provider |
+| Cloud pickers | Hidden until configured; share links always work | Google Picker, Dropbox Chooser, OneDrive picker | App credentials from each provider (see `.env.example`) |
 | AI | Off | Claude API | `ANTHROPIC_API_KEY`, and an admin opts the organisation in |
 
 The sandbox ESP and payment pages (`/api/v1/dev/*`) are only served while `ESIGN_MODE=sandbox` and `PAYMENT_PROVIDER=sandbox` respectively.

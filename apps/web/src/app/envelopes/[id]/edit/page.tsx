@@ -12,6 +12,7 @@ import { api, ApiError, upload } from '@/lib/api';
 import { FIELD_LABELS } from '@/lib/format';
 import { LANGUAGES } from '@/lib/i18n';
 import type { Envelope, Estamp, Field, Option } from '@/lib/types';
+import { type CloudConfig, type CloudPick, pickFromDropbox, pickFromGoogleDrive, pickFromOneDrive } from '@/lib/cloudPickers';
 
 const STEPS = ['Documents', 'Recipients', 'Fields', 'Review & send'] as const;
 
@@ -62,6 +63,49 @@ function Stepper({ step, onStep, maxStep }: { step: number; onStep: (s: number) 
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Buttons for the cloud pickers the server has credentials for. */
+function CloudImport({ envelopeId, onImported, onError }: { envelopeId: string; onImported: () => Promise<void>; onError: (m: string | null) => void }) {
+  const [cfg, setCfg] = useState<CloudConfig | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    api<CloudConfig>('/integrations/config').then(setCfg).catch(() => {});
+  }, []);
+  if (!cfg || (!cfg.google && !cfg.dropbox && !cfg.onedrive)) return null;
+
+  async function run(name: string, pick: () => Promise<CloudPick | null>) {
+    onError(null);
+    setBusy(name);
+    try {
+      const picked = await pick();
+      if (picked) {
+        await api(`/envelopes/${envelopeId}/documents/cloud`, { method: 'POST', json: picked });
+        await onImported();
+      }
+    } catch (err) {
+      onError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const providers = [
+    cfg.google && { name: 'Google Drive', pick: () => pickFromGoogleDrive(cfg.google!) },
+    cfg.dropbox && { name: 'Dropbox', pick: () => pickFromDropbox(cfg.dropbox!) },
+    cfg.onedrive && { name: 'OneDrive', pick: () => pickFromOneDrive(cfg.onedrive!) },
+  ].filter(Boolean) as { name: string; pick: () => Promise<CloudPick | null> }[];
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-gray-500">Import from</span>
+      {providers.map((p) => (
+        <Button key={p.name} size="sm" variant="secondary" loading={busy === p.name} disabled={busy !== null} onClick={() => run(p.name, p.pick)}>
+          {p.name}
+        </Button>
+      ))}
+    </div>
   );
 }
 
@@ -169,6 +213,7 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
               Import
             </Button>
           </form>
+          <CloudImport envelopeId={env.id} onImported={async () => onEnvelope(await api<Envelope>(`/envelopes/${env.id}`))} onError={setError} />
           <ul className="mt-4 space-y-2">
             {env.documents.map((d) => (
               <li key={d.id} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5">

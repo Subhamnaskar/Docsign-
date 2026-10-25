@@ -452,6 +452,8 @@ model WebhookEndpoint {
   secret     String
   // Empty = all events
   events     String[]
+  // json = signed JSON payload | slack / teams = chat message to an incoming-webhook URL
+  format     String            @default("json")
   active     Boolean           @default(true)
   createdAt  DateTime          @default(now())
   deliveries WebhookDelivery[]
