@@ -15,6 +15,8 @@ import { isSsoOnly, passwordSchema } from './security.js';
 import { issueToken, sendVerificationEmail } from './tokens.js';
 
 const password = passwordSchema;
+/** Languages the sender app is available in */
+const APP_LOCALES = ['en', 'hi'] as const;
 // Compared against when the user doesn't exist, so response timing doesn't reveal registered emails
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 12);
 
@@ -29,6 +31,7 @@ export async function authRoutes(app: FastifyInstance) {
         password,
         organizationName: z.string().trim().min(1).max(120),
         jurisdiction: z.string().refine((c) => c in JURISDICTIONS, 'Unknown jurisdiction').default('US'),
+        locale: z.enum(APP_LOCALES).default('en'),
       }),
       req.body,
     );
@@ -44,6 +47,7 @@ export async function authRoutes(app: FastifyInstance) {
         email: body.email,
         passwordHash: await bcrypt.hash(body.password, 12),
         role: 'OWNER',
+        locale: body.locale,
         org: {
           create: { name: body.organizationName, jurisdiction: body.jurisdiction, dataRegion: config.cellRegion },
         },
@@ -91,6 +95,7 @@ export async function authRoutes(app: FastifyInstance) {
         email: user.email,
         role: user.role,
         emailVerified: Boolean(user.emailVerifiedAt),
+        locale: user.locale,
         twoFactor: Boolean(user.totpEnabledAt),
         // The organisation requires two-factor and this password user hasn't set it up
         mfaSetupRequired: org.require2fa && !user.totpEnabledAt && !isSsoOnly(user),
@@ -111,6 +116,14 @@ export async function authRoutes(app: FastifyInstance) {
       features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode },
       billing: billingBrief(org),
     };
+  });
+
+  /** The signed-in user's name and app language. */
+  app.patch('/auth/profile', { preHandler: requireAuth }, async (req) => {
+    const body = parse(z.object({ name: z.string().trim().min(1).max(120).optional(), locale: z.enum(APP_LOCALES).optional() }), req.body);
+    if (!req.auth.userId) throw forbidden('Sign in as a user to change your profile.');
+    const user = await prisma.user.update({ where: { id: req.auth.userId }, data: body });
+    return { name: user.name, locale: user.locale };
   });
 
   app.patch('/organization', { preHandler: [requireAuth, requireRole('OWNER', 'ADMIN')] }, async (req) => {

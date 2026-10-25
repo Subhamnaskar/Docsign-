@@ -13,8 +13,9 @@ import { FIELD_LABELS } from '@/lib/format';
 import { LANGUAGES } from '@/lib/i18n';
 import type { IdCheck, Envelope, Estamp, Field, Option } from '@/lib/types';
 import { type CloudConfig, type CloudPick, pickFromDropbox, pickFromGoogleDrive, pickFromOneDrive } from '@/lib/cloudPickers';
+import { useAppT } from '@/lib/appI18n';
 
-const STEPS = ['Documents', 'Recipients', 'Fields', 'Review & send'] as const;
+const STEPS = ['builder.documents', 'builder.recipients', 'builder.fields', 'builder.review'] as const;
 
 interface Options {
   jurisdictions: Option[];
@@ -49,10 +50,11 @@ let keySeq = 0;
 const newKey = () => `r${keySeq++}`;
 
 function Stepper({ step, onStep, maxStep }: { step: number; onStep: (s: number) => void; maxStep: number }) {
+  const t = useAppT();
   return (
     <ol className="flex flex-wrap items-center gap-2 text-sm">
       {STEPS.map((label, i) => (
-        <li key={label} className="flex items-center gap-2">
+        <li key={t(label)} className="flex items-center gap-2">
           <button
             disabled={i > maxStep}
             onClick={() => onStep(i)}
@@ -62,7 +64,7 @@ function Stepper({ step, onStep, maxStep }: { step: number; onStep: (s: number) 
             )}
           >
             <span className={cx('flex h-5 w-5 items-center justify-center rounded-full text-xs', i === step ? 'bg-white/20' : 'bg-gray-100')}>{i + 1}</span>
-            {label}
+            {t(label)}
           </button>
           {i < STEPS.length - 1 && <span className="hidden h-px w-6 bg-gray-300 sm:block" />}
         </li>

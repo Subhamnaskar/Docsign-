@@ -6,6 +6,7 @@ import { brand } from '@/lib/brand';
 import type { EnvelopeStatus, RecipientStatus } from '@/lib/types';
 
 import { cx } from '@/lib/cx';
+import { type AppKey, useAppT } from '@/lib/appI18n';
 export { cx };
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -133,7 +134,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function StatusBadge({ status, recipient }: { status: EnvelopeStatus | RecipientStatus; recipient?: boolean }) {
-  const label = recipient && status === 'SENT' ? 'Sent' : STATUS_LABELS[status];
+  const t = useAppT();
+  const label = recipient && status === 'SENT' ? t('status.recipientSent') : STATUS_LABELS[status] ? t(`status.${status}` as AppKey) : status;
   return <span className={cx('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[status])}>{label}</span>;
 }
 

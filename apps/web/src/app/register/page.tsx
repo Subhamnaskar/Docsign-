@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { AuthCard } from '@/components/AuthCard';
 import { Alert, Button, Input, Label, Select } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
+import { APP_LANGUAGES, useStoredLocale } from '@/lib/appI18n';
 
 const JURISDICTIONS = [
   { code: 'US', name: 'United States' },
@@ -17,6 +18,7 @@ const JURISDICTIONS = [
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: '', email: '', password: '', organizationName: '', jurisdiction: 'US' });
+  const [locale, setLocale] = useStoredLocale();
   const [error, setError] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +31,7 @@ export default function RegisterPage() {
     setError(null);
     setProblems([]);
     try {
-      await api('/auth/register', { method: 'POST', json: form });
+      await api('/auth/register', { method: 'POST', json: { ...form, locale } });
       router.replace('/dashboard');
     } catch (err) {
       setError((err as Error).message);
@@ -75,6 +77,14 @@ export default function RegisterPage() {
             Password
           </Label>
           <Input id="password" type="password" required minLength={10} autoComplete="new-password" value={form.password} onChange={set('password')} />
+        </div>
+        <div>
+          <Label htmlFor="reg-lang">Language / भाषा</Label>
+          <Select id="reg-lang" value={locale} onChange={(e) => setLocale(e.target.value)}>
+            {APP_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>{l.name}</option>
+            ))}
+          </Select>
         </div>
         <div>
           <Label htmlFor="org">Organization</Label>

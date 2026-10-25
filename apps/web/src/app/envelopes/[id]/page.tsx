@@ -13,6 +13,7 @@ import { AUDIT_LABELS, formatDate } from '@/lib/format';
 import type { AuditEvent, Envelope, Recipient } from '@/lib/types';
 import { KycResults } from '@/components/KycResults';
 import { ApprovalBanner, ContractTerms, ReviseButton, SenderComments } from '@/components/Negotiation';
+import { useAppT } from '@/lib/appI18n';
 
 interface AuditResponse {
   chain: { valid: boolean; count: number; headHash: string; brokenAtSeq?: number };
@@ -69,6 +70,7 @@ function RecipientRow({ r, sequential, onCorrect, onHost }: { r: Recipient; sequ
 
 function Detail() {
   const me = useMe();
+  const t = useAppT();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const params = useSearchParams();
@@ -128,7 +130,7 @@ function Detail() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800">
-            ← Agreements
+            {t('env.back')}
           </Link>
           <h1 className="mt-1 truncate text-2xl font-semibold">{env.title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-500">
@@ -142,10 +144,10 @@ function Detail() {
           {env.status === 'SENT' && (
             <>
               <Button variant="secondary" loading={busy === 'remind'} onClick={() => action('remind', () => api(`/envelopes/${id}/remind`, { method: 'POST' }), 'Reminders sent.')}>
-                Send reminder
+                {t('env.remind')}
               </Button>
               <Button variant="secondary" className="text-red-600" onClick={() => setVoidOpen(true)}>
-                Void
+                {t('env.void')}
               </Button>
             </>
           )}
@@ -159,10 +161,10 @@ function Detail() {
               })
             }
           >
-            Duplicate
+            {t('env.duplicate')}
           </Button>
           <Button variant="secondary" onClick={() => setTemplateOpen(true)}>
-            Save as template
+            {t('env.saveTemplate')}
           </Button>
         </div>
       </div>
@@ -189,7 +191,7 @@ function Detail() {
         <div className="space-y-6">
           <Card className="p-5">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Recipients</h2>
+              <h2 className="font-semibold">{t('env.recipients')}</h2>
               <span className="text-sm text-gray-500">
                 {signed} of {signers.length} signed
               </span>
@@ -230,7 +232,7 @@ function Detail() {
           <KycResults envelopeId={env.id} recipients={env.recipients} />
 
           <Card className="p-5">
-            <h2 className="font-semibold">Documents</h2>
+            <h2 className="font-semibold">{t('env.documents')}</h2>
             <ul className="mt-3 space-y-2">
               {env.documents.map((d) => (
                 <li key={d.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5">
@@ -275,7 +277,7 @@ function Detail() {
 
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold">Audit trail</h2>
+              <h2 className="font-semibold">{t('env.audit')}</h2>
               <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium', audit.chain.valid ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>
                 {audit.chain.valid ? `✓ Hash chain intact (${audit.chain.count} events)` : `✗ Chain broken at event #${audit.chain.brokenAtSeq}`}
               </span>

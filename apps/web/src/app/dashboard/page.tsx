@@ -9,6 +9,7 @@ import { api, fileUrl } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
 import type { Envelope, EnvelopeStatus, EnvelopeSummary } from '@/lib/types';
 import { OnboardingChecklist } from '@/components/Onboarding';
+import { type AppKey, useAppT } from '@/lib/appI18n';
 
 const FILTERS: { label: string; status?: EnvelopeStatus }[] = [
   { label: 'All' },
@@ -95,6 +96,7 @@ function Folders({ folders, active, onSelect, onChange }: { folders: Folder[]; a
 function Dashboard() {
   const router = useRouter();
   const me = useMe();
+  const t = useAppT();
   const isAdmin = me?.user?.role !== 'MEMBER';
   const [stats, setStats] = useState<{ counts: Partial<Record<EnvelopeStatus, number>>; awaitingMe: number } | null>(null);
   const [items, setItems] = useState<EnvelopeSummary[] | null>(null);
@@ -186,24 +188,24 @@ function Dashboard() {
       <OnboardingChecklist />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Agreements</h1>
-          <p className="text-sm text-gray-500">Send documents for signature and track their progress.</p>
+          <h1 className="text-2xl font-semibold text-gray-900">{t('dash.title')}</h1>
+          <p className="text-sm text-gray-500">{t('dash.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <a href={fileUrl(`/envelopes/export.csv${filter ? `?status=${filter}` : ''}`)} className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50">
-            Export CSV
+            {t('dash.export')}
           </a>
           <Button onClick={createEnvelope} loading={creating}>
-            + New agreement
+            {t('dash.new')}
           </Button>
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Awaiting others" value={c.SENT ?? 0} tone="text-blue-700" />
-        <Stat label="Completed" value={c.COMPLETED ?? 0} tone="text-green-700" />
-        <Stat label="Drafts" value={c.DRAFT ?? 0} tone="text-gray-900" />
-        <Stat label="Declined / expired" value={(c.DECLINED ?? 0) + (c.EXPIRED ?? 0)} tone="text-red-700" />
+        <Stat label={t('dash.awaitingOthers')} value={c.SENT ?? 0} tone="text-blue-700" />
+        <Stat label={t('dash.completed')} value={c.COMPLETED ?? 0} tone="text-green-700" />
+        <Stat label={t('dash.drafts')} value={c.DRAFT ?? 0} tone="text-gray-900" />
+        <Stat label={t('dash.declinedExpired')} value={(c.DECLINED ?? 0) + (c.EXPIRED ?? 0)} tone="text-red-700" />
       </div>
 
       {error && (
@@ -225,32 +227,32 @@ function Dashboard() {
                   onClick={() => setFilter(f.status)}
                   className={cx('rounded-md px-3 py-1.5 text-sm font-medium', filter === f.status ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50')}
                 >
-                  {f.label}
+                  {f.status ? t(`status.${f.status}` as AppKey) : t('dash.filterAll')}
                 </button>
               ))}
             </div>
             {isAdmin && (
               <label className="flex items-center gap-1.5 text-sm text-gray-600">
-                <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Sent by me
+                <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> {t('dash.sentByMe')}
               </label>
             )}
             {me?.organization.approvalPolicy && me.organization.approvalPolicy !== 'off' && (
               <label className="flex items-center gap-1.5 text-sm text-gray-600">
-                <input type="checkbox" checked={awaitingApproval} onChange={(e) => setAwaitingApproval(e.target.checked)} /> Awaiting approval
+                <input type="checkbox" checked={awaitingApproval} onChange={(e) => setAwaitingApproval(e.target.checked)} /> {t('dash.awaitingApproval')}
               </label>
             )}
-            <Input className="ml-auto max-w-xs" placeholder="Search title or recipient" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input className="ml-auto max-w-xs" placeholder={t('dash.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           {selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 bg-brand-50/50 px-4 py-2 text-sm">
-              <span className="font-medium">{selected.size} selected</span>
+              <span className="font-medium">{t('dash.selected', { n: selected.size })}</span>
               <Button size="sm" variant="secondary" loading={downloading} disabled={selectedCompleted === 0} onClick={download} title="Completed agreements only">
-                Download {selectedCompleted > 0 ? selectedCompleted : ''} signed
+                {t('dash.downloadSigned')}{selectedCompleted > 0 ? ` (${selectedCompleted})` : ''}
               </Button>
               <Select className="w-44" value="" onChange={(e) => e.target.value !== '' && moveTo(e.target.value === '__none' ? '' : e.target.value)} aria-label="Move to folder">
-                <option value="">Move to folder…</option>
-                <option value="__none">Remove from folder</option>
+                <option value="">{t('dash.moveToFolder')}</option>
+                <option value="__none">{t('dash.removeFromFolder')}</option>
                 {folders.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name}
@@ -258,7 +260,7 @@ function Dashboard() {
                 ))}
               </Select>
               <button className="ml-auto text-gray-500 hover:text-gray-800" onClick={() => setSelected(new Set())}>
-                Clear
+                {t('dash.clear')}
               </button>
             </div>
           )}
@@ -268,8 +270,8 @@ function Dashboard() {
               <Spinner />
             </div>
           ) : items.length === 0 ? (
-            <EmptyState title={filter || search || folder ? 'No matching agreements' : 'No agreements yet'}>
-              {!filter && !search && !folder && 'Create your first agreement to send it for signature.'}
+            <EmptyState title={filter || search || folder ? t('dash.noMatching') : t('dash.noneYet')}>
+              {!filter && !search && !folder && t('dash.createFirst')}
             </EmptyState>
           ) : (
             <ul className="divide-y divide-gray-100">
@@ -283,11 +285,11 @@ function Dashboard() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium text-gray-900">
                           {e.title}
-                          {e.testMode && <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-amber-800">Test</span>}
+                          {e.testMode && <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-amber-800">{t('dash.test')}</span>}
                         </div>
                         <div className="truncate text-sm text-gray-500">
-                          {signers.length ? `To: ${signers.map((r) => r.name).join(', ')}` : 'No recipients yet'}
-                          {isAdmin && e.sender && <span className="text-gray-400"> · from {e.sender}</span>}
+                          {signers.length ? t('dash.to', { names: signers.map((r) => r.name).join(', ') }) : t('dash.noRecipients')}
+                          {isAdmin && e.sender && <span className="text-gray-400"> · {t('dash.from', { name: e.sender })}</span>}
                           {e.folder && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{e.folder.name}</span>}
                         </div>
                       </div>
@@ -297,13 +299,13 @@ function Dashboard() {
                             <div className="h-full rounded-full bg-brand-500" style={{ width: `${(signed / signers.length) * 100}%` }} />
                           </div>
                           <div className="mt-1 text-xs text-gray-500">
-                            {signed} of {signers.length} signed
+                            {t('dash.signedOf', { signed, total: signers.length })}
                           </div>
                         </div>
                       )}
                       <span className="w-10 text-xs font-medium text-gray-400">{e.jurisdiction}</span>
                       {e.status === 'DRAFT' && e.approvalStatus === 'PENDING' ? (
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Awaiting approval</span>
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">{t('dash.awaitingApproval')}</span>
                       ) : (
                         <StatusBadge status={e.status} />
                       )}

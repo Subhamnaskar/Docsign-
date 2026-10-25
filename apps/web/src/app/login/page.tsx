@@ -6,9 +6,12 @@ import { Suspense, useState } from 'react';
 import { AuthCard } from '@/components/AuthCard';
 import { Alert, Button, Input, Label } from '@/components/ui';
 import { api } from '@/lib/api';
+import { APP_LANGUAGES, type AppKey, appT, useStoredLocale } from '@/lib/appI18n';
 
 function LoginForm() {
   const router = useRouter();
+  const [locale, setLocale] = useStoredLocale();
+  const t = (key: AppKey) => appT(locale, key);
   const params = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -117,13 +120,20 @@ function LoginForm() {
 
   return (
     <AuthCard
-      title="Sign in"
+      title={t('auth.signIn')}
       subtitle={
         <>
-          New here?{' '}
+          {t('auth.newHere')}{' '}
           <Link href="/register" className="font-medium text-brand-600 hover:underline">
-            Create an account
+            {t('auth.createAccount')}
           </Link>
+          <span className="float-right">
+            <select aria-label="Language" value={locale} onChange={(e) => setLocale(e.target.value)} className="rounded border border-gray-200 bg-white px-1 py-0.5 text-xs text-gray-600">
+              {APP_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>{l.name}</option>
+              ))}
+            </select>
+          </span>
         </>
       }
     >
@@ -131,25 +141,25 @@ function LoginForm() {
         {ssoError && SSO_MESSAGES[ssoError] && <Alert>{SSO_MESSAGES[ssoError]}</Alert>}
         {error && <Alert>{error}</Alert>}
         <div>
-          <Label htmlFor="email">{ssoMode ? 'Work email' : 'Email'}</Label>
+          <Label htmlFor="email">{ssoMode ? t('auth.workEmail') : t('auth.email')}</Label>
           <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         {!ssoMode && (
           <div>
             <div className="flex items-baseline justify-between">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <Link href="/forgot-password" className="text-xs font-medium text-brand-600 hover:underline">
-                Forgot password?
+                {t('auth.forgot')}
               </Link>
             </div>
             <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
         )}
         <Button type="submit" className="w-full" loading={loading}>
-          {ssoMode ? 'Continue with SSO' : 'Sign in'}
+          {ssoMode ? t('auth.continueSso') : t('auth.signIn')}
         </Button>
         <button type="button" onClick={() => setSsoMode((m) => !m)} className="w-full text-sm text-gray-500 hover:text-gray-800">
-          {ssoMode ? 'Sign in with a password instead' : 'Sign in with SSO'}
+          {ssoMode ? t('auth.withPassword') : t('auth.withSso')}
         </button>
       </form>
     </AuthCard>

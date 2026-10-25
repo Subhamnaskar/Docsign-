@@ -149,6 +149,15 @@ describe('two-factor authentication', () => {
   });
 });
 
+describe('profile', () => {
+  it('stores the app language and name', async () => {
+    const { c } = await registerSender(app);
+    expect((await c.call('PATCH', '/auth/profile', { json: { locale: 'fr' } })).statusCode).toBe(400);
+    await c.json('PATCH', '/auth/profile', { json: { locale: 'hi', name: 'Sam S.' } });
+    expect((await c.json('GET', '/auth/me')).user).toMatchObject({ locale: 'hi', name: 'Sam S.' });
+  });
+});
+
 describe('Office add-in sessions', () => {
   it('issues a session token that works in a header where cookies are unavailable', async () => {
     const { c } = await registerSender(app);

@@ -7,17 +7,18 @@ import { api, ApiError } from '@/lib/api';
 import type { Me } from '@/lib/types';
 import { cx, Logo, PageLoader } from './ui';
 import { HelpPanel } from './HelpPanel';
+import { AppLocaleContext, type AppKey, appT } from '@/lib/appI18n';
 
 const MeContext = createContext<Me | null>(null);
 export const useMe = () => useContext(MeContext);
 
-const NAV = [
-  { href: '/dashboard', label: 'Agreements' },
-  { href: '/templates', label: 'Templates' },
-  { href: '/repository', label: 'Repository' },
-  { href: '/reports', label: 'Reports' },
-  { href: '/verify', label: 'Verify' },
-  { href: '/settings', label: 'Settings' },
+const NAV: { href: string; label: AppKey }[] = [
+  { href: '/dashboard', label: 'nav.agreements' },
+  { href: '/templates', label: 'nav.templates' },
+  { href: '/repository', label: 'nav.repository' },
+  { href: '/reports', label: 'nav.reports' },
+  { href: '/verify', label: 'nav.verify' },
+  { href: '/settings', label: 'nav.settings' },
 ];
 
 /** Layout for signed-in pages; redirects to /login when the session is missing. */
@@ -44,7 +45,14 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
     router.replace('/login');
   }
 
+  const locale = me?.user?.locale ?? 'en';
+  const t = (key: AppKey, vars?: Record<string, string | number>) => appT(locale, key, vars);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   return (
+    <AppLocaleContext.Provider value={locale}>
     <MeContext.Provider value={me}>
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur">
         <div className={cx('mx-auto flex h-14 items-center gap-6 px-4 sm:px-6', wide ? 'max-w-[1400px]' : 'max-w-6xl')}>
@@ -61,7 +69,7 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
                   pathname.startsWith(n.href) ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:text-gray-900',
                 )}
               >
-                {n.label}
+                {t(n.label)}
               </Link>
             ))}
           </nav>
@@ -73,10 +81,10 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
               </span>
             )}
             <button onClick={() => setHelpOpen(true)} className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
-              Help
+              {t('nav.help')}
             </button>
             <button onClick={logout} className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
-              Sign out
+              {t('nav.signOut')}
             </button>
           </div>
         </div>
@@ -88,6 +96,7 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
         {me ? children : <PageLoader />}
       </main>
     </MeContext.Provider>
+    </AppLocaleContext.Provider>
   );
 }
 
@@ -100,11 +109,12 @@ function BillingBanner({ me, wide }: { me: Me; wide?: boolean }) {
   const admin = !me.user || me.user.role === 'OWNER' || me.user.role === 'ADMIN';
   let text: string | null = null;
   let urgent = false;
+  const t = (key: AppKey, vars?: Record<string, string | number>) => appT(me.user?.locale ?? 'en', key, vars);
   if (b.state === 'trialing' && b.trialEndsAt) {
     const days = Math.max(0, Math.ceil((new Date(b.trialEndsAt).getTime() - Date.now()) / 86_400_000));
-    if (days <= TRIAL_WARN_DAYS) text = `Your free trial ends in ${days} day${days === 1 ? '' : 's'}.`;
+    if (days <= TRIAL_WARN_DAYS) text = t('banner.trialEnds', { days });
   } else if (b.state === 'past_due') {
-    text = 'Your last payment failed. Update your payment method to avoid interruption.';
+    text = t('banner.paymentFailed');
   } else if (!b.canSend) {
     text = b.blockedReason;
     urgent = true;
@@ -116,10 +126,10 @@ function BillingBanner({ me, wide }: { me: Me; wide?: boolean }) {
         <span>{text}</span>
         {admin ? (
           <Link href="/settings?tab=billing" className="font-semibold underline">
-            {b.state === 'past_due' ? 'Go to billing' : 'Choose a plan'}
+            {b.state === 'past_due' ? t('banner.goToBilling') : t('banner.choosePlan')}
           </Link>
         ) : (
-          <span>Ask an admin to choose a plan.</span>
+          <span>{t('banner.askAdmin')}</span>
         )}
       </div>
     </div>
@@ -131,11 +141,12 @@ function AccountBanner({ me, wide }: { me: Me; wide?: boolean }) {
   const [resent, setResent] = useState(false);
   const u = me.user;
   if (!u) return null;
+  const t = (key: AppKey, vars?: Record<string, string | number>) => appT(u.locale ?? 'en', key, vars);
   const width = wide ? 'max-w-[1400px]' : 'max-w-6xl';
   if (u.mfaSetupRequired) {
     return (
       <div className="border-b border-amber-200 bg-amber-50 text-sm text-amber-900">
-        <div className={cx('mx-auto px-4 py-2 sm:px-6', width)}>Your organisation requires two-factor authentication. Set it up below to continue.</div>
+        <div className={cx('mx-auto px-4 py-2 sm:px-6', width)}>{t('banner.mfaRequired')}</div>
       </div>
     );
   }
@@ -143,14 +154,12 @@ function AccountBanner({ me, wide }: { me: Me; wide?: boolean }) {
   return (
     <div className="border-b border-brand-100 bg-brand-50 text-sm text-brand-800">
       <div className={cx('mx-auto flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:px-6', width)}>
-        <span>
-          Confirm your email address to start sending. We sent a link to <strong>{u.email}</strong>.
-        </span>
+        <span>{t('banner.confirmEmail', { email: u.email })}</span>
         {resent ? (
-          <span className="font-medium">Sent. Check your inbox.</span>
+          <span className="font-medium">{t('banner.resent')}</span>
         ) : (
           <button className="font-semibold underline" onClick={() => api('/auth/verify-email/resend', { method: 'POST' }).then(() => setResent(true))}>
-            Resend email
+            {t('banner.resend')}
           </button>
         )}
       </div>

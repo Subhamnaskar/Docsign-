@@ -15,6 +15,7 @@ import { formatDate, relativeTime } from '@/lib/format';
 import type { Option } from '@/lib/types';
 import { DepartmentsSettings } from '@/components/settings/Departments';
 import { GovernanceSettings } from '@/components/settings/Governance';
+import { APP_LANGUAGES, type AppKey, useAppT } from '@/lib/appI18n';
 
 interface ApiKey {
   id: string;
@@ -336,21 +337,23 @@ function Webhooks() {
 }
 
 const TABS = [
-  { id: 'organization', label: 'Organization', admin: true },
-  { id: 'security', label: 'Security', admin: false },
-  { id: 'team', label: 'Team', admin: false },
-  { id: 'billing', label: 'Billing', admin: true },
-  { id: 'branding', label: 'Branding', admin: true },
-  { id: 'sso', label: 'Single sign-on', admin: true },
-  { id: 'departments', label: 'Departments', admin: true },
-  { id: 'integrations', label: 'Integrations', admin: true },
-  { id: 'governance', label: 'Governance', admin: true },
-  { id: 'developers', label: 'API & webhooks', admin: true },
-  { id: 'activity', label: 'Activity', admin: true },
+  { id: 'organization', label: 'tab.organization' as AppKey, admin: true },
+  { id: 'security', label: 'tab.security' as AppKey, admin: false },
+  { id: 'team', label: 'tab.team' as AppKey, admin: false },
+  { id: 'billing', label: 'tab.billing' as AppKey, admin: true },
+  { id: 'branding', label: 'tab.branding' as AppKey, admin: true },
+  { id: 'sso', label: 'tab.sso' as AppKey, admin: true },
+  { id: 'departments', label: 'tab.departments' as AppKey, admin: true },
+  { id: 'integrations', label: 'tab.integrations' as AppKey, admin: true },
+  { id: 'governance', label: 'tab.governance' as AppKey, admin: true },
+  { id: 'developers', label: 'tab.developers' as AppKey, admin: true },
+  { id: 'activity', label: 'tab.activity' as AppKey, admin: true },
 ] as const;
 
 function Settings() {
   const me = useMe();
+  const tr = useAppT();
+  const t = tr;
   const admin = me?.user?.role === 'OWNER' || me?.user?.role === 'ADMIN' || !me?.user;
   const tabs = TABS.filter((t) => admin || !t.admin);
   const [tab, setTab] = useState<string>(me?.user?.mfaSetupRequired ? 'security' : tabs[0].id);
@@ -362,7 +365,7 @@ function Settings() {
   }, []);
   return (
     <>
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <h1 className="text-2xl font-semibold">{t('settings.title')}</h1>
       <div className="mt-4 flex flex-wrap gap-1 border-b border-gray-200">
         {tabs.map((t) => (
           <button
@@ -373,12 +376,13 @@ function Settings() {
               tab === t.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800',
             )}
           >
-            {t.label}
+            {tr(t.label)}
           </button>
         ))}
       </div>
       <div className="mt-6 space-y-6">
         {tab === 'organization' && <Organization />}
+        {tab === 'security' && <ProfileCard />}
         {tab === 'security' && (
           <SecuritySettings
             onTwoFactorChange={() => {
@@ -403,6 +407,49 @@ function Settings() {
         {tab === 'activity' && <ActivityLog />}
       </div>
     </>
+  );
+}
+
+/** Name and app language for the signed-in user. */
+function ProfileCard() {
+  const me = useMe();
+  const t = useAppT();
+  const [name, setName] = useState(me?.user?.name ?? '');
+  const [locale, setLocale] = useState(me?.user?.locale ?? 'en');
+  const [error, setError] = useState<string | null>(null);
+  if (!me?.user) return null;
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api('/auth/profile', { method: 'PATCH', json: { name, locale } });
+      // The whole app switches language
+      window.location.reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold">{t('profile.title')}</h2>
+      {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+      <form onSubmit={save} className="mt-4 grid gap-3 sm:grid-cols-[1fr_220px_auto] sm:items-end">
+        <div>
+          <Label htmlFor="pf-name">{t('profile.name')}</Label>
+          <Input id="pf-name" value={name} onChange={(e) => setName(e.target.value)} required />
+        </div>
+        <div>
+          <Label htmlFor="pf-lang">{t('profile.language')}</Label>
+          <Select id="pf-lang" value={locale} onChange={(e) => setLocale(e.target.value)}>
+            {APP_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>{l.name}</option>
+            ))}
+          </Select>
+        </div>
+        <Button type="submit" variant="secondary">{t('common.save')}</Button>
+      </form>
+      <p className="mt-2 text-xs text-gray-500">{t('profile.languageHint')}</p>
+    </Card>
   );
 }
 
