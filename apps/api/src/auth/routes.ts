@@ -131,7 +131,7 @@ export async function authRoutes(app: FastifyInstance) {
       z.object({
         name: z.string().trim().min(1).max(120).optional(),
         jurisdiction: z.string().refine((c) => c in JURISDICTIONS, 'Unknown jurisdiction').optional(),
-        brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #4f46e5').nullable().optional(),
+        brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #9a6f08').nullable().optional(),
         aiEnabled: z.boolean().optional(),
         require2fa: z.boolean().optional(),
         approvalPolicy: z.enum(['off', 'members', 'all']).optional(),

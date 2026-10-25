@@ -34,7 +34,7 @@ export default function ResetPasswordPage() {
     return (
       <AuthCard title="Password changed">
         <p className="text-sm text-gray-600">You have been signed out on every device. Sign in with your new password.</p>
-        <Link href="/login" className="mt-5 block rounded-lg bg-brand-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700">
+        <Link href="/login" className="mt-5 block rounded-lg bg-gold px-4 py-2.5 text-center text-sm font-bold text-ink hover:brightness-105">
           Sign in
         </Link>
       </AuthCard>

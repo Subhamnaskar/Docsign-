@@ -23,7 +23,7 @@ export default function PartnersPage() {
         title="Grow with us"
         intro="We reach new markets through partners: licensed trust providers, identity services, integrators and resellers who know their region."
       >
-        <Link href="/contact?interest=partnership" className="rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700">
+        <Link href="/contact?interest=partnership" className="rounded-full bg-gold px-6 py-3 text-sm font-bold text-ink shadow-md hover:brightness-105">
           Become a partner
         </Link>
       </PageHero>

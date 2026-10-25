@@ -60,7 +60,7 @@ function Stepper({ step, onStep, maxStep }: { step: number; onStep: (s: number) 
             onClick={() => onStep(i)}
             className={cx(
               'flex items-center gap-2 rounded-full px-3 py-1.5 font-medium',
-              i === step ? 'bg-brand-600 text-white' : i <= maxStep ? 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50' : 'text-gray-400',
+              i === step ? 'bg-gold text-ink font-semibold' : i <= maxStep ? 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50' : 'text-gray-400',
             )}
           >
             <span className={cx('flex h-5 w-5 items-center justify-center rounded-full text-xs', i === step ? 'bg-white/20' : 'bg-gray-100')}>{i + 1}</span>

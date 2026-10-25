@@ -10,7 +10,7 @@ interface Branding {
   logoUrl: string | null;
 }
 
-const DEFAULT_COLOR = '#4f46e5';
+const DEFAULT_COLOR = '#9a6f08';
 
 /** Logo and colour shown to signers in emails and on the signing page. */
 export function BrandingSettings() {

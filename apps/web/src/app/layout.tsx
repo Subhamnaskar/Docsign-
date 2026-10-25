@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: brand.name, statusBarStyle: 'default' },
 };
 
-export const viewport: Viewport = { themeColor: '#4f46e5' };
+export const viewport: Viewport = { themeColor: '#c9932e' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

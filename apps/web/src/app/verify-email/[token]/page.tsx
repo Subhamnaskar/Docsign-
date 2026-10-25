@@ -29,7 +29,7 @@ export default function VerifyEmailPage() {
   return (
     <AuthCard title={state === 'done' ? 'Email confirmed' : 'Link not valid'}>
       {state === 'done' ? <p className="text-sm text-gray-600">Thanks. You can now send agreements.</p> : <Alert>{message}</Alert>}
-      <Link href="/dashboard" className="mt-5 block rounded-lg bg-brand-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700">
+      <Link href="/dashboard" className="mt-5 block rounded-lg bg-gold px-4 py-2.5 text-center text-sm font-bold text-ink hover:brightness-105">
         Go to your agreements
       </Link>
     </AuthCard>

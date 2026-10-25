@@ -103,7 +103,7 @@ export async function paymentRoutes(app: FastifyInstance) {
 <main style="background:#fff;border-radius:16px;padding:28px;max-width:360px;width:100%;box-shadow:0 1px 3px #0001">
 <p style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 10px;font-size:13px">SANDBOX checkout: no money moves.</p>
 <h1 style="font-size:28px;margin:12px 0">${formatAmount(payment.amount, payment.currency)}</h1>
-<form method="POST" action="${config.appUrl}/api/v1/dev/pay/${id}"><button name="outcome" value="pay" style="width:100%;padding:12px;border:0;border-radius:8px;background:#4f46e5;color:#fff;font-weight:600;font-size:15px">Pay (test)</button>
+<form method="POST" action="${config.appUrl}/api/v1/dev/pay/${id}"><button name="outcome" value="pay" style="width:100%;padding:12px;border:0;border-radius:8px;background:#9a6f08;color:#fff;font-weight:600;font-size:15px">Pay (test)</button>
 <button name="outcome" value="cancel" style="width:100%;margin-top:8px;padding:10px;border:1px solid #d1d5db;border-radius:8px;background:#fff">Cancel</button></form></main></body></html>`;
   });
 

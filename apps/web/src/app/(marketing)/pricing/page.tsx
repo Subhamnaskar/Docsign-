@@ -46,7 +46,7 @@ export default async function PricingPage() {
               {apiPricing.note}
             </p>
           </div>
-          <Link href="/contact?interest=api" className="shrink-0 rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800">
+          <Link href="/contact?interest=api" className="shrink-0 rounded-full bg-ink px-6 py-3 text-sm font-bold text-white hover:bg-black">
             Get API pricing
           </Link>
         </div>

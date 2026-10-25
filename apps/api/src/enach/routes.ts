@@ -181,7 +181,7 @@ export async function enachRoutes(app: FastifyInstance) {
 <dt style="color:#6b7280">Maximum debit</dt><dd style="margin:0;font-weight:600">${formatAmount(m.maxAmount, m.currency)}</dd>
 <dt style="color:#6b7280">Frequency</dt><dd style="margin:0">${FREQ_TEXT[m.frequency] ?? m.frequency}</dd>
 <dt style="color:#6b7280">Valid until</dt><dd style="margin:0">${day(m.endsOn)}</dd></dl>
-<form method="POST" action="${config.appUrl}/api/v1/dev/enach/${id}"><button name="outcome" value="approve" style="width:100%;padding:12px;border:0;border-radius:8px;background:#4f46e5;color:#fff;font-weight:600;font-size:15px">Approve (test)</button>
+<form method="POST" action="${config.appUrl}/api/v1/dev/enach/${id}"><button name="outcome" value="approve" style="width:100%;padding:12px;border:0;border-radius:8px;background:#9a6f08;color:#fff;font-weight:600;font-size:15px">Approve (test)</button>
 <button name="outcome" value="reject" style="width:100%;margin-top:8px;padding:10px;border:1px solid #d1d5db;border-radius:8px;background:#fff">Reject</button></form></main></body></html>`;
   });
 

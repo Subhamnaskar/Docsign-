@@ -95,8 +95,8 @@ export function PricingPlans({ data }: { data: PricingData | null }) {
               <Link
                 href={c.cta.href}
                 className={cx(
-                  'mt-8 rounded-lg px-4 py-3 text-center text-sm font-semibold',
-                  c.highlighted ? 'bg-brand-600 text-white hover:bg-brand-700' : 'border border-gray-300 text-gray-800 hover:bg-gray-50',
+                  'mt-8 rounded-full px-4 py-3 text-center text-sm font-semibold',
+                  c.highlighted ? 'bg-gold text-ink font-bold hover:brightness-105' : 'border border-gray-300 text-gray-800 hover:bg-gray-50',
                 )}
               >
                 {c.cta.label}

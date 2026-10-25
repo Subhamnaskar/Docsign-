@@ -40,7 +40,7 @@ export function layout(opts: {
 }): { html: string; text: string } {
   const lang = opts.locale ?? 'en';
   const dir = RTL_LOCALES.includes(lang) ? 'rtl' : 'ltr';
-  const color = opts.brand?.color ?? '#4f46e5';
+  const color = opts.brand?.color ?? '#9a6f08';
   const header = opts.brand?.logoUrl
     ? `<img src="${escape(opts.brand.logoUrl)}" alt="${escape(opts.brand.name)}" style="max-height:40px;max-width:200px">`
     : `<div style="font-weight:700;font-size:18px;color:${color}">${escape(opts.brand?.name ?? 'DocSign')}</div>`;

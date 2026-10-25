@@ -11,7 +11,7 @@ export { cx };
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 shadow-sm disabled:bg-brand-600/50',
+  primary: 'bg-gold text-ink font-semibold hover:brightness-105 shadow-sm disabled:opacity-50',
   secondary: 'bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 shadow-sm disabled:text-gray-400',
   danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm disabled:bg-red-600/50',
   ghost: 'text-gray-700 hover:bg-gray-100 disabled:text-gray-400',
@@ -170,12 +170,21 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={cx('inline-flex items-center gap-2 font-semibold tracking-tight', className)}>
+    <span className={cx('inline-flex items-center gap-2 font-extrabold tracking-tight', className)}>
       <svg viewBox="0 0 32 32" className="h-7 w-7" aria-hidden>
-        <rect width="32" height="32" rx="8" fill="#4f46e5" />
-        <path d="M8 21c3-1 4.5-9 7-9s1 7 3 7 2.5-4 6-4" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <defs>
+          <linearGradient id="logo-gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#d4a24e" />
+            <stop offset="1" stopColor="#b8860b" />
+          </linearGradient>
+        </defs>
+        <rect width="32" height="32" rx="8" fill="url(#logo-gold)" />
+        <path d="M8 21c3-1 4.5-9 7-9s1 7 3 7 2.5-4 6-4" stroke="#14110b" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      {brand.name}
+      <span>
+        {brand.name}
+        <span className="text-brand-500">.</span>
+      </span>
     </span>
   );
 }

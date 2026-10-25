@@ -263,7 +263,7 @@ export async function billingRoutes(app: FastifyInstance) {
 <p style="color:#6b7280;font-size:14px;margin:12px 0 0">${PLANS[q.plan].name} plan &middot; ${q.seats} user${q.seats === 1 ? '' : 's'} &middot; ${q.interval === 'year' ? 'yearly' : 'monthly'}</p>
 <h1 style="font-size:28px;margin:6px 0">${fmt(q.total)}<span style="font-size:14px;color:#6b7280;font-weight:400"> / ${q.interval}</span></h1>
 ${q.tax ? `<p style="color:#6b7280;font-size:13px;margin:0">${fmt(q.subtotal)} + ${q.taxLabel} ${fmt(q.tax)}</p>` : ''}
-<form method="POST" action="${config.appUrl}/api/v1/dev/billing/${id}" style="margin-top:18px"><button name="outcome" value="pay" style="width:100%;padding:12px;border:0;border-radius:8px;background:#4f46e5;color:#fff;font-weight:600;font-size:15px">Subscribe (test)</button>
+<form method="POST" action="${config.appUrl}/api/v1/dev/billing/${id}" style="margin-top:18px"><button name="outcome" value="pay" style="width:100%;padding:12px;border:0;border-radius:8px;background:#9a6f08;color:#fff;font-weight:600;font-size:15px">Subscribe (test)</button>
 <button name="outcome" value="cancel" style="width:100%;margin-top:8px;padding:10px;border:1px solid #d1d5db;border-radius:8px;background:#fff">Cancel</button></form></main></body></html>`;
   });
 

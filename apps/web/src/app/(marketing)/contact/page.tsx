@@ -121,7 +121,7 @@ function ContactForm() {
 
 export default function ContactPage() {
   return (
-    <section className="bg-gradient-to-b from-brand-50/70 to-white">
+    <section className="bg-cream">
       <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1.2fr]">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wider text-brand-600">Contact</p>

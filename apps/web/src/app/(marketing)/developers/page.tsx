@@ -13,7 +13,7 @@ const BASE = `https://${brand.domain}/api/v1`;
 
 function Code({ children }: { children: string }) {
   return (
-    <pre className="mt-4 overflow-x-auto rounded-xl bg-gray-950 p-5 text-xs leading-relaxed text-gray-200 sm:text-sm">
+    <pre className="mt-4 overflow-x-auto rounded-xl bg-night p-5 text-xs leading-relaxed text-gray-200 sm:text-sm">
       <code>{children}</code>
     </pre>
   );
@@ -51,7 +51,7 @@ export default function DevelopersPage() {
         intro="Our own web app is built on the same REST API you use. Create envelopes, send from templates, track progress with webhooks and download sealed PDFs."
       >
         <div className="flex flex-wrap gap-3">
-          <Link href="/register" className="rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700">
+          <Link href="/register" className="rounded-full bg-gold px-6 py-3 text-sm font-bold text-ink shadow-md hover:brightness-105">
             Get an API key
           </Link>
           <a href="#quickstart" className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">

@@ -1,13 +1,13 @@
 import Link from 'next/link';
-import { Check, CtaBand, Section, SectionHeading } from '@/components/marketing/Site';
+import { Check, CtaBand, GoldLink, OutlineLink, Section, SectionHeading } from '@/components/marketing/Site';
 import { brand } from '@/lib/brand';
 
 /** Illustrative product mock: a document with signer fields and a status panel. */
 function ProductMock() {
   return (
     <div className="relative mx-auto w-full max-w-md lg:max-w-none" aria-hidden>
-      <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-brand-100 via-white to-cyan-50 blur-2xl" />
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-xl">
+      <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-brand-500/30 via-brand-300/10 to-transparent blur-2xl" />
+      <div className="rounded-2xl border border-white/10 bg-white p-5 text-left shadow-2xl">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">Mutual NDA</div>
           <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">Out for signature</span>
@@ -77,43 +77,71 @@ const SEGMENTS = [
 export default function Home() {
   return (
     <>
-      <section className="overflow-hidden bg-gradient-to-b from-brand-50/80 via-white to-white">
-        <div className="mx-auto grid max-w-6xl items-center gap-16 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-brand-100 bg-white px-3 py-1 text-xs font-medium text-brand-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-500" /> US · UK · EU · India compliance profiles
-            </p>
-            <h1 className="mt-6 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
-              Sign agreements in every market, <span className="text-brand-600">compliant by design</span>
-            </h1>
-            <p className="mt-6 max-w-xl text-lg text-gray-600">{brand.description}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/register" className="rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-brand-700">
-                Start free
-              </Link>
-              <Link href="/contact" className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
-                Book a demo
-              </Link>
+      <section className="bg-cream px-3 pb-6 pt-10 sm:px-6 sm:pt-12">
+        <p className="mx-auto flex max-w-6xl items-center justify-center gap-3 text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-600 sm:text-xs">
+          <span className="hidden h-px w-10 bg-brand-400 sm:block" /> {brand.name} · e-signatures for every market <span className="hidden h-px w-10 bg-brand-400 sm:block" />
+        </p>
+        <div className="relative mx-auto mt-6 max-w-6xl overflow-hidden rounded-[2rem] bg-night bg-dots shadow-2xl shadow-black/10">
+          <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-brand-500/20 blur-3xl" aria-hidden />
+          <div className="absolute -bottom-32 right-0 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" aria-hidden />
+          <span className="absolute left-5 top-5 h-6 w-6 rounded-tl-md border-l-2 border-t-2 border-white/30" aria-hidden />
+          <span className="absolute right-5 top-5 h-6 w-6 rounded-tr-md border-r-2 border-t-2 border-white/30" aria-hidden />
+          <span className="absolute bottom-5 left-5 h-6 w-6 rounded-bl-md border-b-2 border-l-2 border-white/30" aria-hidden />
+          <span className="absolute bottom-5 right-5 h-6 w-6 rounded-br-md border-b-2 border-r-2 border-white/30" aria-hidden />
+          <div className="relative grid items-center gap-14 px-6 py-14 sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:py-20">
+            <div>
+              <h1 className="text-[2.6rem] font-black leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-[4.2rem]">
+                Sign agreements in every market, <span className="text-gold">compliant by design.</span>
+              </h1>
+              <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-300">{brand.description}</p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <GoldLink href="/register">Start free 14-day trial →</GoldLink>
+                <OutlineLink href="/contact" dark>
+                  Book a demo
+                </OutlineLink>
+              </div>
+              <p className="mt-5 text-sm text-gray-400">
+                No credit card required · Received a signed PDF?{' '}
+                <Link href="/verify" className="font-semibold text-brand-300 hover:text-brand-200">
+                  Verify it here
+                </Link>
+              </p>
             </div>
-            <p className="mt-4 text-sm text-gray-500">
-              Received a signed PDF?{' '}
-              <Link href="/verify" className="font-medium text-brand-600 hover:underline">
-                Verify it here
-              </Link>
-              .
-            </p>
+            <ProductMock />
           </div>
-          <ProductMock />
         </div>
+        <ul className="mx-auto mt-6 flex max-w-6xl flex-wrap justify-center gap-2.5">
+          {['IT Act 2000 · ESIGN · eIDAS', 'Aadhaar eSign & DSC', 'Tamper-evident audit trail', 'Made in India'].map((c) => (
+            <li key={c} className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-700">
+              <svg className="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.7-9.3a1 1 0 0 0-1.4-1.4L9 10.6 7.7 9.3a1 1 0 0 0-1.4 1.4l2 2a1 1 0 0 0 1.4 0l4-4Z" clipRule="evenodd" />
+              </svg>
+              {c}
+            </li>
+          ))}
+        </ul>
+        <dl className="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-8 pb-6 text-center sm:grid-cols-4">
+          {[
+            ['4', 'Legal frameworks'],
+            ['10', 'Signer languages'],
+            ['PAdES', 'Long-term validation'],
+            ['14 days', 'Free trial'],
+          ].map(([v, l]) => (
+            <div key={l}>
+              <dt className="text-gold text-3xl font-black tracking-tight">{v}</dt>
+              <dd className="mt-1 text-sm text-gray-500">{l}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <Section>
-        <SectionHeading eyebrow="How it works" title="From upload to sealed PDF in three steps" center />
+        <SectionHeading number="01" eyebrow="How it works" title="From upload to sealed PDF in three steps" center />
         <ol className="mt-14 grid gap-8 md:grid-cols-3">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="relative rounded-2xl border border-gray-200 p-6">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">{i + 1}</span>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">{s.title}</h3>
+            <li key={s.title} className="relative rounded-2xl border border-gray-200 bg-white p-7 transition hover:-translate-y-0.5 hover:shadow-lg">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold text-sm font-black text-ink">{i + 1}</span>
+              <h3 className="mt-5 text-lg font-bold text-ink">{s.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.body}</p>
             </li>
           ))}
@@ -121,11 +149,11 @@ export default function Home() {
       </Section>
 
       <Section tone="muted">
-        <SectionHeading eyebrow="Platform" title="Everything you need to sign with confidence" intro="Built for teams that need more than a signature box: evidence that holds up, compliance per country and an API to automate it." />
+        <SectionHeading number="02" eyebrow="Platform" title="Everything you need to sign with confidence" intro="Built for teams that need more than a signature box: evidence that holds up, compliance per country and an API to automate it." />
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h3 className="font-semibold text-gray-900">{f.title}</h3>
+            <div key={f.title} className="rounded-2xl border border-gray-200 bg-white p-7 transition hover:-translate-y-0.5 hover:shadow-lg">
+              <h3 className="font-bold text-ink">{f.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-gray-600">{f.body}</p>
             </div>
           ))}
@@ -140,17 +168,17 @@ export default function Home() {
       <Section tone="dark">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div>
-            <SectionHeading dark eyebrow="Compliance engine" title="One platform. The right rules for each country." intro="Choose the governing jurisdiction and document type. The policy engine applies the signature level, signer checks, consent text, retention and data region for you." />
+            <SectionHeading dark number="03" eyebrow="Compliance engine" title="One platform. The right rules for each country." intro="Choose the governing jurisdiction and document type. The policy engine applies the signature level, signer checks, consent text, retention and data region for you." />
             <ul className="mt-8 space-y-3 text-gray-300">
               <Check dark>ESIGN Act and UETA (US), Electronic Communications Act (UK), eIDAS (EU), IT Act 2000 (India)</Check>
               <Check dark>Automatic guardrails: wills, certain property deeds and other excluded documents are blocked</Check>
               <Check dark>New countries are added as configuration and partner adapters, not rebuilds</Check>
             </ul>
-            <Link href="/compliance" className="mt-8 inline-block text-sm font-semibold text-brand-100 hover:text-white">
+            <Link href="/compliance" className="mt-8 inline-block text-sm font-semibold text-brand-300 hover:text-brand-200">
               How compliance works →
             </Link>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 font-mono text-sm">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 font-mono text-sm shadow-2xl">
             <div className="text-xs uppercase tracking-wide text-gray-400">Policy decision</div>
             <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5">
               {[
@@ -165,7 +193,7 @@ export default function Home() {
               ].map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-gray-400">{k}</dt>
-                  <dd className={k === 'Result' ? 'text-green-400' : 'text-white'}>{v}</dd>
+                  <dd className={k === 'Result' ? 'text-emerald-400' : 'text-white'}>{v}</dd>
                 </div>
               ))}
             </dl>
@@ -174,11 +202,11 @@ export default function Home() {
       </Section>
 
       <Section>
-        <SectionHeading eyebrow="Who it's for" title="Built for teams where signatures carry weight" center />
+        <SectionHeading number="04" eyebrow="Who it's for" title="Built for teams where signatures carry weight" center />
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {SEGMENTS.map((s) => (
-            <div key={s.title} className="rounded-2xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900">{s.title}</h3>
+            <div key={s.title} className="rounded-2xl border border-gray-200 bg-white p-7 transition hover:-translate-y-0.5 hover:shadow-lg">
+              <h3 className="font-bold text-ink">{s.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.body}</p>
             </div>
           ))}
@@ -188,12 +216,12 @@ export default function Home() {
       <Section tone="muted">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div>
-            <SectionHeading eyebrow="Developers" title="Send for signature with one API call" intro="Create envelopes from templates, track progress with signed webhooks and download sealed PDFs, all over a clean REST API." />
-            <Link href="/developers" className="mt-8 inline-block rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800">
+            <SectionHeading number="05" eyebrow="Developers" title="Send for signature with one API call" intro="Create envelopes from templates, track progress with signed webhooks and download sealed PDFs, all over a clean REST API." />
+            <Link href="/developers" className="mt-8 inline-block rounded-full bg-ink px-6 py-3 text-sm font-bold text-white hover:bg-black">
               Read the API overview
             </Link>
           </div>
-          <pre className="overflow-x-auto rounded-2xl bg-gray-950 p-6 text-xs leading-relaxed text-gray-200 sm:text-sm">
+          <pre className="overflow-x-auto rounded-2xl bg-night p-6 text-xs leading-relaxed text-gray-200 sm:text-sm">
             <code>{`curl https://${brand.domain}/api/v1/templates/$TEMPLATE/envelopes \\
   -H "Authorization: Bearer $API_KEY" \\
   -H "Content-Type: application/json" \\

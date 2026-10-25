@@ -1,19 +1,43 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-script: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
+  /* NuronixAI gold. 600 and darker keep white text at WCAG AA. */
+  --color-brand-50: #fdf8ec;
+  --color-brand-100: #f7ebcf;
+  --color-brand-200: #efd9a6;
+  --color-brand-300: #e8c170;
+  --color-brand-400: #d4a24e;
+  --color-brand-500: #c9932e;
+  --color-brand-600: #9a6f08;
+  --color-brand-700: #7a5806;
+  --color-brand-800: #5c4205;
+  --color-ink: #14110b;
+  --color-night: #0a0a12;
+  --color-cream: #faf8f3;
 }
 
 html,
 body {
-  background: #f6f7fb;
-  color: #111827;
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
+/* Gold gradient fill (buttons, badges) and gradient text, as on nuronixai.in */
+@utility bg-gold {
+  background-image: linear-gradient(135deg, #d4a24e 0%, #c9932e 45%, #b8860b 100%);
+}
+@utility text-gold {
+  background-image: linear-gradient(135deg, #d4a24e 0%, #c9932e 30%, #e8c170 60%, #b8860b 80%, #d4a24e 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+/* Faint dot grid on dark sections */
+@utility bg-dots {
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 
 /* Signer colours, reused by the field editor and signing view */

@@ -20,7 +20,7 @@ export function SiteHeader() {
   useEffect(() => setOpen(false), [pathname]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200/70 bg-white/85 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-gray-200/70 bg-cream/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
         <Link href="/" aria-label="Home">
           <Logo className="text-lg text-gray-900" />
@@ -32,7 +32,7 @@ export function SiteHeader() {
               href={n.href}
               className={cx(
                 'rounded-md px-3 py-2 text-sm font-medium',
-                pathname.startsWith(n.href) ? 'text-brand-700' : 'text-gray-600 hover:text-gray-900',
+                pathname.startsWith(n.href) ? 'text-brand-600' : 'text-gray-600 hover:text-ink',
               )}
             >
               {n.label}
@@ -40,13 +40,13 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="ml-auto hidden items-center gap-2 md:flex">
-          <Link href="/login" className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">
+          <Link href="/login" className="rounded-full border border-gray-200 bg-white/60 px-5 py-2 text-sm font-medium text-gray-700 hover:text-ink">
             Sign in
           </Link>
-          <Link href="/contact" className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">
+          <Link href="/contact" className="rounded-full px-4 py-2 text-sm font-medium text-gray-600 hover:text-ink">
             Book a demo
           </Link>
-          <Link href="/register" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+          <Link href="/register" className="rounded-full bg-gold px-5 py-2 text-sm font-bold text-ink shadow-sm hover:brightness-105">
             Start free
           </Link>
         </div>
@@ -62,7 +62,7 @@ export function SiteHeader() {
         </button>
       </div>
       {open && (
-        <div className="border-t border-gray-200 bg-white px-4 pb-4 md:hidden">
+        <div className="border-t border-gray-200 bg-cream px-4 pb-4 md:hidden">
           <nav className="flex flex-col py-2">
             {SITE_NAV.map((n) => (
               <Link key={n.href} href={n.href} className="rounded-md px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -77,10 +77,10 @@ export function SiteHeader() {
             </Link>
           </nav>
           <div className="grid grid-cols-2 gap-2">
-            <Link href="/contact" className="rounded-lg border border-gray-300 px-4 py-2.5 text-center text-sm font-medium">
+            <Link href="/contact" className="rounded-full border border-gray-300 px-4 py-2.5 text-center text-sm font-medium">
               Book a demo
             </Link>
-            <Link href="/register" className="rounded-lg bg-brand-600 px-4 py-2.5 text-center text-sm font-semibold text-white">
+            <Link href="/register" className="rounded-full bg-gold px-4 py-2.5 text-center text-sm font-bold text-ink">
               Start free
             </Link>
           </div>

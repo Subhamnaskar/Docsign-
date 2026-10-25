@@ -33,7 +33,7 @@ export function OnboardingChecklist() {
         </button>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Setup progress">
-        <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
       </div>
       <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {data.steps.map((s) => (
