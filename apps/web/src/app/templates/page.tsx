@@ -10,6 +10,7 @@ import { parseCsv, toCsv } from '@/lib/csv';
 import { relativeTime } from '@/lib/format';
 import { LANGUAGES } from '@/lib/i18n';
 import type { Envelope, Template, TemplateSummary } from '@/lib/types';
+import { WordTemplates } from '@/components/WordTemplates';
 
 const MAX_BULK_ROWS = 100;
 
@@ -299,6 +300,7 @@ function Templates() {
           </ul>
         )}
       </Card>
+      <WordTemplates />
       <SigningLinks templates={list} />
       <Modal open={!!active} onClose={() => setActive(null)} title={active ? `${active.mode === 'use' ? 'Use' : 'Bulk send'}: ${active.template.name}` : ''} wide>
         {active?.mode === 'use' && <UseTemplate template={active.template} onClose={() => setActive(null)} />}

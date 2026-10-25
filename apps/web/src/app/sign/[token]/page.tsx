@@ -13,6 +13,7 @@ import { isRtl, LANGUAGES, signerT, type SignerKey, type Translate } from '@/lib
 import type { Field, PageInfo } from '@/lib/types';
 import { IdChecks, type IdCheckState } from '@/components/IdChecks';
 import { MandateDialog } from '@/components/MandateDialog';
+import { SignerComments } from '@/components/SignerComments';
 
 interface SigningSession {
   state: 'ready' | 'waiting' | 'signed' | 'completed' | 'declined' | 'voided' | 'expired' | 'unavailable';
@@ -313,6 +314,7 @@ function SignDocument({
 
   const [paying, setPaying] = useState(false);
   const [mandateField, setMandateField] = useState<Field | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   async function startPayment(f: Field) {
     setPaying(true);
     setError(null);
@@ -456,6 +458,9 @@ function SignDocument({
         </div>
         {/* Secondary actions: inline on wider screens, in a menu on phones */}
         <div className="hidden items-center gap-1 sm:flex">
+          <Button variant="ghost" size="sm" onClick={() => setCommentsOpen(true)}>
+            Comments
+          </Button>
           {session.recipient.canReassign && (
             <Button variant="ghost" size="sm" onClick={() => setReassignOpen(true)}>
               {tr('reassign')}
@@ -470,6 +475,9 @@ function SignDocument({
             ⋯
           </summary>
           <div className="absolute right-0 z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            <button className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50" onClick={() => setCommentsOpen(true)}>
+              Comments
+            </button>
             {session.recipient.canReassign && (
               <button className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50" onClick={() => setReassignOpen(true)}>
                 {tr('reassign')}
@@ -753,6 +761,7 @@ function SignDocument({
           </Button>
         </div>
       </Modal>
+      <SignerComments token={token} open={commentsOpen} onClose={() => setCommentsOpen(false)} documents={session.documents} />
       {mandateField && <MandateDialog token={token} field={mandateField} defaultHolder={session.recipient.name} onClose={() => setMandateField(null)} />}
     </>
   );

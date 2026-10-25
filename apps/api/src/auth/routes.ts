@@ -104,6 +104,8 @@ export async function authRoutes(app: FastifyInstance) {
         embedOrigins: org.embedOrigins,
         aiEnabled: org.aiEnabled,
         require2fa: org.require2fa,
+        approvalPolicy: org.approvalPolicy,
+        approverIds: org.approverIds,
       },
       cell: config.cellRegion,
       features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode },
@@ -119,6 +121,8 @@ export async function authRoutes(app: FastifyInstance) {
         brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #4f46e5').nullable().optional(),
         aiEnabled: z.boolean().optional(),
         require2fa: z.boolean().optional(),
+        approvalPolicy: z.enum(['off', 'members', 'all']).optional(),
+        approverIds: z.array(z.string()).max(50).optional(),
         embedOrigins: z.array(z.string().url().refine((u) => /^https?:\/\/[^/]+$/.test(u), 'Use an origin like https://app.example.com')).max(20).optional(),
       }),
       req.body,
@@ -127,6 +131,10 @@ export async function authRoutes(app: FastifyInstance) {
       // Turning the policy on would otherwise lock the admin out mid-session
       const admin = await prisma.user.findUniqueOrThrow({ where: { id: req.auth.userId } });
       if (!admin.totpEnabledAt && !isSsoOnly(admin)) throw badRequest('Turn on two-factor authentication for your own account first (Settings → Security).');
+    }
+    if (body.approverIds?.length) {
+      const found = await prisma.user.count({ where: { id: { in: body.approverIds }, orgId: req.auth.orgId, disabledAt: null } });
+      if (found !== new Set(body.approverIds).size) throw badRequest('Approvers must be active members of this organisation.');
     }
     const org = await prisma.organization.update({ where: { id: req.auth.orgId }, data: body });
     await logActivity(req, 'organization.updated', body);
@@ -139,6 +147,8 @@ export async function authRoutes(app: FastifyInstance) {
       embedOrigins: org.embedOrigins,
       aiEnabled: org.aiEnabled,
       require2fa: org.require2fa,
+      approvalPolicy: org.approvalPolicy,
+      approverIds: org.approverIds,
     };
   });
 }

@@ -9,6 +9,7 @@ Upload a document, place fields, send it to signers, and get back a sealed, veri
 | Area | Implemented |
 |---|---|
 | Documents | PDF upload, Office/ODT/RTF/TXT → PDF conversion (Gotenberg), import from Google Drive, Dropbox and OneDrive pickers or any public share link (SSRF-safe), ClamAV malware scanning, SHA-256 fingerprint, multi-document envelopes |
+| Contracts | Word templates with `{{placeholders}}` that generate agreements (form or API), a contract repository with key terms (counterparty, value, dates, tags), AI extraction of key terms, renewal reminders before the notice deadline, comments between signers and senders, revised document versions while nobody has signed, internal approval before sending (members or everyone) |
 | Templates & forms | Templates with named roles, create-from-template, bulk send from CSV (100 rows per batch), public web forms (`/f/<slug>`) that create and route an agreement when someone fills them in |
 | Languages | Per-recipient language for emails and the signing page: English, Hindi, Spanish, French, German, Portuguese, Italian, Dutch, Arabic (RTL), Japanese |
 | Workflow | Sequential or parallel routing, signers + CC, reminders, expiry, void, decline, duplicate, correct a recipient after sending (old link stops working), signer-initiated reassign, folders, bulk ZIP download, CSV export |
@@ -150,6 +151,8 @@ apps/api      Fastify + Prisma (PostgreSQL) — domain services, policy engine, 
   src/payments    Payment providers (sandbox, Stripe, Razorpay)
   src/billing     Plans and limits, subscriptions, invoices
   src/sso         OIDC single sign-on and SCIM 2.0
+  src/docgen      Word template generation; src/contracts is the repository; src/negotiation comments and revisions; src/approvals internal approval
+  src/kyc         Signer identity checks; src/enach eNACH mandates
   src/ai          Claude API features; src/mcp is the MCP server
   src/team        Members, roles, invitations; src/organization holds settings and branding
   src/integrations  Share-link import, REST hooks

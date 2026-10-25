@@ -5,6 +5,7 @@ import { deliverPendingWebhooks, enqueueWebhook } from './webhooks/dispatcher.js
 import type { FastifyBaseLogger } from 'fastify';
 import { renewSandboxSubscriptions } from './billing/service.js';
 import { renewArchiveTimestamps } from './trust/archive.js';
+import { sendRenewalReminders } from './contracts/routes.js';
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -62,6 +63,7 @@ export function startWorker(log: FastifyBaseLogger) {
       await retryFinalization();
       await renewSandboxSubscriptions();
       await renewArchiveTimestamps();
+      await sendRenewalReminders();
     } catch (err) {
       log.error({ err }, 'worker tick failed');
     } finally {

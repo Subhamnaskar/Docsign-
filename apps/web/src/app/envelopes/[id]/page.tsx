@@ -12,6 +12,7 @@ import { api, fileUrl } from '@/lib/api';
 import { AUDIT_LABELS, formatDate } from '@/lib/format';
 import type { AuditEvent, Envelope, Recipient } from '@/lib/types';
 import { KycResults } from '@/components/KycResults';
+import { ApprovalBanner, ContractTerms, ReviseButton, SenderComments } from '@/components/Negotiation';
 
 interface AuditResponse {
   chain: { valid: boolean; count: number; headHash: string; brokenAtSeq?: number };
@@ -84,7 +85,8 @@ function Detail() {
 
   const load = useCallback(async () => {
     const [e, a] = await Promise.all([api<Envelope>(`/envelopes/${id}`), api<AuditResponse>(`/envelopes/${id}/audit`)]);
-    if (e.status === 'DRAFT') router.replace(`/envelopes/${id}/edit`);
+    // Drafts open in the editor, except ones waiting for (or sent back from) approval
+    if (e.status === 'DRAFT' && !e.approval) router.replace(`/envelopes/${id}/edit`);
     setEnv(e);
     setAudit(a);
   }, [id, router]);
@@ -223,6 +225,8 @@ function Detail() {
             </ul>
           </Card>
 
+          <ApprovalBanner env={env} onChange={load} />
+
           <KycResults envelopeId={env.id} recipients={env.recipients} />
 
           <Card className="p-5">
@@ -244,6 +248,9 @@ function Detail() {
                       Signed PDF
                     </a>
                   )}
+                  {env.status === 'SENT' && signed === 0 && !env.recipients.some((r) => r.signatureMethod && r.signatureMethod !== 'ELECTRONIC') && (
+                    <ReviseButton envelopeId={env.id} documentId={d.id} onDone={(msg) => { setNotice(msg); load(); }} />
+                  )}
                 </li>
               ))}
               {env.hasCertificate && (
@@ -259,6 +266,10 @@ function Detail() {
               )}
             </ul>
           </Card>
+
+          <SenderComments env={env} />
+
+          {env.status !== 'DRAFT' && <ContractTerms envelopeId={env.id} />}
 
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">

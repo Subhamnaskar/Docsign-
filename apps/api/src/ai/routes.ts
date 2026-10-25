@@ -40,13 +40,13 @@ const ReviewSchema = z4.object({
   missingClauses: z4.array(z4.string()),
 });
 
-async function requireAiEnabled(orgId: string) {
+export async function requireAiEnabled(orgId: string) {
   if (!config.ai.enabled) throw new HttpError(503, 'AI features are not configured on this server.', 'ai_unavailable');
   const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { aiEnabled: true } });
   if (!org.aiEnabled) throw new HttpError(403, 'AI features are turned off for this organisation. An admin can turn them on in Settings.', 'ai_disabled');
 }
 
-async function loadPdfs(docs: { name: string; storageKey: string; finalKey: string | null }[]): Promise<PdfInput[]> {
+export async function loadPdfs(docs: { name: string; storageKey: string; finalKey: string | null }[]): Promise<PdfInput[]> {
   return Promise.all(docs.map(async (d) => ({ name: d.name, data: await getObject(d.finalKey ?? d.storageKey) })));
 }
 

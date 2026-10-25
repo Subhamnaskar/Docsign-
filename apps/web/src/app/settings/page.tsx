@@ -42,6 +42,12 @@ function Organization() {
   const [origins, setOrigins] = useState((me?.organization.embedOrigins ?? []).join('\n'));
   const [aiEnabled, setAiEnabled] = useState(Boolean(me?.organization.aiEnabled));
   const [require2fa, setRequire2fa] = useState(Boolean(me?.organization.require2fa));
+  const [approvalPolicy, setApprovalPolicy] = useState(me?.organization.approvalPolicy ?? 'off');
+  const [approverIds, setApproverIds] = useState<string[]>(me?.organization.approverIds ?? []);
+  const [people, setPeople] = useState<{ id: string; name: string; email: string; role: string; disabledAt: string | null }[]>([]);
+  useEffect(() => {
+    if (approvalPolicy !== 'off') api<{ users: typeof people }>('/team').then((t) => setPeople(t.users.filter((u) => !u.disabledAt))).catch(() => {});
+  }, [approvalPolicy]);
   const [orgError, setOrgError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,7 +60,7 @@ function Organization() {
     try {
       await api('/organization', {
         method: 'PATCH',
-        json: { name, jurisdiction, aiEnabled, require2fa, embedOrigins: origins.split('\n').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean) },
+        json: { name, jurisdiction, aiEnabled, require2fa, approvalPolicy, approverIds, embedOrigins: origins.split('\n').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean) },
       });
     } catch (err) {
       setOrgError((err as Error).message);
@@ -96,6 +102,27 @@ function Organization() {
             Require two-factor authentication <span className="text-gray-500">for everyone who signs in with a password. Single sign-on users rely on your identity provider.</span>
           </span>
         </label>
+        <div className="sm:col-span-2">
+          <Label htmlFor="org-approval">Approval before sending</Label>
+          <Select id="org-approval" value={approvalPolicy} onChange={(e) => setApprovalPolicy(e.target.value as typeof approvalPolicy)}>
+            <option value="off">Off: agreements are sent straight away</option>
+            <option value="members">Agreements sent by members need approval</option>
+            <option value="all">Every agreement needs approval</option>
+          </Select>
+          {approvalPolicy !== 'off' && (
+            <div className="mt-2">
+              <p className="text-xs text-gray-500">Approvers (none selected = any owner or admin). Approvers&apos; own agreements are not held.</p>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                {people.map((u) => (
+                  <label key={u.id} className="flex items-center gap-1.5">
+                    <input type="checkbox" checked={approverIds.includes(u.id)} onChange={(e) => setApproverIds(e.target.checked ? [...approverIds, u.id] : approverIds.filter((x) => x !== u.id))} />
+                    {u.name} <span className="text-gray-400">({u.role.toLowerCase()})</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <div className="sm:col-span-2">
           <Label htmlFor="org-origins" hint="(one per line)">
             Allowed embed origins

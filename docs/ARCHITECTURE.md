@@ -36,7 +36,7 @@ When any signer signs with Aadhaar eSign or a DSC, the envelope switches to incr
 | Phase | Status in this repository | Still to do |
 |---|---|---|
 | 2. Trust | Aadhaar eSign 2.1 (sandbox ESP + production adapter), DSC tokens, SMS/WhatsApp/access-code identity, incremental signing, PAdES B-LT/B-LTA with archive-timestamp renewal | QES via QTSP partners (CSC API), ID document verification, native mobile apps, Salesforce/M365/Google integrations |
-| 3. Enterprise | Roles, OIDC SSO, SCIM, branding, activity log, reports, AI (Claude API), web forms, conditional and calculated fields, REST hooks, MCP server | Workflow builder (Temporal), CLM repository, BYOK, dedicated cells, SOC 2 audit (see [compliance/soc2-readiness.md](compliance/soc2-readiness.md)) |
+| 3. Enterprise | Roles, OIDC SSO, SCIM, branding, activity log, reports, AI (Claude API), web forms, conditional and calculated fields, REST hooks, MCP server, contract repository with renewal reminders, Word template generation, comments and revisions, internal approval | Visual workflow builder, BYOK, dedicated cells, SOC 2 audit (see [compliance/soc2-readiness.md](compliance/soc2-readiness.md)) |
 | 4. Regulated | e-stamp interface with a sandbox provider, payments at signing | RON, real e-stamp vendor, FedRAMP cell, on-prem, ICP-Brasil, national eIDs |
 | 5. Full suite | — | Negotiation/redlining, marketplace, EUDI Wallet (see below), China stack |
 

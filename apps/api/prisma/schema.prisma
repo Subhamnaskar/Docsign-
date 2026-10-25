@@ -38,6 +38,10 @@ model Organization {
   aiEnabled          Boolean           @default(false)
   // Every password user must turn on two-factor authentication
   require2fa         Boolean           @default(false)
+  // Internal approval before sending: off | members (agreements from members) | all
+  approvalPolicy     String            @default("off")
+  // Who may approve; empty = any owner or admin
+  approverIds        String[]          @default([])
   // --- Billing (see src/billing/plans.ts) ---
   plan               String            @default("trial")
   billingStatus      BillingStatus     @default(TRIALING)
@@ -64,6 +68,7 @@ model Organization {
   apiKeys            ApiKey[]
   webhooks           WebhookEndpoint[]
   templates          Template[]
+  docTemplates       DocTemplate[]
   invitations        Invitation[]
   folders            Folder[]
   activity           ActivityLog[]
@@ -228,6 +233,16 @@ model Envelope {
   routing           RoutingMode    @default(SEQUENTIAL)
   jurisdiction      String
   documentType      String         @default("general")
+  // Internal approval before sending: PENDING | APPROVED | REJECTED (null = not requested)
+  approvalStatus      String?
+  approvalRequestedAt DateTime?
+  approvalRequestedBy String?
+  approvalDecidedBy   String?
+  approvalNote        String?
+  // Hash of documents, recipients and fields at approval; edits afterwards need a new approval
+  approvalFingerprint String?
+  contract          ContractMeta?
+  comments          Comment[]
   folderId          String?
   folder            Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
   // Set when created through a self-serve signing form
@@ -280,6 +295,9 @@ model Document {
   archiveTimestampAt DateTime?
   // Fingerprints of earlier sealed versions (before archive-timestamp renewals), still verifiable
   priorSha256        String[] @default([])
+  // Revisions made during negotiation (1 = as first sent)
+  version            Int      @default(1)
+  versions           DocumentVersion[]
   createdAt   DateTime @default(now())
   fields      Field[]
 
@@ -790,4 +808,76 @@ model Invoice {
   createdAt   DateTime     @default(now())
 
   @@index([orgId, createdAt])
+}
+
+/// A Word template with {{placeholders}} that generates documents.
+model DocTemplate {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  storageKey  String
+  // Placeholder names found in the template, in order of appearance
+  variables   String[]
+  createdById String
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId])
+}
+
+/// Key terms of an agreement for the contract repository.
+model ContractMeta {
+  envelopeId     String    @id
+  envelope       Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  counterparty   String?
+  // Minor units
+  value          BigInt?
+  currency       String?
+  effectiveDate  DateTime?
+  expiryDate     DateTime?
+  renewalDate    DateTime?
+  // Days of notice needed to cancel or renegotiate before the renewal/expiry date
+  noticeDays     Int?
+  autoRenews     Boolean   @default(false)
+  tags           String[]  @default([])
+  notes          String?
+  // manual | ai (key terms extracted by the AI and not yet edited)
+  source         String    @default("manual")
+  reminderSentAt DateTime?
+  updatedAt      DateTime  @updatedAt
+}
+
+/// A comment pinned to a place in a document (negotiation before signing).
+model Comment {
+  id         String    @id @default(cuid())
+  envelopeId String
+  envelope   Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  documentId String?
+  page       Int?
+  x          Float?
+  y          Float?
+  // user | recipient
+  authorKind String
+  authorId   String
+  authorName String
+  body       String
+  parentId   String?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([envelopeId])
+}
+
+/// Earlier versions of a document replaced during negotiation.
+model DocumentVersion {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version    Int
+  storageKey String
+  sha256     String
+  pageCount  Int
+  createdAt  DateTime @default(now())
+
+  @@index([documentId])
 }

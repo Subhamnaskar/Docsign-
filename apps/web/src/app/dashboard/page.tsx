@@ -101,6 +101,7 @@ function Dashboard() {
   const [folder, setFolder] = useState<string | undefined>();
   const [filter, setFilter] = useState<EnvelopeStatus | undefined>();
   const [mine, setMine] = useState(false);
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
@@ -114,10 +115,11 @@ function Dashboard() {
     if (search.trim()) qs.set('search', search.trim());
     if (folder) qs.set('folderId', folder);
     if (mine) qs.set('sender', 'me');
+    if (awaitingApproval) qs.set('approval', 'pending');
     const res = await api<{ data: EnvelopeSummary[] }>(`/envelopes?${qs}`);
     setItems(res.data);
     setSelected(new Set());
-  }, [filter, search, folder, mine]);
+  }, [filter, search, folder, mine, awaitingApproval]);
 
   useEffect(() => {
     api<typeof stats>('/stats').then(setStats).catch(() => {});
@@ -230,6 +232,11 @@ function Dashboard() {
                 <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Sent by me
               </label>
             )}
+            {me?.organization.approvalPolicy && me.organization.approvalPolicy !== 'off' && (
+              <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                <input type="checkbox" checked={awaitingApproval} onChange={(e) => setAwaitingApproval(e.target.checked)} /> Awaiting approval
+              </label>
+            )}
             <Input className="ml-auto max-w-xs" placeholder="Search title or recipient" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
@@ -290,7 +297,11 @@ function Dashboard() {
                         </div>
                       )}
                       <span className="w-10 text-xs font-medium text-gray-400">{e.jurisdiction}</span>
-                      <StatusBadge status={e.status} />
+                      {e.status === 'DRAFT' && e.approvalStatus === 'PENDING' ? (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Awaiting approval</span>
+                      ) : (
+                        <StatusBadge status={e.status} />
+                      )}
                       <span className="w-20 text-right text-xs text-gray-400">{relativeTime(e.updatedAt)}</span>
                     </Link>
                   </li>

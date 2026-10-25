@@ -110,6 +110,7 @@ export interface Policy {
 
 export interface Envelope {
   id: string;
+  approval?: { status: 'PENDING' | 'APPROVED' | 'REJECTED'; requestedAt: string | null; requestedBy: string | null; decidedBy: string | null; note: string | null } | null;
   title: string;
   message: string | null;
   status: EnvelopeStatus;
@@ -144,6 +145,7 @@ export interface EnvelopeSummary {
   updatedAt: string;
   sender?: string;
   folder?: { id: string; name: string } | null;
+  approvalStatus?: string | null;
   recipients: { name: string; email: string; role: string; status: RecipientStatus }[];
 }
 
@@ -171,6 +173,8 @@ export interface Me {
     embedOrigins: string[];
     aiEnabled?: boolean;
     require2fa?: boolean;
+    approvalPolicy?: 'off' | 'members' | 'all';
+    approverIds?: string[];
   };
   cell: string;
   features?: { ai: boolean; aadhaarEsign: string };

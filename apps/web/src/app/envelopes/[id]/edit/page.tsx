@@ -821,8 +821,8 @@ function Builder() {
     setSaving(true);
     setError(null);
     try {
-      await api(`/envelopes/${id}/send`, { method: 'POST' });
-      router.push(`/envelopes/${id}?sent=1`);
+      const res = await api<Envelope>(`/envelopes/${id}/send`, { method: 'POST' });
+      router.push(res.approval?.status === 'PENDING' ? `/envelopes/${id}` : `/envelopes/${id}?sent=1`);
     } catch (err) {
       setError({ message: (err as Error).message, problems: err instanceof ApiError ? err.problems : [] });
       setSaving(false);

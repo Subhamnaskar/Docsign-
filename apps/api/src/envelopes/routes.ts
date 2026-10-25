@@ -4,7 +4,7 @@ import { appendAudit, verifyChain } from '../audit/audit.js';
 import { prisma } from '../db.js';
 import { MAX_UPLOAD_BYTES } from '../documents/ingest.js';
 import { clientInfo, requireAuth } from '../lib/auth.js';
-import { badRequest, conflict, notFound } from '../lib/errors.js';
+import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { getObject, putObject } from '../lib/storage.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { Prisma } from '@prisma/client';
@@ -26,10 +26,13 @@ import {
   sendReadinessProblems,
   voidEnvelope,
   type FullEnvelope,
+  getEnvelope,
 } from './service.js';
 import { ID_CHECKS } from '../kyc/names.js';
 import { mandateConfig } from '../enach/mandate-config.js';
 import { calculateDuty, INSTRUMENTS, supportedDuty } from '../estamp/duty.js';
+import { approvalFingerprint, isApprover } from '../approvals/service.js';
+import { layout, sendMail } from '../lib/mailer.js';
 
 const jurisdictionCode = z.string().refine((c) => c in JURISDICTIONS, 'Unknown jurisdiction');
 const documentTypeCode = z.string().refine((c) => c in DOCUMENT_TYPES, 'Unknown document type');
@@ -126,6 +129,9 @@ export function serializeEnvelope(env: FullEnvelope) {
     estamp: env.estamp,
     estampResult: env.estampResult,
     certificateSha256: env.certificateSha256,
+    approval: env.approvalStatus
+      ? { status: env.approvalStatus, requestedAt: env.approvalRequestedAt, requestedBy: env.approvalRequestedBy, decidedBy: env.approvalDecidedBy, note: env.approvalNote }
+      : null,
     policy: env.status === 'DRAFT' ? resolvePolicy(env.jurisdiction, env.documentType) : env.policy,
     readiness: env.status === 'DRAFT' ? sendReadinessProblems(env) : [],
     documents: env.documents.map((d) => ({
@@ -248,6 +254,8 @@ export async function envelopeRoutes(app: FastifyInstance) {
         folderId: z.string().optional(),
         /** "me" limits to agreements I sent */
         sender: z.literal('me').optional(),
+        /** "pending" lists drafts waiting for internal approval */
+        approval: z.literal('pending').optional(),
       }),
       req.query,
     );
@@ -257,6 +265,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
         ...(q.folderId ? { folderId: q.folderId === 'none' ? null : q.folderId } : {}),
         ...(q.sender === 'me' && req.auth.userId ? { createdById: req.auth.userId } : {}),
         ...(q.status ? { status: q.status } : {}),
+        ...(q.approval ? { status: 'DRAFT' as const, approvalStatus: 'PENDING' } : {}),
         ...(q.search
           ? {
               OR: [
@@ -284,6 +293,7 @@ export async function envelopeRoutes(app: FastifyInstance) {
         updatedAt: e.updatedAt,
         sender: e.createdBy.name,
         folder: e.folder,
+        approvalStatus: e.approvalStatus,
         recipients: e.recipients.map((r) => ({ name: r.name, email: r.email, role: r.role, status: r.status })),
       })),
       nextCursor: hasMore ? items[q.limit - 1].id : null,
@@ -511,6 +521,41 @@ export async function envelopeRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     await getVisibleEnvelope(req.auth, id);
     return serializeEnvelope(await sendEnvelope(req.auth.orgId, id, req.auth.actor, clientInfo(req)));
+  });
+
+  /** Approver decision on a draft waiting for internal approval. Approving sends it. */
+  app.post('/envelopes/:id/approval', async (req) => {
+    const { id } = req.params as { id: string };
+    const body = parse(z.object({ decision: z.enum(['approve', 'reject']), note: z.string().trim().max(1000).optional() }), req.body);
+    const env = await getEnvelope(req.auth.orgId, id);
+    if (env.status !== 'DRAFT' || env.approvalStatus !== 'PENDING') throw conflict('This agreement is not waiting for approval.');
+    const [org, me] = await Promise.all([
+      prisma.organization.findUniqueOrThrow({ where: { id: req.auth.orgId } }),
+      req.auth.userId ? prisma.user.findUnique({ where: { id: req.auth.userId } }) : null,
+    ]);
+    if (!me || !isApprover(org, me)) throw forbidden('You are not an approver for this organisation.');
+    if (me.id === env.approvalRequestedBy) throw forbidden('Someone else must approve agreements you send.');
+    const requester = await prisma.user.findUniqueOrThrow({ where: { id: env.approvalRequestedBy! } });
+    const approved = body.decision === 'approve';
+    await prisma.$transaction(async (tx) => {
+      await tx.envelope.update({
+        where: { id },
+        data: { approvalStatus: approved ? 'APPROVED' : 'REJECTED', approvalDecidedBy: me.id, approvalNote: body.note ?? null, approvalFingerprint: approved ? approvalFingerprint(env) : null },
+      });
+      await appendAudit(tx, { envelopeId: id, type: approved ? 'envelope.approved' : 'envelope.approval_rejected', actor: req.auth.actor, data: { note: body.note ?? null }, ...clientInfo(req) });
+    });
+    if (!approved) {
+      const { html, text } = layout({
+        heading: `${me.name} sent "${env.title}" back`,
+        paragraphs: [body.note ? `Note: ${body.note}` : 'Make the changes needed and send it again.'],
+        button: { label: 'Open agreement', url: `${config.appUrl}/envelopes/${id}/edit` },
+      });
+      await sendMail({ to: requester.email, subject: `Changes requested: ${env.title}`, html, text }).catch(() => {});
+      return serializeEnvelope(await getEnvelope(req.auth.orgId, id));
+    }
+    // Sent on behalf of the person who asked for approval
+    const sent = await sendEnvelope(req.auth.orgId, id, { kind: 'user', id: requester.id, name: requester.name, email: requester.email }, clientInfo(req));
+    return serializeEnvelope(sent);
   });
 
   app.post('/envelopes/:id/void', async (req) => {

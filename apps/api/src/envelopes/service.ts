@@ -18,6 +18,7 @@ import { enqueueWebhook } from '../webhooks/dispatcher.js';
 import { assertCanSend } from '../billing/plans.js';
 import { HttpError } from '../lib/errors.js';
 import { mandateLabels } from '../enach/routes.js';
+import { approvalGate } from '../approvals/service.js';
 
 export const envelopeInclude = {
   documents: { orderBy: { order: 'asc' } },
@@ -113,6 +114,8 @@ export async function sendEnvelope(orgId: string, id: string, actor: Actor, clie
   const policy = resolvePolicy(env.jurisdiction, env.documentType);
   if (!policy.allowed) throw unprocessable('This document cannot be sent under the selected compliance profile.', { problems: policy.blockers });
   await assertCanSend(orgId);
+  // Internal approval: the agreement waits as a draft until an approver approves it
+  if (actor.kind === 'user' && (await approvalGate(env, actor.id)) === 'pending') return getEnvelope(orgId, id);
   if (actor.kind === 'user') {
     const sender = await prisma.user.findUnique({ where: { id: actor.id }, select: { emailVerifiedAt: true } });
     if (sender && !sender.emailVerifiedAt) throw new HttpError(403, 'Confirm your email address before sending. We sent you a link when you signed up.', 'email_unverified');
