@@ -34,18 +34,24 @@ declare module 'fastify' {
   }
 }
 
-export async function createSession(reply: FastifyReply, userId: string) {
+/** Creates a session row and returns its raw token. */
+export async function issueSessionToken(request: FastifyRequest, userId: string, label?: string): Promise<string> {
   const token = randomToken();
-  const ua = reply.request.headers['user-agent'];
+  const ua = request.headers['user-agent'];
   await prisma.session.create({
     data: {
       userId,
       tokenHash: sha256Hex(token),
       expiresAt: new Date(Date.now() + SESSION_TTL_MS),
-      ip: reply.request.ip,
-      userAgent: typeof ua === 'string' ? ua.slice(0, 300) : null,
+      ip: request.ip,
+      userAgent: label ?? (typeof ua === 'string' ? ua.slice(0, 300) : null),
     },
   });
+  return token;
+}
+
+export async function createSession(reply: FastifyReply, userId: string) {
+  const token = await issueSessionToken(reply.request, userId);
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -80,7 +86,9 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     return;
   }
 
-  const token = request.cookies[SESSION_COOKIE];
+  // Office add-ins on the web run in cross-site iframes without cookies; they send the token instead
+  const headerToken = request.headers['x-session-token'];
+  const token = request.cookies[SESSION_COOKIE] ?? (typeof headerToken === 'string' ? headerToken : undefined);
   if (!token) throw unauthorized();
   const session = await prisma.session.findUnique({
     where: { tokenHash: sha256Hex(token) },

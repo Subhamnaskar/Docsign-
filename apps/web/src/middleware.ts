@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:4000';
+const OFFICE_ORIGINS = ['https://*.officeapps.live.com', 'https://*.office.com', 'https://*.office365.com', 'https://outlook.live.com', 'https://*.sharepoint.com', 'https://*.microsoft365.com'];
 
 /**
  * Clickjacking protection. Pages can only be framed by this site, except
@@ -21,6 +22,8 @@ export async function middleware(req: NextRequest) {
       // API unreachable: fall back to the strict policy
     }
   }
+  // The Office task pane is framed by Office on the web
+  if (req.nextUrl.pathname.startsWith('/office/taskpane')) origins = OFFICE_ORIGINS;
   res.headers.set('Content-Security-Policy', ["frame-ancestors 'self'", ...origins].join(' '));
   return res;
 }

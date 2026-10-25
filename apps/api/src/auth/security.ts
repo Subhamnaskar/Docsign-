@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { logActivity } from '../lib/activity.js';
-import { createSession, requireAuth } from '../lib/auth.js';
+import { createSession, issueSessionToken, requireAuth } from '../lib/auth.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { badRequest, forbidden, notFound, unauthorized } from '../lib/errors.js';
 import { layout, sendMail } from '../lib/mailer.js';
@@ -205,6 +205,12 @@ export async function securityRoutes(app: FastifyInstance) {
       const res = await prisma.session.deleteMany({ where: { id, userId: req.auth.userId ?? '' } });
       if (!res.count) throw notFound('Session');
       reply.code(204);
+    });
+
+    /** Session token for an Office add-in, handed over from a top-level sign-in dialog. */
+    r.post('/auth/session-token', strict, async (req) => {
+      const user = await me(req.auth.userId);
+      return { token: await issueSessionToken(req, user.id, 'Office add-in') };
     });
 
     r.post('/auth/sessions/revoke-others', async (req) => {

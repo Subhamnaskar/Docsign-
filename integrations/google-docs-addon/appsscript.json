@@ -1,0 +1,22 @@
+{
+  "timeZone": "Asia/Kolkata",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/documents.currentonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "urlFetchWhitelist": ["https://app.example.com/"],
+  "addOns": {
+    "common": {
+      "name": "DocSign",
+      "logoUrl": "https://app.example.com/icons/icon-128.png",
+      "layoutProperties": { "primaryColor": "#4f46e5" }
+    },
+    "docs": {
+      "homepageTrigger": { "runFunction": "onHomepage" }
+    }
+  }
+}

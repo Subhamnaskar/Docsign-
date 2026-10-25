@@ -40,9 +40,30 @@ export function signerSessionHeaders(): Record<string, string> {
   }
 }
 
+const ADDIN_SESSION_KEY = 'ds_addin_session';
+
+/** Office add-ins on the web can't use cookies (cross-site iframe), so they keep a session token. */
+export function setAddinSession(token: string | null) {
+  try {
+    if (token) localStorage.setItem(ADDIN_SESSION_KEY, token);
+    else localStorage.removeItem(ADDIN_SESSION_KEY);
+  } catch {
+    // Storage unavailable: the add-in asks to sign in again
+  }
+}
+
+function addinSessionHeaders(): Record<string, string> {
+  try {
+    const token = typeof window !== 'undefined' && window.location.pathname.startsWith('/office/') ? localStorage.getItem(ADDIN_SESSION_KEY) : null;
+    return token ? { 'X-Session-Token': token } : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function api<T = unknown>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, headers, ...rest } = init;
-  const base = path.startsWith('/signing/') ? signerSessionHeaders() : {};
+  const base = path.startsWith('/signing/') ? signerSessionHeaders() : addinSessionHeaders();
   const res = await fetch(`/api/v1${path}`, {
     credentials: 'include',
     ...rest,

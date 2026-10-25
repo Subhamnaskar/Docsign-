@@ -149,6 +149,18 @@ describe('two-factor authentication', () => {
   });
 });
 
+describe('Office add-in sessions', () => {
+  it('issues a session token that works in a header where cookies are unavailable', async () => {
+    const { c } = await registerSender(app);
+    const { token } = await c.json('POST', '/auth/session-token');
+    const res = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { 'x-session-token': token } });
+    expect(res.statusCode).toBe(200);
+    expect((await c.json('GET', '/auth/sessions')).some((x: { userAgent: string }) => x.userAgent === 'Office add-in')).toBe(true);
+    expect((await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { 'x-session-token': 'nope' } })).statusCode).toBe(401);
+    expect((await client(app).call('POST', '/auth/session-token')).statusCode).toBe(401);
+  });
+});
+
 describe('sessions', () => {
   it('lists devices and signs out the others', async () => {
     const { c, email } = await registerSender(app);
