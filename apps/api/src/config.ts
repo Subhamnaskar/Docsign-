@@ -118,6 +118,15 @@ export const config = {
     dropboxAppKey: process.env.DROPBOX_APP_KEY ?? '',
     onedriveClientId: process.env.ONEDRIVE_CLIENT_ID ?? '',
   },
+  /**
+   * Emails of NuronixAI staff who can open the platform console (/admin):
+   * every customer, plan, login and revenue figure. Comma-separated; they
+   * must also confirm their email, and in production turn on two-factor.
+   */
+  platformAdmins: (process.env.PLATFORM_ADMINS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
   billing: {
     /** sandbox (built-in test checkout) | stripe | razorpay. Uses the Stripe/Razorpay keys above. */
     provider: env('BILLING_PROVIDER', 'sandbox') as 'sandbox' | 'stripe' | 'razorpay',

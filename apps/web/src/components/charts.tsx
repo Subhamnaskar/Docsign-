@@ -44,17 +44,19 @@ export function Legend({ items }: { items: { label: string; color: string }[] })
   );
 }
 
-/** Multi-series line chart over weeks with a crosshair tooltip. */
+/** Multi-series line chart (weeks by default) with a crosshair tooltip. */
 export function LineChart({
   data,
   series,
   formatX,
   height = 220,
+  period = 'week',
 }: {
   data: { x: string; values: number[] }[];
   series: { label: string; color: string }[];
   formatX: (x: string) => string;
   height?: number;
+  period?: 'week' | 'day';
 }) {
   const { ref, width } = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -76,7 +78,7 @@ export function LineChart({
   return (
     <div ref={ref} className="relative">
       {width > 0 && (
-        <svg width={width} height={height} role="img" aria-label={`Line chart: ${series.map((s) => s.label).join(' and ')} per week`}>
+        <svg width={width} height={height} role="img" aria-label={`Line chart: ${series.map((s) => s.label).join(' and ')} per ${period}`}>
           <g transform={`translate(${pad.left},${pad.top})`}>
             {ticks.map((t) => (
               <g key={t}>
@@ -128,7 +130,7 @@ export function LineChart({
           className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg"
           style={{ left: Math.min(pad.left + x(hover) + 12, width - 150), top: pad.top }}
         >
-          <div className="font-medium text-gray-900">Week of {formatX(data[hover].x)}</div>
+          <div className="font-medium text-gray-900">{period === 'week' ? 'Week of ' : ''}{formatX(data[hover].x)}</div>
           {series.map((s, si) => (
             <div key={s.label} className="mt-1 flex items-center gap-2 text-gray-600">
               <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />

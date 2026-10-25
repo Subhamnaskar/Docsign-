@@ -27,6 +27,8 @@ const LABELS: Record<string, string> = {
   'branding.logo_updated': 'Uploaded a logo',
   'branding.logo_removed': 'Removed the logo',
   'sso.updated': 'Changed single sign-on',
+  'platform.trial_extended': 'NuronixAI support extended the free trial',
+  'platform.plan_changed': 'NuronixAI support changed the plan',
 };
 
 function summary(e: Entry): string {

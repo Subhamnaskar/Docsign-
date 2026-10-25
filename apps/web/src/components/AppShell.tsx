@@ -72,6 +72,14 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
                 {t(n.label)}
               </Link>
             ))}
+            {me?.user?.platformAdmin && (
+              <Link
+                href="/admin"
+                className={cx('rounded-md px-3 py-1.5 text-sm font-semibold', pathname.startsWith('/admin') ? 'bg-ink text-white' : 'text-brand-700 hover:bg-brand-50')}
+              >
+                {t('nav.console')}
+              </Link>
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
             {me && (

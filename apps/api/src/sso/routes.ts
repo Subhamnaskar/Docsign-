@@ -132,7 +132,7 @@ export async function ssoRoutes(app: FastifyInstance) {
     } else if (!user.ssoSubject && claims?.sub) {
       await prisma.user.update({ where: { id: user.id }, data: { ssoSubject: claims.sub } });
     }
-    await createSession(reply, user.id);
+    await createSession(reply, user.id, 'sso');
     return reply.redirect(`${config.appUrl}${flow.next}`, 303);
   });
 

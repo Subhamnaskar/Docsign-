@@ -6,11 +6,13 @@ import { prisma } from '../db.js';
 import { logActivity } from '../lib/activity.js';
 import { createSession, requireAuth, requireRole, SESSION_COOKIE } from '../lib/auth.js';
 import { sha256Hex } from '../lib/crypto.js';
+import { type LoginFailure, recordLogin } from '../lib/logins.js';
 import { badRequest, conflict, forbidden, unauthorized } from '../lib/errors.js';
 import { ssoOrgForEmail } from '../sso/routes.js';
 import { parse } from '../lib/validate.js';
 import { JURISDICTIONS } from '../policy/jurisdictions.js';
 import { billingBrief } from '../billing/routes.js';
+import { isPlatformAdmin } from '../platform/routes.js';
 import { isSsoOnly, passwordSchema } from './security.js';
 import { issueToken, sendVerificationEmail } from './tokens.js';
 
@@ -53,7 +55,7 @@ export async function authRoutes(app: FastifyInstance) {
         },
       },
     });
-    await createSession(reply, user.id);
+    await createSession(reply, user.id, 'register');
     await sendVerificationEmail(user);
     reply.code(201);
     return { id: user.id, name: user.name, email: user.email };
@@ -63,13 +65,21 @@ export async function authRoutes(app: FastifyInstance) {
     const body = parse(z.object({ email: z.string().trim().toLowerCase(), password: z.string() }), req.body);
     const user = await prisma.user.findUnique({ where: { email: body.email } });
     const ok = await bcrypt.compare(body.password, user?.passwordHash ?? DUMMY_HASH);
-    if (!user || !ok) throw unauthorized('Incorrect email or password.');
+    const failed = (reason: LoginFailure) => recordLogin(req, { email: body.email, method: 'password', success: false, userId: user?.id, orgId: user?.orgId, reason });
+    if (!user || !ok) {
+      await failed(user ? 'bad_password' : 'unknown_user');
+      throw unauthorized('Incorrect email or password.');
+    }
     const sso = await ssoOrgForEmail(body.email);
     // Owners keep password access so a broken identity provider can't lock everyone out
     if (sso?.ssoEnforced && sso.id === user.orgId && user.role !== 'OWNER') {
+      await failed('sso_required');
       throw forbidden('Your organisation requires single sign-on. Use "Sign in with SSO".');
     }
-    if (user.disabledAt) throw unauthorized('This account has been deactivated.');
+    if (user.disabledAt) {
+      await failed('deactivated');
+      throw unauthorized('This account has been deactivated.');
+    }
     if (user.totpEnabledAt) {
       // Password was right; the session is only created after the second factor
       return { mfaRequired: true, mfaToken: await issueToken(user.id, 'MFA_LOGIN') };
@@ -99,6 +109,8 @@ export async function authRoutes(app: FastifyInstance) {
         twoFactor: Boolean(user.totpEnabledAt),
         // The organisation requires two-factor and this password user hasn't set it up
         mfaSetupRequired: org.require2fa && !user.totpEnabledAt && !isSsoOnly(user),
+        // NuronixAI staff: show the platform console link
+        platformAdmin: Boolean(req.auth.sessionId) && isPlatformAdmin(user),
       },
       organization: {
         id: org.id,

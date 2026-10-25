@@ -38,7 +38,7 @@ export async function teamRoutes(app: FastifyInstance) {
     await prisma.activityLog.create({
       data: { orgId: inv.orgId, type: 'user.joined', actor: { kind: 'user', id: user.id, name: user.name, email: user.email }, data: { role: user.role }, ip: req.ip },
     });
-    await createSession(reply, user.id);
+    await createSession(reply, user.id, 'invite');
     reply.code(201);
     return { id: user.id, name: user.name, email: user.email };
   });

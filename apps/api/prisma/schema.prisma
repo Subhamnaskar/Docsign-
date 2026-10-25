@@ -138,6 +138,9 @@ model User {
   // Hashed single-use recovery codes
   recoveryCodeHashes String[]     @default([])
   authTokens   AuthToken[]
+  loginEvents  LoginEvent[]
+  // Last successful sign-in (any method), for the platform console
+  lastLoginAt  DateTime?
   // Getting-started checklist hidden by the user
   onboardingDismissedAt DateTime?
   // Language of the app for this user (BCP 47, e.g. "hi")
@@ -1003,4 +1006,36 @@ model CrmEvent {
   createdAt     DateTime       @default(now())
 
   @@index([status, nextAttemptAt])
+}
+
+/// Every sign-in attempt, successful or not, for the platform console
+/// (NuronixAI staff): logins per day, failed attempts, sign-in methods.
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orgId     String?
+  email     String
+  // password | mfa | sso | invite | register | office
+  method    String
+  success   Boolean
+  // Why a failed attempt failed (bad_password, unknown_user, deactivated, sso_required, bad_code)
+  reason    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+/// One row per user per day they used the app, for daily/weekly/monthly
+/// active-user counts in the platform console (sessions only keep the latest).
+model ActiveDay {
+  userId String
+  orgId  String
+  day    DateTime @db.Date
+
+  @@id([userId, day])
+  @@index([day])
 }

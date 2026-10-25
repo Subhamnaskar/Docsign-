@@ -37,6 +37,7 @@ import { departmentRoutes } from './governance/departments.js';
 import { helpRoutes } from './help/routes.js';
 import { crmRoutes } from './crm/routes.js';
 import { qesRoutes } from './qes/routes.js';
+import { platformRoutes } from './platform/routes.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
 export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] } = {}) {
@@ -87,6 +88,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(reportRoutes);
       await v1.register(esignRoutes);
       await v1.register(qesRoutes);
+      await v1.register(platformRoutes);
       await v1.register(ssoRoutes);
       await v1.register(scimRoutes);
       await v1.register(integrationRoutes);

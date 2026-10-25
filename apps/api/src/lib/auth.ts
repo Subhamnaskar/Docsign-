@@ -6,6 +6,7 @@ import { hmacSha256Hex, randomToken, safeEqualHex, sha256Hex } from './crypto.js
 import { forbidden, HttpError, unauthorized } from './errors.js';
 import { assertFeature } from '../billing/plans.js';
 import { ipAllowed, orgIpAllowlist } from '../governance/delivery.js';
+import { type LoginMethod, markActive, recordLogin } from './logins.js';
 
 export const SESSION_COOKIE = 'ds_session';
 export const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
@@ -34,11 +35,11 @@ declare module 'fastify' {
   }
 }
 
-/** Creates a session row and returns its raw token. */
-export async function issueSessionToken(request: FastifyRequest, userId: string, label?: string): Promise<string> {
+/** Creates a session row, records the sign-in and returns the raw token. */
+export async function issueSessionToken(request: FastifyRequest, userId: string, label?: string, method: LoginMethod = 'password'): Promise<string> {
   const token = randomToken();
   const ua = request.headers['user-agent'];
-  await prisma.session.create({
+  const session = await prisma.session.create({
     data: {
       userId,
       tokenHash: sha256Hex(token),
@@ -46,12 +47,14 @@ export async function issueSessionToken(request: FastifyRequest, userId: string,
       ip: request.ip,
       userAgent: label ?? (typeof ua === 'string' ? ua.slice(0, 300) : null),
     },
+    include: { user: { select: { email: true, orgId: true } } },
   });
+  await recordLogin(request, { email: session.user.email, method, success: true, userId, orgId: session.user.orgId });
   return token;
 }
 
-export async function createSession(reply: FastifyReply, userId: string) {
-  const token = await issueSessionToken(reply.request, userId);
+export async function createSession(reply: FastifyReply, userId: string, method: LoginMethod = 'password') {
+  const token = await issueSessionToken(reply.request, userId, undefined, method);
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -104,6 +107,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
   }
   if (Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_RESOLUTION_MS) {
     prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
+    markActive(user.id, user.orgId);
   }
   request.auth = {
     orgId: user.orgId,

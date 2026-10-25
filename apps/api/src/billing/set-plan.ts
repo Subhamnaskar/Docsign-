@@ -7,6 +7,7 @@
  * Plans: enterprise | business | starter (billed manually) | trial (extends the trial by --months, default 1).
  */
 import { prisma } from '../db.js';
+import { applyManualPlan } from './manual-plan.js';
 import { isPlanId } from './plans.js';
 
 const [who, plan, ...rest] = process.argv.slice(2);
@@ -28,25 +29,9 @@ if (!org) {
   process.exit(1);
 }
 
-const months = flag('months', plan === 'trial' ? 1 : 12);
-const end = new Date();
-end.setUTCMonth(end.getUTCMonth() + months);
-
-const updated =
-  plan === 'trial'
-    ? await prisma.organization.update({ where: { id: org.id }, data: { plan, billingStatus: 'TRIALING', trialEndsAt: end } })
-    : await prisma.organization.update({
-        where: { id: org.id },
-        data: {
-          plan,
-          seats: flag('seats', org.seats),
-          billingStatus: 'ACTIVE',
-          billingProvider: 'manual',
-          subscriptionRef: null,
-          cancelAtPeriodEnd: false,
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: end,
-        },
-      });
+const { org: updated, until: end } = await applyManualPlan(org.id, plan, {
+  seats: rest.includes('--seats') ? flag('seats', org.seats) : undefined,
+  months: rest.includes('--months') ? flag('months', 1) : undefined,
+});
 console.log(`${updated.name}: ${updated.plan}, ${updated.seats} seats, until ${end.toISOString().slice(0, 10)}`);
 await prisma.$disconnect();

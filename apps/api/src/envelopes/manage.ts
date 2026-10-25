@@ -16,7 +16,7 @@ import { envelopeScope, getVisibleEnvelope, notifySigners } from './service.js';
 const MAX_DOWNLOAD = 50;
 const EMBED_TICKET_TTL_MS = 5 * 60 * 1000;
 
-const csvCell = (v: unknown) => {
+export const csvCell = (v: unknown) => {
   const s = v == null ? '' : v instanceof Date ? v.toISOString() : String(v);
   // Prefix formula-like cells so spreadsheets don't execute them
   const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;

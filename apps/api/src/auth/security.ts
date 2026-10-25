@@ -7,6 +7,7 @@ import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { logActivity } from '../lib/activity.js';
 import { createSession, issueSessionToken, requireAuth } from '../lib/auth.js';
+import { recordLogin } from '../lib/logins.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { badRequest, forbidden, notFound, unauthorized } from '../lib/errors.js';
 import { layout, sendMail } from '../lib/mailer.js';
@@ -98,10 +99,11 @@ export async function securityRoutes(app: FastifyInstance) {
     if (!t || t.attempts >= MFA_MAX_ATTEMPTS) throw unauthorized('This sign-in has expired. Enter your password again.');
     if (!(await checkSecondFactor(t.user, body.code))) {
       await prisma.authToken.update({ where: { id: t.id }, data: { attempts: { increment: 1 } } });
+      await recordLogin(req, { email: t.user.email, method: 'mfa', success: false, userId: t.user.id, orgId: t.user.orgId, reason: 'bad_code' });
       throw unauthorized('That code is not correct.');
     }
     if (!(await consumeToken(body.token, 'MFA_LOGIN'))) throw unauthorized('This sign-in has expired. Enter your password again.');
-    await createSession(reply, t.user.id);
+    await createSession(reply, t.user.id, 'mfa');
     return { id: t.user.id, name: t.user.name, email: t.user.email };
   });
 
@@ -210,7 +212,7 @@ export async function securityRoutes(app: FastifyInstance) {
     /** Session token for an Office add-in, handed over from a top-level sign-in dialog. */
     r.post('/auth/session-token', strict, async (req) => {
       const user = await me(req.auth.userId);
-      return { token: await issueSessionToken(req, user.id, 'Office add-in') };
+      return { token: await issueSessionToken(req, user.id, 'Office add-in', 'office') };
     });
 
     r.post('/auth/sessions/revoke-others', async (req) => {
