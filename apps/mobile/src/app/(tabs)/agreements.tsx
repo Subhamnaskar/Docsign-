@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput } from 'react-native';
 import { EnvelopeRow } from '@/components/EnvelopeRow';
-import { Empty, Heading, Notice, Screen } from '@/components/ui';
+import { Empty, Grid, Heading, Notice, Screen } from '@/components/ui';
 import { api } from '@/lib/api';
 import { radius, space, useTheme } from '@/lib/theme';
 import type { EnvelopeStatus, EnvelopeSummary } from '@/lib/types';
@@ -64,7 +64,7 @@ export default function Agreements() {
       </ScrollView>
       {error ? <Notice>{error}</Notice> : null}
       {data && !data.data.length ? <Empty title="No agreements">{query ? 'Nothing matches your search.' : 'Agreements you send appear here.'}</Empty> : null}
-      {data?.data.map((e) => <EnvelopeRow key={e.id} envelope={e} />)}
+      <Grid>{data?.data.map((e) => <EnvelopeRow key={e.id} envelope={e} />)}</Grid>
     </Screen>
   );
 }

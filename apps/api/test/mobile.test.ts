@@ -90,6 +90,8 @@ describe('mobile app', () => {
     expect(first.headers.location).toBe('/envelopes/new');
     const cookie = first.cookies.find((c) => c.name === 'ds_session');
     expect(cookie?.httpOnly).toBe(true);
+    // Marks the web view as the app's, so the website hides its own navigation
+    expect(first.cookies.find((c) => c.name === 'ds_app')?.value).toBe('1');
     const me = await app.inject({ method: 'GET', url: '/api/v1/auth/me', headers: { cookie: `ds_session=${cookie!.value}` } });
     expect(me.json().user.email).toBe(email);
 

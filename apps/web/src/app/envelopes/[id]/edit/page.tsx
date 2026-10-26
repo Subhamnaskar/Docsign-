@@ -189,7 +189,7 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-6">
         <Card className="p-5">
           <h2 className="mb-4 font-semibold">Documents</h2>
@@ -672,7 +672,7 @@ function ReviewStep({ env }: { env: Envelope }) {
   const ai = Boolean(me?.features?.ai && me.organization.aiEnabled);
   const signers = env.recipients.filter((r) => r.role === 'SIGNER');
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <Card className="p-5">
         <h2 className="text-lg font-semibold">{env.title}</h2>
         {env.message && <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600">{env.message}</p>}
@@ -791,8 +791,11 @@ function Builder() {
   useEffect(() => {
     api<Envelope>(`/envelopes/${id}`)
       .then((e) => {
-        if (e.status !== 'DRAFT') router.replace(`/envelopes/${id}`);
-        else adopt(e);
+        if (e.status !== 'DRAFT') return router.replace(`/envelopes/${id}`);
+        adopt(e);
+        // The mobile app adds the document and signers itself, then opens ?step=fields
+        const ready = e.documents.length > 0 && e.recipients.some((r) => r.role === 'SIGNER');
+        if (ready && new URLSearchParams(window.location.search).get('step') === 'fields') setStep(2);
       })
       .catch((err) => setError({ message: err.message, problems: [] }));
     api<typeof options>('/policy/options').then(setOptions);

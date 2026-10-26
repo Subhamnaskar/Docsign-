@@ -9,6 +9,7 @@ import { cx, Logo, PageLoader } from './ui';
 import { HelpPanel } from './HelpPanel';
 import { Icon, type IconName } from './marketing/Icons';
 import { AppLocaleContext, type AppKey, appT } from '@/lib/appI18n';
+import { useInApp } from '@/lib/inApp';
 
 const MeContext = createContext<Me | null>(null);
 export const useMe = () => useContext(MeContext);
@@ -33,6 +34,7 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
   const [helpOpen, setHelpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const inApp = useInApp();
 
   useEffect(() => {
     api<Me>('/auth/me')
@@ -115,6 +117,17 @@ export function AppShell({ children, wide }: { children: ReactNode; wide?: boole
       </div>
     </div>
   );
+
+  if (inApp) {
+    return (
+      <AppLocaleContext.Provider value={locale}>
+        <MeContext.Provider value={me}>
+          {me && <AccountBanner me={me} wide={wide} />}
+          <main className="px-4 py-4">{me ? children : <PageLoader />}</main>
+        </MeContext.Provider>
+      </AppLocaleContext.Provider>
+    );
+  }
 
   return (
     <AppLocaleContext.Provider value={locale}>

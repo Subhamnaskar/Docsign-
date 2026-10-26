@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Body, Button, Card, Heading, Label, Notice, Screen } from '@/components/ui';
+import { Body, Button, Card, Grid, Heading, Label, Notice, Screen } from '@/components/ui';
 import { api } from '@/lib/api';
 import { activityLabel, timeAgo } from '@/lib/format';
 import { radius, space, useTheme } from '@/lib/theme';
 import type { Home, ToSignItem } from '@/lib/types';
+import { useLayout } from '@/lib/layout';
 import { useLoad } from '@/lib/useLoad';
 
 export default function HomeScreen() {
@@ -17,6 +18,7 @@ export default function HomeScreen() {
   }, []);
   const { data, error, refreshing, refresh } = useLoad(load);
   const first = data?.name?.split(' ')[0];
+  const { wide } = useLayout();
 
   return (
     <Screen safeTop refreshing={refreshing} onRefresh={refresh}>
@@ -30,42 +32,49 @@ export default function HomeScreen() {
         <Stat label="Completed this month" value={data?.counts.completedThisMonth} onPress={() => router.push({ pathname: '/agreements', params: { status: 'COMPLETED' } })} />
       </View>
 
-      <View style={{ gap: space.md }}>
-        <Button title="Send for signature" onPress={() => router.push('/new')} />
-        <Button title="Sign a document yourself" kind="secondary" onPress={() => router.push({ pathname: '/new', params: { mode: 'self' } })} />
+      <View style={{ gap: space.md, flexDirection: wide ? 'row' : 'column' }}>
+        <View style={{ flex: wide ? 1 : undefined }}>
+          <Button title="Send for signature" onPress={() => router.push('/new')} />
+        </View>
+        <View style={{ flex: wide ? 1 : undefined }}>
+          <Button title="Sign a document yourself" kind="secondary" onPress={() => router.push({ pathname: '/new', params: { mode: 'self' } })} />
+        </View>
       </View>
 
       <Label>Recent activity</Label>
       {data && !data.activity.length ? <Body muted>Nothing yet. Agreements you send show up here.</Body> : null}
-      {data?.activity.map((a) => (
-        <Card key={a.id} onPress={() => router.push(`/agreement/${a.envelope.id}`)}>
-          <Body>
-            {a.type === 'envelope.completed' ? (
-              <>
-                <Text style={{ fontWeight: '700' }}>{a.envelope.title}</Text> is complete
-              </>
-            ) : (
-              <>
-                <Text style={{ fontWeight: '700' }}>{a.actor?.name ?? a.actor?.email ?? 'A signer'}</Text> {activityLabel[a.type] ?? a.type} {a.envelope.title}
-              </>
-            )}
-          </Body>
-          <Body muted>{timeAgo(a.createdAt)}</Body>
-        </Card>
-      ))}
+      <Grid>
+        {data?.activity.map((a) => (
+          <Card key={a.id} onPress={() => router.push(`/agreement/${a.envelope.id}`)}>
+            <Body>
+              {a.type === 'envelope.completed' ? (
+                <>
+                  <Text style={{ fontWeight: '700' }}>{a.envelope.title}</Text> is complete
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontWeight: '700' }}>{a.actor?.name ?? a.actor?.email ?? 'A signer'}</Text> {activityLabel[a.type] ?? a.type} {a.envelope.title}
+                </>
+              )}
+            </Body>
+            <Body muted>{timeAgo(a.createdAt)}</Body>
+          </Card>
+        ))}
+      </Grid>
     </Screen>
   );
 }
 
 function Stat({ label, value, onPress, highlight }: { label: string; value?: number; onPress: () => void; highlight?: boolean }) {
   const t = useTheme();
+  const { wide } = useLayout();
   const strong = highlight && !!value;
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
         flexGrow: 1,
-        flexBasis: '45%',
+        flexBasis: wide ? '22%' : '45%',
         padding: space.lg,
         borderRadius: radius.lg,
         backgroundColor: strong ? t.primary : t.card,

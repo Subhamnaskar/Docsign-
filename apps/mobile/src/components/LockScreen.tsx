@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useAuth } from '@/lib/auth';
+import { MAX_FORM_WIDTH } from '@/lib/layout';
 import { space, useTheme } from '@/lib/theme';
 import { Body, Button, Heading, Logo } from './ui';
 
@@ -23,7 +24,7 @@ export function LockScreen() {
       <Logo size={64} />
       <Heading>Nuronix eSign is locked</Heading>
       {me?.user ? <Body muted>{me.user.email}</Body> : null}
-      <View style={{ alignSelf: 'stretch', gap: space.md, marginTop: space.lg }}>
+      <View style={{ gap: space.md, marginTop: space.lg, width: '100%', maxWidth: MAX_FORM_WIDTH }}>
         <Button title="Unlock" onPress={() => unlock().then((ok) => setFailed(!ok))} />
         {failed ? <Button title="Sign out" kind="secondary" onPress={signOut} /> : null}
       </View>

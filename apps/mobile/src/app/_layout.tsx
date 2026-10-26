@@ -5,10 +5,12 @@ import { useEffect } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 import { LockScreen } from '@/components/LockScreen';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { lockPhonesUpright } from '@/lib/layout';
 import { routeForNotification } from '@/lib/push';
 import { useTheme } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
+lockPhonesUpright();
 
 export default function RootLayout() {
   return (

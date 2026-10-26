@@ -37,7 +37,7 @@ export default function Agreement() {
   const edit = () =>
     env.selfSign
       ? openWebPage(router, `/sign-yourself?id=${env.id}`, { title: 'Sign', watch: env.id })
-      : openWebPage(router, `/envelopes/${env.id}/edit`, { title: 'Place fields', watch: env.id });
+      : openWebPage(router, `/envelopes/${env.id}/edit?step=fields`, { title: 'Place fields', watch: env.id });
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>

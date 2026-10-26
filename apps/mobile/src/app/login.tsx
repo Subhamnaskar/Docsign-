@@ -36,7 +36,7 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen safeTop>
+      <Screen safeTop narrow>
         <View style={{ alignItems: 'center', gap: space.md, marginTop: space.xxl, marginBottom: space.lg }}>
           <Logo size={64} />
           <Heading size={26}>Nuronix eSign</Heading>

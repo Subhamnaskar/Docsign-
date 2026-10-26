@@ -76,7 +76,7 @@ export default function NewAgreement() {
         });
       }
       // Placing fields is easiest on the page itself; the editor then sends (or starts signing)
-      await openWebPage(router, self ? `/sign-yourself?id=${env.id}` : `/envelopes/${env.id}/edit`, { title: self ? 'Sign' : 'Place fields', watch: env.id, replace: true });
+      await openWebPage(router, self ? `/sign-yourself?id=${env.id}` : `/envelopes/${env.id}/edit?step=fields`, { title: self ? 'Sign' : 'Place fields', watch: env.id, replace: true });
     });
 
   return (

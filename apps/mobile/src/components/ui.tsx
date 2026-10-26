@@ -1,25 +1,65 @@
 import * as Haptics from 'expo-haptics';
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, type TextInputProps, View, type ViewStyle } from 'react-native';
 import { statusLabel } from '@/lib/format';
+import { MAX_CONTENT_WIDTH, MAX_FORM_WIDTH, useLayout } from '@/lib/layout';
 import { gold, radius, space, type Theme, useTheme } from '@/lib/theme';
 import type { EnvelopeStatus } from '@/lib/types';
 
-/** Scrolling page with pull-to-refresh. Tab screens have no header, so they keep clear of the status bar (`safeTop`). */
-export function Screen({ children, refreshing, onRefresh, safeTop }: { children: ReactNode; refreshing?: boolean; onRefresh?: () => void; safeTop?: boolean }) {
+/**
+ * Scrolling page with pull-to-refresh, centred and capped in width on tablets.
+ * Tab screens have no header, so they keep clear of the status bar (`safeTop`);
+ * `narrow` is for forms.
+ */
+export function Screen({
+  children,
+  refreshing,
+  onRefresh,
+  safeTop,
+  narrow,
+}: {
+  children: ReactNode;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  safeTop?: boolean;
+  narrow?: boolean;
+}) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: t.background }}
-      contentContainerStyle={{ padding: space.lg, paddingTop: space.lg + (safeTop ? insets.top : 0), gap: space.lg, paddingBottom: space.xxl * 2 }}
+      contentContainerStyle={{ padding: space.lg, paddingTop: space.lg + (safeTop ? insets.top : 0), paddingBottom: space.xxl * 2 }}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={t.primary} /> : undefined}>
-      {children}
+      <View style={{ width: '100%', maxWidth: narrow ? MAX_FORM_WIDTH : MAX_CONTENT_WIDTH, alignSelf: 'center', gap: space.lg }}>{children}</View>
     </ScrollView>
+  );
+}
+
+/** A list of cards: one column on phones, two on tablets. */
+export function Grid({ children }: { children: ReactNode }) {
+  const { wide } = useLayout();
+  if (!wide) return <View style={{ gap: space.lg }}>{children}</View>;
+  // Rows of two, so a card left on its own keeps the width of a column
+  const items = Children.toArray(children);
+  const rows = Array.from({ length: Math.ceil(items.length / 2) }, (_, i) => items.slice(i * 2, i * 2 + 2));
+  return (
+    <View style={{ gap: space.lg }}>
+      {rows.map((row, i) => (
+        <View key={i} style={{ flexDirection: 'row', gap: space.lg }}>
+          {row.map((child, j) => (
+            <View key={j} style={{ flex: 1 }}>
+              {child}
+            </View>
+          ))}
+          {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -153,7 +193,7 @@ export function Logo({ size = 40 }: { size?: number }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: space.lg, gap: space.sm },
+  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: space.lg, gap: space.sm, flexGrow: 1 },
   button: { minHeight: 50, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.lg },
   input: { minHeight: 48, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
   pill: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },

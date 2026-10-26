@@ -11,6 +11,8 @@ import { parse } from '../lib/validate.js';
 import { config } from '../config.js';
 
 const platform = z.enum(['ios', 'android']);
+/** Read by the website (apps/web lib/inApp.ts) */
+const IN_APP_COOKIE = 'ds_app';
 
 /** Only paths on this site (no other hosts, no protocol-relative URLs). */
 const safePath = z
@@ -49,6 +51,8 @@ export async function mobileRoutes(app: FastifyInstance) {
     const user = await consumeToken(token, 'WEB_HANDOFF');
     if (!user) return reply.redirect(`/login?next=${encodeURIComponent(next)}`);
     await createSession(reply, user.id, 'mobile');
+    // Not a secret: tells the website it is inside the app's web view (no sidebar or header)
+    reply.setCookie(IN_APP_COOKIE, '1', { path: '/', sameSite: 'lax', secure: config.isProduction, maxAge: 365 * 24 * 3600 });
     return reply.redirect(next);
   });
 
