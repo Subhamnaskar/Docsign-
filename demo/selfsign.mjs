@@ -10,8 +10,25 @@ const APP = process.env.APP ?? 'http://localhost:3000';
 const MAIL = process.env.MAIL ?? 'http://localhost:8025';
 const out = process.argv[2] ?? 'selfsign-shots';
 mkdirSync(out, { recursive: true });
-const email = `priya.${Date.now()}@gmail.test`;
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// MAIL=mailtm: real disposable inboxes (mail.tm), for testing a live deployment
+const MAILTM = 'https://api.mail.tm';
+const inboxes = new Map();
+async function mailtmInbox(name) {
+  const { 'hydra:member': [{ domain }] } = await (await fetch(`${MAILTM}/domains`)).json();
+  const address = `${name}.${Date.now()}@${domain}`;
+  const password = `pw-${Date.now()}-${Math.random()}`;
+  const body = JSON.stringify({ address, password });
+  const headers = { 'Content-Type': 'application/json' };
+  await fetch(`${MAILTM}/accounts`, { method: 'POST', headers, body });
+  const { token } = await (await fetch(`${MAILTM}/token`, { method: 'POST', headers, body })).json();
+  inboxes.set(address, token);
+  return address;
+}
+const live = MAIL === 'mailtm';
+const email = live ? await mailtmInbox('priya') : `priya.${Date.now()}@gmail.test`;
+const hrEmail = live ? await mailtmInbox('hr') : 'hr@acme-hiring.test';
 
 async function joiningLetter() {
   const doc = await PDFDocument.create();
@@ -28,6 +45,19 @@ async function joiningLetter() {
 }
 
 async function mail(to, subject) {
+  if (live) {
+    const auth = { headers: { Authorization: `Bearer ${inboxes.get(to)}` } };
+    for (let i = 0; i < 90; i++) {
+      const list = await (await fetch(`${MAILTM}/messages`, auth)).json();
+      const m = list['hydra:member']?.find((x) => subject.test(x.subject));
+      if (m) {
+        const full = await (await fetch(`${MAILTM}/messages/${m.id}`, auth)).json();
+        return { Subject: full.subject, Attachments: (full.attachments ?? []).map((a) => ({ FileName: a.filename })) };
+      }
+      await pause(2000);
+    }
+    throw new Error(`No email to ${to} matching ${subject}`);
+  }
   for (let i = 0; i < 60; i++) {
     const list = await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`)).json();
     const m = list.messages?.find((x) => subject.test(x.Subject));
@@ -37,20 +67,36 @@ async function mail(to, subject) {
   throw new Error(`No email to ${to} matching ${subject}`);
 }
 
+console.log('signer:', email, '| HR:', hrEmail);
 const browser = await chromium.launch({ channel: process.env.BROWSER ?? 'msedge', headless: Boolean(process.env.HEADLESS), slowMo: process.env.HEADLESS ? 0 : 250 });
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 860 }, acceptDownloads: true });
 const page = await ctx.newPage();
 page.setDefaultTimeout(60_000);
+if (process.env.DEBUG) {
+  page.on('response', async (r) => r.status() >= 400 && console.log('HTTP', r.status(), r.request().method(), r.url(), (await r.text().catch(() => '')).slice(0, 300)));
+  page.on('requestfailed', (r) => console.log('FAILED', r.url(), r.failure()?.errorText));
+  page.on('console', (m) => m.type() === 'error' && console.log('CONSOLE', m.text().slice(0, 300)));
+}
 
-// 1. No account: name, email, code
-await page.goto(`${APP}/sign-yourself`);
-await page.getByLabel('Your full name').fill('Priya Nair');
-await page.getByLabel('Your email').fill(email);
-await page.screenshot({ path: `${out}/1-start.png` });
-await page.getByRole('button', { name: 'Email me a code' }).click();
-const code = (await mail(email, /signing code/)).Subject.match(/\d{6}/)[0];
-await page.getByLabel('Code').fill(code);
-await page.getByRole('button', { name: 'Continue' }).click();
+if (process.env.ACCOUNT) {
+  // 1. With an account (no email code needed): sign up, then sign it yourself
+  const res = await page.request.post(`${APP}/api/v1/auth/register`, {
+    data: { name: 'Priya Nair', email, password: `Test-${Date.now()}-pass`, organizationName: 'E2E Test', jurisdiction: 'IN' },
+  });
+  console.log('registered:', res.status());
+  if (!res.ok()) throw new Error(await res.text());
+  await page.goto(`${APP}/sign-yourself`);
+} else {
+  // 1. No account: name, email, code
+  await page.goto(`${APP}/sign-yourself`);
+  await page.getByLabel('Your full name').fill('Priya Nair');
+  await page.getByLabel('Your email').fill(email);
+  await page.screenshot({ path: `${out}/1-start.png` });
+  await page.getByRole('button', { name: 'Email me a code' }).click();
+  const code = (await mail(email, /signing code/)).Subject.match(/\d{6}/)[0];
+  await page.getByLabel('Code').fill(code);
+  await page.getByRole('button', { name: 'Continue' }).click();
+}
 
 // 2. Upload the joining letter and place the signature
 await page.getByText('Drop your document here').waitFor();
@@ -94,12 +140,15 @@ const [cert] = await Promise.all([page.waitForEvent('download'), page.getByRole(
 console.log('certificate:', cert.suggestedFilename());
 
 // 5. Send it back to HR
-await page.getByLabel('Their email').fill('hr@acme-hiring.test');
+await page.getByLabel('Their email').fill(hrEmail);
 await page.getByLabel('Message (optional)').fill('Hi, please find my signed joining letter attached. Regards, Priya');
 await page.getByRole('button', { name: 'Send signed copy' }).click();
-await page.getByText(/Sent to hr@acme-hiring.test/).waitFor();
+await page.getByText(`Sent to ${hrEmail}`, { exact: false }).waitFor();
 await page.screenshot({ path: `${out}/4-sent.png`, fullPage: true });
-const hr = await mail('hr@acme-hiring.test', /Signed: Joining letter/);
-console.log('HR received:', hr.Subject, '| attachments:', hr.Attachments.map((a) => a.FileName).join(', '));
+console.log('send-back accepted by the app for', hrEmail);
+if (!process.env.SKIP_HR_INBOX) {
+  const hr = await mail(hrEmail, /Signed: Joining letter/);
+  console.log('HR received:', hr.Subject, '| attachments:', hr.Attachments.map((a) => a.FileName).join(', '));
+}
 if (!process.env.HEADLESS) await pause(4000);
 await browser.close();
