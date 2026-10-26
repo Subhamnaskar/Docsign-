@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { CtaBand, PageHero, Section } from '@/components/marketing/Site';
 import { type PricingData, PricingPlans } from '@/components/marketing/PricingPlans';
 import { apiPricing } from '@/lib/brand';
+import { API_URL } from '@/lib/serverApi';
 
-const API_URL = process.env.API_URL ?? 'http://localhost:4000';
 // Prices come from the API; refresh every 5 minutes
 export const revalidate = 300;
 

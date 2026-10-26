@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 import { HelpIndex } from '@/components/marketing/HelpIndex';
 import { PageHero, Section } from '@/components/marketing/Site';
 import type { ArticleSummary } from '@/components/HelpWidgets';
+import { API_URL } from '@/lib/serverApi';
 
 export const metadata: Metadata = {
   title: 'Help centre',
   description: 'Guides for sending and signing agreements, India features, teams, security, billing and the API.',
 };
 
-const API_URL = process.env.API_URL ?? 'http://localhost:4000';
 export const revalidate = 300;
 
 async function loadArticles(): Promise<ArticleSummary[]> {

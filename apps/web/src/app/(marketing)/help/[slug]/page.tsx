@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Section } from '@/components/marketing/Site';
 import { Markdown } from '@/lib/markdown';
+import { API_URL } from '@/lib/serverApi';
 
 interface Article {
   slug: string;
@@ -12,7 +13,6 @@ interface Article {
   body: string;
 }
 
-const API_URL = process.env.API_URL ?? 'http://localhost:4000';
 export const revalidate = 300;
 
 async function load(slug: string): Promise<Article | null> {

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-const API_URL = process.env.API_URL ?? 'http://localhost:4000';
+const API_URL = process.env.API_URL;
 const OFFICE_ORIGINS = ['https://*.officeapps.live.com', 'https://*.office.com', 'https://*.office365.com', 'https://outlook.live.com', 'https://*.sharepoint.com', 'https://*.microsoft365.com'];
 
 /**
@@ -15,7 +15,7 @@ export async function middleware(req: NextRequest) {
   if (m) {
     const param = m[1] === 'sign' ? 'token' : 'ticket';
     try {
-      const r = await fetch(`${API_URL}/api/v1/frame-origins?${param}=${encodeURIComponent(m[2])}`, { cache: 'no-store' });
+      const r = await fetch(`${API_URL ?? req.nextUrl.origin}/api/v1/frame-origins?${param}=${encodeURIComponent(m[2])}`, { cache: 'no-store' });
       // The API only stores validated https?://host origins, so they are safe to place in the header
       if (r.ok) origins = ((await r.json()).origins as string[]) ?? [];
     } catch {
