@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "worker": "tsx src/worker-main.ts",
     "keys:export": "tsx src/trust/export-keys.ts",
+    "google:connect": "tsx src/lib/google-connect.ts",
     "billing:set-plan": "tsx src/billing/set-plan.ts",
     "start:worker": "node dist/worker-main.js"
   },

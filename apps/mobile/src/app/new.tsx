@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Body, Button, Card, Field, Label, Notice, Screen } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
-import { type LocalFile, pagesToPdf, pickPdf, scanPage, uploadDocument } from '@/lib/files';
+import { useAuth } from '@/lib/auth';
+import { type LocalFile, MAX_UPLOAD_BYTES, pagesToPdf, pickDocument, scanPage, uploadDocument } from '@/lib/files';
 import { space, useTheme } from '@/lib/theme';
 import type { Envelope } from '@/lib/types';
 import { openWebPage } from '@/lib/web';
@@ -21,6 +22,7 @@ export default function NewAgreement() {
   const self = mode === 'self';
   const router = useRouter();
   const t = useTheme();
+  const officeFiles = !!useAuth().me?.features?.officeFiles;
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<LocalFile | null>(null);
   const [pages, setPages] = useState<string[]>([]);
@@ -42,11 +44,13 @@ export default function NewAgreement() {
 
   const choose = () =>
     run('pick', async () => {
-      const f = await pickPdf();
+      const f = await pickDocument(officeFiles);
       if (!f) return;
+      // Say so now rather than after the upload is refused
+      if (f.size && f.size > MAX_UPLOAD_BYTES) throw new ApiError(`${f.name} is larger than 4 MB. Choose a smaller file.`, 413);
       setFile(f);
       setPages([]);
-      if (!title) setTitle(f.name.replace(/\.pdf$/i, ''));
+      if (!title) setTitle(f.name.replace(/\.[^.]+$/, ''));
     });
 
   const scan = () =>
@@ -88,10 +92,12 @@ export default function NewAgreement() {
         <Label>Document</Label>
         {file ? <Body>📄 {file.name}</Body> : null}
         {pages.length ? <Body>📷 {pages.length} scanned {pages.length === 1 ? 'page' : 'pages'}</Body> : null}
-        {!hasDocument ? <Body muted>Choose a PDF, or scan paper pages with the camera.</Body> : null}
+        {!hasDocument ? (
+          <Body muted>{officeFiles ? 'Choose a PDF, Word, Excel or PowerPoint file, or scan paper pages with the camera.' : 'Choose a PDF, or scan paper pages with the camera.'}</Body>
+        ) : null}
         <View style={{ flexDirection: 'row', gap: space.md }}>
           <View style={{ flex: 1 }}>
-            <Button title={file ? 'Change PDF' : 'Choose PDF'} kind="secondary" onPress={choose} loading={busy === 'pick'} />
+            <Button title={file ? 'Change file' : officeFiles ? 'Choose file' : 'Choose PDF'} kind="secondary" onPress={choose} loading={busy === 'pick'} />
           </View>
           <View style={{ flex: 1 }}>
             <Button title={pages.length ? 'Scan another page' : 'Scan pages'} kind="secondary" onPress={scan} loading={busy === 'scan'} />

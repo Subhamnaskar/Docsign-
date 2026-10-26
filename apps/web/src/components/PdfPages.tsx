@@ -48,7 +48,7 @@ export function displaySize(p: PageInfo) {
   return rotated ? { width: p.height, height: p.width } : { width: p.width, height: p.height };
 }
 
-function PageCanvas({ pdf, index, width }: { pdf: PDFDocumentProxy; index: number; width: number }) {
+export function PageCanvas({ pdf, index, width }: { pdf: PDFDocumentProxy; index: number; width: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (width <= 0) return;

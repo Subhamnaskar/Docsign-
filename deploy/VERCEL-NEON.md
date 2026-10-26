@@ -16,7 +16,8 @@ PDFs. Email goes through your **Hostinger** mailbox.
 **Limits of this setup**
 
 - **Uploads up to about 4 MB per file**: Vercel caps request size at 4.5 MB.
-- **PDF uploads only**: no Word/Excel conversion or virus scanning.
+- **Word, Excel and PowerPoint** need step 7 (free, through your Google account); until then
+  uploads are PDF only. No virus scanning.
 - Signed files are not write-once storage: the bucket has no Object Lock, so
   the app itself refuses to delete them before their retention date.
 - **Vercel Hobby (free) is for non-commercial use.** Fine for testing and demos;
@@ -120,6 +121,34 @@ Vercel's free plan runs scheduled jobs only once a day (already set up in
 Open **https://sign.nuronixai.in** and register with your `PLATFORM_ADMINS` email.
 
 ---
+
+## 7. Word, Excel and PowerPoint files (free, through Google)
+
+Office files are turned into PDFs by Google Drive: each file is uploaded to your
+Google account as a Google Doc, Sheet or Slides file, exported as PDF and deleted
+straight away. The app only gets the `drive.file` permission, so it can never see
+the rest of your Drive.
+
+1. **console.cloud.google.com** → create a project (e.g. "Nuronix eSign").
+2. **APIs & Services → Library** → search **Google Drive API** → **Enable**.
+3. **Google Auth Platform → Branding**: app name `Nuronix eSign`, your support email.
+   **Audience**: External, then **Publish app** (in "Testing" the connection stops
+   working after 7 days).
+4. **Clients → Create client** → type **Desktop app** → copy the client ID and secret.
+5. On your PC, in the project folder:
+
+   ```powershell
+   npm run google:connect -w @docsign/api -- <client id> <client secret>
+   ```
+
+   Sign in with the Google account to use and allow access. If Google says the app
+   isn't verified, choose **Advanced → Go to Nuronix eSign**. The terminal prints four lines.
+6. Add those four lines in Vercel (Settings → Environment Variables), then
+   **Deployments → ⋯ → Redeploy**.
+
+The upload boxes on the website and in the app offer Word, Excel and PowerPoint as
+soon as this is set up. To use your own converter instead, set `CONVERTER=gotenberg`
+and `GOTENBERG_URL`.
 
 ## Updating
 

@@ -185,7 +185,7 @@ export interface Me {
   /** Read-only NuronixAI support session */
   support?: { by: string; endsAt: string | null } | null;
   cell: string;
-  features?: { ai: boolean; aadhaarEsign: string };
+  features?: { ai: boolean; aadhaarEsign: string; officeFiles?: boolean; uploadLimitMb?: number };
   billing?: {
     plan: string;
     planName: string;

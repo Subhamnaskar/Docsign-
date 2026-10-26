@@ -51,6 +51,25 @@ export default function Agreement() {
       </View>
       {message ? <Notice kind="info">{message}</Notice> : null}
 
+      {env.documents.length > 0 && env.status !== 'DRAFT' ? (
+        <Card>
+          <Label>{env.documents.length === 1 ? 'Document' : 'Documents'}</Label>
+          {env.documents.map((d) => (
+            <Button
+              key={d.id}
+              title={`View ${d.name.replace(/\.pdf$/i, '')}`}
+              kind="secondary"
+              loading={busy === `view-${d.id}`}
+              onPress={() =>
+                act(`view-${d.id}`, () =>
+                  openWebPage(router, `/envelopes/${env.id}/view?doc=${d.id}&version=${env.status === 'COMPLETED' ? 'signed' : 'original'}`, { title: d.name.replace(/\.pdf$/i, '') }),
+                )
+              }
+            />
+          ))}
+        </Card>
+      ) : null}
+
       {env.status === 'COMPLETED' ? (
         <Card>
           <Label>Signed documents</Label>

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { AppShell } from '@/components/AppShell';
+import { AppShell, useMe } from '@/components/AppShell';
 import { FieldEditor } from '@/components/FieldEditor';
 import { Alert, Button, Card, cx, Input, Label, Logo, PageLoader } from '@/components/ui';
 import { api, ApiError, upload } from '@/lib/api';
+import { uploadRules } from '@/lib/uploads';
 import type { Envelope, Field } from '@/lib/types';
 
 /**
@@ -150,6 +151,7 @@ function GuestStart({ onSignedIn }: { onSignedIn: () => void }) {
 // --- Signed in ----------------------------------------------------------------
 
 function SelfSignFlow() {
+  const rules = uploadRules(useMe());
   const [env, setEnv] = useState<Envelope | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
   const [busy, setBusy] = useState(false);
@@ -171,6 +173,8 @@ function SelfSignFlow() {
   async function addFiles(files: FileList | File[]) {
     const list = Array.from(files);
     if (!list.length) return;
+    const problem = list.map((f) => rules.problem(f)).find(Boolean);
+    if (problem) return setError(problem);
     setBusy(true);
     setError(null);
     try {
@@ -257,8 +261,8 @@ function SelfSignFlow() {
             📄
           </span>
           <span className="mt-3 text-lg font-semibold text-ink">{busy ? 'Uploading…' : 'Drop your document here, or click to choose'}</span>
-          <span className="mt-1 text-sm text-gray-500">PDF, Word, Excel or PowerPoint, up to 25 MB</span>
-          <input type="file" className="sr-only" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.rtf,.txt" disabled={busy} onChange={(e) => e.target.files && addFiles(e.target.files)} />
+          <span className="mt-1 text-sm text-gray-500">{rules.hint}</span>
+          <input type="file" className="sr-only" multiple accept={rules.accept} disabled={busy} onChange={(e) => e.target.files && addFiles(e.target.files)} />
         </label>
       ) : (
         <>
@@ -269,7 +273,7 @@ function SelfSignFlow() {
           <div className="sticky bottom-0 z-20 -mx-4 flex items-center justify-between gap-3 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
             <label className="cursor-pointer text-sm font-medium text-brand-700 hover:underline">
               + Add another document
-              <input type="file" className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.rtf,.txt" onChange={(e) => e.target.files && addFiles(e.target.files)} />
+              <input type="file" className="sr-only" accept={rules.accept} onChange={(e) => e.target.files && addFiles(e.target.files)} />
             </label>
             <div className="flex items-center gap-3">
               {!hasSignature && <span className="hidden text-sm text-gray-500 sm:inline">Place a signature field to continue</span>}

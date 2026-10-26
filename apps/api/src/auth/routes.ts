@@ -16,6 +16,8 @@ import { TRIAL } from '../billing/plans.js';
 import { platformRole } from '../platform/access.js';
 import { isSsoOnly, passwordSchema } from './security.js';
 import { issueToken, sendVerificationEmail } from './tokens.js';
+import { conversionAvailable } from '../lib/convert.js';
+import { MAX_UPLOAD_BYTES } from '../documents/ingest.js';
 
 const password = passwordSchema;
 /** Languages the sender app is available in */
@@ -136,7 +138,7 @@ export async function authRoutes(app: FastifyInstance) {
       // Read-only NuronixAI support session: the app shows a banner with a way out
       support: req.auth.support ? { by: req.auth.support.email, endsAt: (await prisma.session.findUnique({ where: { id: req.auth.sessionId! } }))?.expiresAt ?? null } : null,
       cell: config.cellRegion,
-      features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode },
+      features: { ai: config.ai.enabled, aadhaarEsign: config.esign.mode, officeFiles: conversionAvailable(), uploadLimitMb: process.env.VERCEL ? 4 : MAX_UPLOAD_BYTES / 1024 / 1024 },
       billing: billingBrief(org),
     };
   });

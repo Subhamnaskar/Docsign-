@@ -33,6 +33,18 @@ export const config = {
     from: env('MAIL_FROM', 'Nuronix eSign <no-reply@docsign.local>'),
   },
   gotenbergUrl: env('GOTENBERG_URL', 'http://localhost:3100'),
+  /**
+   * How Word, Excel and PowerPoint uploads become PDFs: 'gotenberg' (LibreOffice,
+   * GOTENBERG_URL), 'google' (Google Drive, see lib/convert.ts) or 'off'. Defaults
+   * to Gotenberg when GOTENBERG_URL is set or in development, otherwise off.
+   */
+  converter: (process.env.CONVERTER ?? (process.env.GOTENBERG_URL || process.env.NODE_ENV !== 'production' ? 'gotenberg' : 'off')) as 'gotenberg' | 'google' | 'off',
+  /** Google Drive conversion: an OAuth client and a refresh token from `npm run google:connect` */
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID ?? '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+    refreshToken: process.env.GOOGLE_REFRESH_TOKEN ?? '',
+  },
   tsaUrl: process.env.TSA_URL ?? '',
   keysDir: env('KEYS_DIR', '.keys'),
   /** Platform seal key: local (dev key on disk) | aws-kms (HSM-backed key in AWS KMS) */

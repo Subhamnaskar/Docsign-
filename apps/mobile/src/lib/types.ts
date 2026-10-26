@@ -6,6 +6,8 @@ export type RecipientStatus = 'PENDING' | 'SENT' | 'VIEWED' | 'SIGNED' | 'DECLIN
 export interface Me {
   user: { id: string; name: string; email: string; role: string; emailVerified: boolean; twoFactor: boolean; guest: boolean } | null;
   organization: { id: string; name: string; jurisdiction: string };
+  /** officeFiles: the server turns Word, Excel and PowerPoint into PDFs */
+  features?: { officeFiles?: boolean };
 }
 
 export interface EnvelopeSummary {

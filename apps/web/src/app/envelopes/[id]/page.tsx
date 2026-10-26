@@ -242,13 +242,13 @@ function Detail() {
                       {d.completed ? `Sealed · SHA-256 ${d.finalSha256?.slice(0, 24)}…` : `Original · SHA-256 ${d.sha256.slice(0, 24)}…`}
                     </div>
                   </div>
-                  <a className="text-sm font-medium text-brand-600 hover:underline" href={fileUrl(`/envelopes/${id}/documents/${d.id}/file?version=original`)} target="_blank" rel="noreferrer">
+                  <Link className="text-sm font-medium text-brand-600 hover:underline" href={`/envelopes/${id}/view?doc=${d.id}&version=original`}>
                     Original
-                  </a>
+                  </Link>
                   {d.completed && (
-                    <a className="text-sm font-medium text-brand-600 hover:underline" href={fileUrl(`/envelopes/${id}/documents/${d.id}/file`)} target="_blank" rel="noreferrer">
+                    <Link className="text-sm font-medium text-brand-600 hover:underline" href={`/envelopes/${id}/view?doc=${d.id}&version=signed`}>
                       Signed PDF
-                    </a>
+                    </Link>
                   )}
                   {env.status === 'SENT' && signed === 0 && !env.recipients.some((r) => r.signatureMethod && r.signatureMethod !== 'ELECTRONIC') && (
                     <ReviseButton envelopeId={env.id} documentId={d.id} onDone={(msg) => { setNotice(msg); load(); }} />

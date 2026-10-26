@@ -10,6 +10,7 @@ import { FieldEditor, newFieldId } from '@/components/FieldEditor';
 import { SaveTemplateModal } from '@/components/SaveTemplateModal';
 import { Alert, Button, Card, cx, Input, Label, PageLoader, Select, Spinner, Textarea } from '@/components/ui';
 import { api, ApiError, upload } from '@/lib/api';
+import { uploadRules } from '@/lib/uploads';
 import { FIELD_LABELS } from '@/lib/format';
 import { LANGUAGES } from '@/lib/i18n';
 import type { IdCheck, Envelope, Estamp, Field, Option } from '@/lib/types';
@@ -138,6 +139,7 @@ function DepartmentSelect({ env, onPatch }: { env: Envelope; onPatch: (data: Par
 }
 
 function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope: (e: Envelope) => void; options: Options }) {
+  const rules = uploadRules(useMe());
   const [uploading, setUploading] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -171,6 +173,11 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
   async function addFiles(files: FileList | File[]) {
     setError(null);
     for (const file of Array.from(files)) {
+      const problem = rules.problem(file);
+      if (problem) {
+        setError(problem);
+        continue;
+      }
       setUploading((u) => [...u, file.name]);
       try {
         await upload(`/envelopes/${env.id}/documents`, file);
@@ -219,13 +226,13 @@ function DocumentsStep({ env, onEnvelope, options }: { env: Envelope; onEnvelope
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
             </svg>
             <p className="mt-2 text-sm font-medium text-gray-700">Drop files here or click to browse</p>
-            <p className="text-xs text-gray-500">PDF, Word, Excel, PowerPoint, ODT, RTF or TXT, up to 25 MB</p>
+            <p className="text-xs text-gray-500">{rules.hint}</p>
             <input
               ref={inputRef}
               type="file"
               multiple
               hidden
-              accept=".pdf,.doc,.docx,.odt,.rtf,.txt,.xls,.xlsx,.ods,.ppt,.pptx,.odp"
+              accept={rules.accept}
               onChange={(e) => e.target.files && addFiles(e.target.files)}
             />
           </div>
