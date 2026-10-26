@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { background } from '../lib/background.js';
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
@@ -93,7 +94,7 @@ export async function qesRoutes(app: FastifyInstance) {
         if (createHash('sha256').update(key.toBeSigned!).digest('base64') !== state.hashes![i]) throw new Error('Signed attributes changed between authorisation and signing');
       }
       await completeTransaction(txn.id, cms, { ip: req.ip, userAgent: (req.headers['user-agent'] as string) ?? null });
-      advanceEnvelope(txn.envelopeId).catch((err) => req.log.error({ err }, 'advanceEnvelope failed'));
+      background(advanceEnvelope(txn.envelopeId), (err) => req.log.error({ err }, 'advanceEnvelope failed'));
       return back('signed');
     } catch (err) {
       await failTransaction(txn.id, (err as Error).message);

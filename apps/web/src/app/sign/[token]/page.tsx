@@ -828,7 +828,7 @@ function notifyParent(type: string, session: SigningSession | null) {
 }
 
 export default function SignPage() {
-  const { token } = useParams<{ token: string }>();
+  const { token } = useParams<{ token: string }>()!;
   const [session, setSession] = useState<SigningSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [consented, setConsentedState] = useState(false);

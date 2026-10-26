@@ -28,7 +28,7 @@ const NAV: { href: string; label: AppKey; icon: IconName }[] = [
 /** Layout for signed-in pages: navy sidebar, top bar, banners. Redirects to /login when the session is missing. */
 export function AppShell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname()!;
   const [me, setMe] = useState<Me | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

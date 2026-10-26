@@ -10,7 +10,7 @@ import { api, setSignerSession } from '@/lib/api';
  * session (kept in sessionStorage, sent as a header) and opens the document.
  */
 export default function EmbedStartPage() {
-  const { ticket } = useParams<{ ticket: string }>();
+  const { ticket } = useParams<{ ticket: string }>()!;
   const router = useRouter();
   const [failed, setFailed] = useState(false);
   const started = useRef(false);

@@ -51,7 +51,7 @@ const RESOURCES: MenuLink[] = [
 
 /** Public website header: utility bar, main navigation with menus, and the trial button. */
 export function SiteHeader() {
-  const pathname = usePathname();
+  const pathname = usePathname()!;
   const [menu, setMenu] = useState<MenuId | null>(null);
   const [mobile, setMobile] = useState(false);
   const header = useRef<HTMLElement>(null);

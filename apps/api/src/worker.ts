@@ -54,22 +54,27 @@ async function retryFinalization() {
   for (const { id } of stuck) await finalizeEnvelope(id);
 }
 
+/** One round of every background job. Serverless hosts call it on a schedule (POST /api/v1/internal/tick). */
+export async function runJobs() {
+  await deliverPendingWebhooks();
+  await deliverCrmEvents();
+  await runPendingWorkflows();
+  await expireEnvelopes();
+  await sendReminders();
+  await retryFinalization();
+  await renewSandboxSubscriptions();
+  await renewArchiveTimestamps();
+  await sendRenewalReminders();
+  await purgeExpired();
+}
+
 export function startWorker(log: FastifyBaseLogger) {
   let running = false;
   const tick = async () => {
     if (running) return;
     running = true;
     try {
-      await deliverPendingWebhooks();
-      await deliverCrmEvents();
-      await runPendingWorkflows();
-      await expireEnvelopes();
-      await sendReminders();
-      await retryFinalization();
-      await renewSandboxSubscriptions();
-      await renewArchiveTimestamps();
-      await sendRenewalReminders();
-      await purgeExpired();
+      await runJobs();
     } catch (err) {
       log.error({ err }, 'worker tick failed');
     } finally {

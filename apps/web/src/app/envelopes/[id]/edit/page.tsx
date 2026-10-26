@@ -732,7 +732,7 @@ function ReviewStep({ env }: { env: Envelope }) {
 }
 
 function Builder() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>()!;
   const router = useRouter();
   const [env, setEnv] = useState<Envelope | null>(null);
   const [options, setOptions] = useState<Options | null>(null);

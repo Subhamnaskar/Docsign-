@@ -11,6 +11,8 @@ export const config = {
   port: Number(env('PORT', '4000')),
   appUrl: env('APP_URL', 'http://localhost:3000').replace(/\/$/, ''),
   corsOrigins: env('CORS_ORIGINS', 'http://localhost:3000').split(',').map((s) => s.trim()),
+  /** s3 (default) | database: files in Postgres, for hosts without object storage (Vercel + Neon) */
+  storageDriver: env('STORAGE_DRIVER', 's3') as 's3' | 'database',
   s3: {
     endpoint: env('S3_ENDPOINT', 'http://localhost:9000'),
     region: env('S3_REGION', 'us-east-1'),
@@ -166,6 +168,8 @@ export const config = {
   ltaRenewAfterDays: Number(env('LTA_RENEW_AFTER_DAYS', String(5 * 365))),
   /** 'inline' runs background jobs inside the API process; 'off' expects `npm run worker`. */
   workerMode: env('WORKER_MODE', 'inline') as 'inline' | 'off',
+  /** Serverless: secret for the scheduled POST/GET /api/v1/internal/tick (Vercel Cron sends it as a Bearer token) */
+  cronSecret: process.env.CRON_SECRET ?? '',
   clamav: {
     host: process.env.CLAMAV_HOST ?? '',
     port: Number(env('CLAMAV_PORT', '3310')),

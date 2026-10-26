@@ -7,7 +7,7 @@ import { Alert, Button, Input, Label, PageLoader } from '@/components/ui';
 import { api } from '@/lib/api';
 
 export default function AcceptInvitePage() {
-  const { token } = useParams<{ token: string }>();
+  const { token } = useParams<{ token: string }>()!;
   const router = useRouter();
   const [invite, setInvite] = useState<{ email: string; organization: string; role: string } | null>(null);
   const [name, setName] = useState('');

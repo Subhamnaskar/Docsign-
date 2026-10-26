@@ -1,4 +1,5 @@
 import type { Recipient } from '@prisma/client';
+import { background } from '../lib/background.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { appendAudit, type Actor } from '../audit/audit.js';
@@ -431,7 +432,7 @@ export async function signingRoutes(app: FastifyInstance) {
     if (isIncremental(envRecipients)) await applyElectronicIncrement(r.envelopeId, r.id);
 
     // Routing and sealing can take a few seconds (timestamp authority round-trip); run after responding.
-    advanceEnvelope(r.envelopeId).catch((err) => req.log.error({ err }, 'advanceEnvelope failed'));
+    background(advanceEnvelope(r.envelopeId), (err) => req.log.error({ err }, 'advanceEnvelope failed'));
     return { signed: true };
   });
 

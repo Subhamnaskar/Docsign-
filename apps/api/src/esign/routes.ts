@@ -1,4 +1,5 @@
 import { createSign, generateKeyPairSync } from 'node:crypto';
+import { background } from '../lib/background.js';
 import { readFileSync } from 'node:fs';
 import formbody from '@fastify/formbody';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -122,7 +123,7 @@ export async function esignRoutes(app: FastifyInstance) {
       await failTransaction(txn.id, (err as Error).message);
       return reply.redirect(`${back}?esign=failed&reason=${encodeURIComponent((err as Error).message)}`, 303);
     }
-    advanceEnvelope(txn.envelopeId).catch((err) => req.log.error({ err }, 'advanceEnvelope failed'));
+    background(advanceEnvelope(txn.envelopeId), (err) => req.log.error({ err }, 'advanceEnvelope failed'));
     return reply.redirect(`${back}?esign=done`, 303);
   });
 
@@ -151,7 +152,7 @@ export async function esignRoutes(app: FastifyInstance) {
       await failTransaction(txn.id, (err as Error).message);
       throw err;
     }
-    advanceEnvelope(r.envelopeId).catch((err) => req.log.error({ err }, 'advanceEnvelope failed'));
+    background(advanceEnvelope(r.envelopeId), (err) => req.log.error({ err }, 'advanceEnvelope failed'));
     return { signed: true };
   });
 

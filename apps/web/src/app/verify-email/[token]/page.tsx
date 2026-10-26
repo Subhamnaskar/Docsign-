@@ -8,7 +8,7 @@ import { Alert, PageLoader } from '@/components/ui';
 import { api } from '@/lib/api';
 
 export default function VerifyEmailPage() {
-  const { token } = useParams<{ token: string }>();
+  const { token } = useParams<{ token: string }>()!;
   const [state, setState] = useState<'working' | 'done' | 'failed'>('working');
   const [message, setMessage] = useState('');
   const sent = useRef(false);

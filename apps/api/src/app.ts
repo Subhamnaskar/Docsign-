@@ -44,6 +44,7 @@ import { contactRoutes } from './contacts/routes.js';
 import { workflowRoutes } from './workflows/routes.js';
 import { homeRoutes } from './home/routes.js';
 import { selfSignRoutes } from './selfsign/routes.js';
+import { internalRoutes } from './internal/routes.js';
 
 /** Builds the HTTP application without listening, so tests can drive it with inject(). */
 const PLAN_REFRESH_MS = 60_000;
@@ -108,6 +109,7 @@ export async function buildApp(opts: { logger?: FastifyServerOptions['logger'] }
       await v1.register(workflowRoutes);
       await v1.register(homeRoutes);
       await v1.register(selfSignRoutes);
+      await v1.register(internalRoutes);
       await v1.register(ssoRoutes);
       await v1.register(scimRoutes);
       await v1.register(integrationRoutes);

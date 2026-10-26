@@ -104,7 +104,7 @@ type Dialog = { kind: 'suspend' } | { kind: 'cancel' } | { kind: 'credit' } | { 
 type Act = (path: string, json: unknown, done: string, confirmText?: string) => Promise<boolean>;
 
 function OrgDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>()!;
   const role = usePlatformRole();
   const canChange = role === 'owner' || role === 'admin';
   const [org, setOrg] = useState<Detail | null>(null);

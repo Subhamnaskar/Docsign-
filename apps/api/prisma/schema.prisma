@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native for this machine; rhel-openssl-3.0.x for Vercel functions
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -1199,4 +1201,17 @@ model GuestCode {
   attempts  Int      @default(0)
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+/// Files kept in the database (STORAGE_DRIVER=database) for hosts without
+/// object storage, e.g. Vercel + Neon only. Default storage is S3.
+model StoredObject {
+  key         String    @id
+  data        Bytes
+  contentType String
+  size        Int
+  // Write-once until this date (deletion is refused before it)
+  retainUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

@@ -8,7 +8,7 @@ import { Alert, Button, Input, Label } from '@/components/ui';
 import { api } from '@/lib/api';
 
 export default function ResetPasswordPage() {
-  const { token } = useParams<{ token: string }>();
+  const { token } = useParams<{ token: string }>()!;
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [done, setDone] = useState(false);

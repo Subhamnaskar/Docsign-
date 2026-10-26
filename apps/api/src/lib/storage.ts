@@ -19,6 +19,7 @@ const s3 = new S3Client({
 
 /** Creates the bucket (with Object Lock where supported) so sealed documents can be stored write-once. */
 export async function ensureBucket(): Promise<void> {
+  if (config.storageDriver === 'database') return;
   try {
     await s3.send(new HeadBucketCommand({ Bucket: config.s3.bucket }));
   } catch {
@@ -34,6 +35,15 @@ export async function putObject(
   contentType: string,
   retainYears?: number,
 ): Promise<void> {
+  if (config.storageDriver === 'database') {
+    const retainUntil = retainYears ? new Date(Date.now() + retainYears * 365 * 24 * 3600 * 1000) : null;
+    await prisma.storedObject.upsert({
+      where: { key },
+      create: { key, data: new Uint8Array(body), contentType, size: body.length, retainUntil },
+      update: { data: new Uint8Array(body), contentType, size: body.length, ...(retainUntil && { retainUntil }) },
+    });
+    return;
+  }
   const retention = retainYears && config.s3.objectLock
     ? {
         // GOVERNANCE mode: write-once for normal users; privileged admins can
@@ -80,6 +90,12 @@ export const forgetCustomerKeys = () => keyCache.clear();
  * and the caller retries later.
  */
 export async function deletePrefix(prefix: string): Promise<{ deleted: number; locked: number }> {
+  if (config.storageDriver === 'database') {
+    const now = new Date();
+    const locked = await prisma.storedObject.count({ where: { key: { startsWith: prefix }, retainUntil: { gt: now } } });
+    const { count } = await prisma.storedObject.deleteMany({ where: { key: { startsWith: prefix }, OR: [{ retainUntil: null }, { retainUntil: { lte: now } }] } });
+    return { deleted: count, locked };
+  }
   let deleted = 0;
   let locked = 0;
   let keyMarker: string | undefined;
@@ -99,6 +115,11 @@ export async function deletePrefix(prefix: string): Promise<{ deleted: number; l
 }
 
 export async function getObject(key: string): Promise<Buffer> {
+  if (config.storageDriver === 'database') {
+    const row = await prisma.storedObject.findUnique({ where: { key }, select: { data: true } });
+    if (!row) throw Object.assign(new Error(`No such object: ${key}`), { name: 'NoSuchKey' });
+    return Buffer.from(row.data);
+  }
   const res = await s3.send(new GetObjectCommand({ Bucket: config.s3.bucket, Key: key }));
   return Buffer.from(await res.Body!.transformToByteArray());
 }

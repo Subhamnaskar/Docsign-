@@ -11,6 +11,7 @@
     "postinstall": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
+    "@vercel/functions": "^3.10.3",
     "next": "^15.3.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.1.0",

@@ -16,7 +16,7 @@ const INTERESTS = [
 ];
 
 function ContactForm() {
-  const params = useSearchParams();
+  const params = useSearchParams()!;
   const initial = params.get('interest');
   const [form, setForm] = useState({
     name: '',

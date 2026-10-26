@@ -16,7 +16,7 @@ interface FormInfo {
 
 /** Public self-serve signing link: the visitor enters their details and is taken to sign. */
 export default function SigningFormPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug } = useParams<{ slug: string }>()!;
   const router = useRouter();
   const [info, setInfo] = useState<FormInfo | null>(null);
   const [missing, setMissing] = useState(false);

@@ -44,7 +44,7 @@ export default function WorkflowPage() {
 }
 
 function WorkflowEditor() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>()!;
   const router = useRouter();
   const me = useMe();
   const admin = me?.user?.role === 'OWNER' || me?.user?.role === 'ADMIN';

@@ -12,7 +12,7 @@ function LoginForm() {
   const router = useRouter();
   const [locale, setLocale] = useStoredLocale();
   const t = (key: AppKey) => appT(locale, key);
-  const params = useSearchParams();
+  const params = useSearchParams()!;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);

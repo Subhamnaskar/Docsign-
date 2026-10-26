@@ -71,9 +71,9 @@ function RecipientRow({ r, sequential, onCorrect, onHost }: { r: Recipient; sequ
 function Detail() {
   const me = useMe();
   const t = useAppT();
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>()!;
   const router = useRouter();
-  const params = useSearchParams();
+  const params = useSearchParams()!;
   const [env, setEnv] = useState<Envelope | null>(null);
   const [audit, setAudit] = useState<AuditResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
