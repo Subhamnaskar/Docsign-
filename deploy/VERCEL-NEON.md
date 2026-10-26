@@ -1,13 +1,14 @@
 # Host on Vercel + Neon only (sign.nuronixai.in)
 
-The whole app (website, API, files and background jobs) runs on **Vercel**,
-with **Neon** as the database. Files (uploaded and signed PDFs) are stored in
-Neon too. Email goes through your **Hostinger** mailbox. No credit card.
+The whole app (website, API and background jobs) runs on **Vercel**. **Neon**
+holds the database and, in its object storage bucket, the uploaded and signed
+PDFs. Email goes through your **Hostinger** mailbox.
 
 | Piece | Where |
 |---|---|
 | Website + API | Vercel (one project; the API is a serverless function) |
-| Database + files | Neon (free: 0.5 GB, enough for thousands of signed PDFs) |
+| Database | Neon Postgres (free: 0.5 GB) |
+| Files | Neon object storage, bucket `documents` (free: 5 GB) |
 | Background jobs (reminders, workflows, webhooks) | A scheduler calls the app every 5 minutes (step 6) |
 | Email | Hostinger (`no-reply@nuronixai.in`) |
 | Address | `sign.nuronixai.in` (one DNS record at Hostinger) |
@@ -16,8 +17,8 @@ Neon too. Email goes through your **Hostinger** mailbox. No credit card.
 
 - **Uploads up to about 4 MB per file**: Vercel caps request size at 4.5 MB.
 - **PDF uploads only**: no Word/Excel conversion or virus scanning.
-- Signed files are not write-once storage (the database keeps them; deleting
-  them before their retention date is refused by the app).
+- Signed files are not write-once storage: the bucket has no Object Lock, so
+  the app itself refuses to delete them before their retention date.
 - **Vercel Hobby (free) is for non-commercial use.** Fine for testing and demos;
   move to Vercel Pro before charging customers.
 
@@ -26,10 +27,16 @@ Neon too. Email goes through your **Hostinger** mailbox. No credit card.
 ## 1. Neon: database
 
 1. Sign up at **neon.tech** (GitHub login works) → create a project, region
-   **AWS Asia Pacific (Singapore)**.
-2. **Connect** → turn **Connection pooling off** → copy the connection string.
-   Add `&connection_limit=3` at the end. This is `DATABASE_URL`, for example:
-   `postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&connection_limit=3`
+   **AWS Asia Pacific (Singapore)**, with **Postgres** and **Object storage** on.
+   Add one bucket: `documents`, **Private**.
+2. Get the connection details. Either:
+   - with the Neon CLI in the project folder: `npm i -g neon`, `neon init`
+     (link the project, services postgres + object-storage), `neon deploy`.
+     This writes them to `.env.local` (git-ignored); or
+   - in the Neon console: **Connect** (pooling off) for the database, and the
+     bucket's **Access keys** for storage.
+3. `DATABASE_URL` for Vercel is the **unpooled** connection string with
+   `&connection_limit=3` added at the end.
 
 ## 2. Hostinger: email mailboxes
 
@@ -63,7 +70,13 @@ Also make a random secret for the scheduler (`CRON_SECRET`):
 | Name | Value |
 |---|---|
 | `DATABASE_URL` | from step 1 |
-| `STORAGE_DRIVER` | `database` |
+| `STORAGE_DRIVER` | `s3` |
+| `S3_ENDPOINT` | `AWS_ENDPOINT_URL_S3` from step 1 |
+| `S3_REGION` | `ap-southeast-1` |
+| `S3_ACCESS_KEY` | `AWS_ACCESS_KEY_ID` from step 1 |
+| `S3_SECRET_KEY` | `AWS_SECRET_ACCESS_KEY` from step 1 |
+| `S3_BUCKET` | `documents` |
+| `S3_OBJECT_LOCK` | `false` |
 | `KEYS_DIR` | `/tmp/keys` |
 | `SEAL_KEYS` | from step 3 |
 | `CRON_SECRET` | from step 3 |
@@ -113,6 +126,8 @@ Push to GitHub; Vercel redeploys and applies database changes automatically.
 
 ## When you outgrow it
 
-Bigger uploads, Word conversion and virus scanning need a server: Render
+Without the bucket, `STORAGE_DRIVER=database` keeps files in Postgres instead
+(no S3 settings needed). Bigger uploads, Word conversion and virus scanning
+need a server: Render
 (`render.yaml`, `deploy/FREE-NO-CARD.md`) or a VPS (`deploy/README.md`).
 Change the `sign` DNS record to move; the app is the same.

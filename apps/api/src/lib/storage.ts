@@ -3,6 +3,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   ListObjectVersionsCommand,
   PutObjectCommand,
   S3Client,
@@ -44,14 +45,15 @@ export async function putObject(
     });
     return;
   }
-  const retention = retainYears && config.s3.objectLock
-    ? {
-        // GOVERNANCE mode: write-once for normal users; privileged admins can
+  const retainUntil = retainYears ? new Date(Date.now() + retainYears * 365 * 24 * 3600 * 1000) : null;
+  const retention = !retainUntil
+    ? {}
+    : config.s3.objectLock
+      ? // GOVERNANCE mode: write-once for normal users; privileged admins can
         // still lift it (use COMPLIANCE in production cells).
-        ObjectLockMode: 'GOVERNANCE' as const,
-        ObjectLockRetainUntilDate: new Date(Date.now() + retainYears * 365 * 24 * 3600 * 1000),
-      }
-    : {};
+        { ObjectLockMode: 'GOVERNANCE' as const, ObjectLockRetainUntilDate: retainUntil }
+      : // Stores without Object Lock: deletePrefix enforces the date itself
+        { Metadata: { [RETAIN_UNTIL]: retainUntil.toISOString() } };
   const kmsKeyId = await customerKeyFor(key);
   await s3.send(
     new PutObjectCommand({
@@ -64,6 +66,15 @@ export async function putObject(
       ...(kmsKeyId ? { ServerSideEncryption: 'aws:kms' as const, SSEKMSKeyId: kmsKeyId } : {}),
     }),
   );
+}
+
+const RETAIN_UNTIL = 'retain-until';
+
+/** Without Object Lock: whether a version is still inside the retention date recorded at upload. */
+async function retained(Key: string, VersionId: string | undefined, now: Date): Promise<boolean> {
+  const head = await s3.send(new HeadObjectCommand({ Bucket: config.s3.bucket, Key, VersionId }));
+  const until = head.Metadata?.[RETAIN_UNTIL];
+  return !!until && new Date(until) > now;
 }
 
 const keyCache = new Map<string, { at: number; keyId: string | null }>();
@@ -85,9 +96,9 @@ async function customerKeyFor(key: string): Promise<string | null> {
 export const forgetCustomerKeys = () => keyCache.clear();
 
 /**
- * Deletes every version under a prefix. Versions still under an Object Lock
- * retention period are refused by the store; they are counted as `locked`
- * and the caller retries later.
+ * Deletes every version under a prefix. Versions still under a retention
+ * period (refused by Object Lock, or checked here when the store has none)
+ * are counted as `locked` and the caller retries later.
  */
 export async function deletePrefix(prefix: string): Promise<{ deleted: number; locked: number }> {
   if (config.storageDriver === 'database') {
@@ -96,13 +107,20 @@ export async function deletePrefix(prefix: string): Promise<{ deleted: number; l
     const { count } = await prisma.storedObject.deleteMany({ where: { key: { startsWith: prefix }, OR: [{ retainUntil: null }, { retainUntil: { lte: now } }] } });
     return { deleted: count, locked };
   }
+  const now = new Date();
   let deleted = 0;
   let locked = 0;
   let keyMarker: string | undefined;
   let versionMarker: string | undefined;
   do {
     const page = await s3.send(new ListObjectVersionsCommand({ Bucket: config.s3.bucket, Prefix: prefix, KeyMarker: keyMarker, VersionIdMarker: versionMarker }));
-    const objects = [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])].map((v) => ({ Key: v.Key!, VersionId: v.VersionId }));
+    let objects = [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])].map((v) => ({ Key: v.Key!, VersionId: v.VersionId }));
+    if (!config.s3.objectLock) {
+      const keep = await Promise.all((page.Versions ?? []).map((v) => retained(v.Key!, v.VersionId, now)));
+      const held = new Set((page.Versions ?? []).filter((_, i) => keep[i]).map((v) => JSON.stringify([v.Key, v.VersionId])));
+      locked += held.size;
+      objects = objects.filter((o) => !held.has(JSON.stringify([o.Key, o.VersionId])));
+    }
     if (objects.length) {
       const res = await s3.send(new DeleteObjectsCommand({ Bucket: config.s3.bucket, Delete: { Objects: objects, Quiet: true } }));
       locked += res.Errors?.length ?? 0;

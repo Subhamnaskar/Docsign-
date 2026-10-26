@@ -17,6 +17,8 @@
     "worker": "npm run worker -w @docsign/api"
   },
   "devDependencies": {
+    "@neon/config": "^1.9.4",
+    "@neon/env": "^1.6.5",
     "concurrently": "^9.1.2"
   },
   "allowScripts": {
