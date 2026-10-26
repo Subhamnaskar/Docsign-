@@ -82,8 +82,8 @@ describe('mobile app', () => {
     const { email } = await registerSender(app);
     const phone = await mobileLogin(email);
     expect((await phone.call('POST', '/mobile/web-session', { next: '//evil.test/x' })).statusCode).toBe(400);
-    const { url } = (await phone.call('POST', '/mobile/web-session', { next: '/envelopes/new' })).json();
-    const path = new URL(url).pathname + new URL(url).search;
+    const { url, path } = (await phone.call('POST', '/mobile/web-session', { next: '/envelopes/new' })).json();
+    expect(url.endsWith(path)).toBe(true);
 
     const first = await app.inject({ method: 'GET', url: path });
     expect(first.statusCode).toBe(302);

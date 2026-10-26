@@ -156,6 +156,18 @@ function SelfSignFlow() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The mobile app uploads the document itself and opens /sign-yourself?id=… to place the signature
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('id');
+    if (!id) return;
+    api<Envelope>(`/envelopes/${id}`)
+      .then((fresh) => {
+        setEnv(fresh);
+        setFields(fresh.fields);
+      })
+      .catch((e) => setError(e instanceof ApiError ? e.message : 'Could not open this document.'));
+  }, []);
+
   async function addFiles(files: FileList | File[]) {
     const list = Array.from(files);
     if (!list.length) return;

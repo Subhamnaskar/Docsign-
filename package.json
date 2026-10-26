@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "Global e-signature platform: Phase 1 core (see docs/ARCHITECTURE.md)",
   "workspaces": [
-    "apps/*"
+    "apps/api",
+    "apps/web"
   ],
   "scripts": {
     "infra:up": "docker compose up -d",

@@ -138,6 +138,7 @@ export function serializeEnvelope(env: FullEnvelope) {
     certificateSha256: env.certificateSha256,
     departmentId: env.departmentId,
     testMode: env.testMode,
+    selfSign: env.selfSign,
     externalRefs: env.externalRefs,
     legalHold: env.legalHoldAt ? { since: env.legalHoldAt, reason: env.legalHoldReason } : null,
     approval: env.approvalStatus

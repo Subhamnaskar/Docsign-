@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Nuronix eSign",
+    "slug": "nuronix-esign",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "nuronixesign",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "in.nuronixai.esign",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to unlock Nuronix eSign.",
+        "NSCameraUsageDescription": "Scan paper documents to send them for signature.",
+        "NSPhotoLibraryUsageDescription": "Choose photos of documents to send for signature."
+      }
+    },
+    "android": {
+      "package": "in.nuronixai.esign",
+      "adaptiveIcon": {
+        "backgroundColor": "#14110b",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to unlock Nuronix eSign."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#b8860b"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Scan paper documents to send them for signature.",
+          "photosPermission": "Choose photos of documents to send for signature."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0a0a12",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      "expo-sharing"
+    ],
+    "extra": {
+      "apiUrl": "https://docsign-puce-six.vercel.app"
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

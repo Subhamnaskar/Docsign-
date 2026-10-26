@@ -72,7 +72,9 @@ export async function mobileRoutes(app: FastifyInstance) {
       const user = await me(req.auth.userId);
       if (req.auth.support) throw forbidden('Not available in a support session.');
       const token = await issueToken(user.id, 'WEB_HANDOFF');
-      return { url: `${config.appUrl}/api/v1/mobile/web-session/${token}?next=${encodeURIComponent(next)}` };
+      // The app joins `path` to the server address it talks to, so the web view stays on that host
+      const path = `/api/v1/mobile/web-session/${token}?next=${encodeURIComponent(next)}`;
+      return { path, url: `${config.appUrl}${path}` };
     });
 
     /** Registers this phone for push notifications (an Expo push token). */
