@@ -23,6 +23,8 @@ export async function renewArchiveTimestamps(opts: { olderThanDays?: number; now
   const docs = await prisma.document.findMany({
     where: { finalKey: { not: null }, archiveTimestampAt: { lt: cutoff } },
     include: { envelope: { select: { id: true, policy: true } } },
+    // Oldest timestamps first, so a backlog is worked through in order
+    orderBy: { archiveTimestampAt: 'asc' },
     take: opts.limit ?? 20,
   });
   for (const doc of docs) {
@@ -51,6 +53,7 @@ export async function renewArchiveTimestamps(opts: { olderThanDays?: number; now
   const certs = await prisma.envelope.findMany({
     where: { certificateKey: { not: null }, certificateArchiveTimestampAt: { lt: cutoff } },
     select: { id: true, certificateKey: true, certificateSha256: true, policy: true },
+    orderBy: { certificateArchiveTimestampAt: 'asc' },
     take: opts.limit ?? 20,
   });
   for (const env of certs) {

@@ -101,7 +101,8 @@ describe('long-term validation', () => {
 
     // Nothing is due yet
     expect((await withTsa(() => renewArchiveTimestamps())).renewed).toBe(0);
-    const { renewed } = await withTsa(() => renewArchiveTimestamps({ olderThanDays: 0, now: new Date(Date.now() + 60_000) }));
+    // A large limit: the shared test database holds documents from earlier runs too
+    const { renewed } = await withTsa(() => renewArchiveTimestamps({ olderThanDays: 0, now: new Date(Date.now() + 60_000), limit: 10_000 }));
     expect(renewed).toBeGreaterThanOrEqual(2); // document and certificate
 
     const after = await prisma.document.findUniqueOrThrow({ where: { id: doc.id } });
