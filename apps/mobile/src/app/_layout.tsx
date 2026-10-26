@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import { LockScreen } from '@/components/LockScreen';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { routeForNotification } from '@/lib/push';
@@ -30,7 +30,7 @@ function Navigation() {
 
   // A tapped alert opens the agreement it is about (or the "to sign" list)
   useEffect(() => {
-    if (status !== 'signedIn') return;
+    if (status !== 'signedIn' || Platform.OS === 'web') return;
     const open = (response: Notifications.NotificationResponse | null) => {
       const to = routeForNotification(response?.notification.request.content.data);
       if (to) router.push(to as never);

@@ -1,9 +1,9 @@
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { api, loadToken, saveToken, setSignedOutHandler } from './api';
 import { currentPushToken, registerForPush } from './push';
+import { secure } from './secure';
 import type { Me } from './types';
 
 type Status = 'loading' | 'signedOut' | 'locked' | 'signedIn';
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSignedOutHandler(() => void clear());
     (async () => {
-      const lock = (await SecureStore.getItemAsync(LOCK_KEY)) === 'on';
+      const lock = (await secure.get(LOCK_KEY)) === 'on';
       setLock(lock);
       if (!(await loadToken())) return setStatus('signedOut');
       try {
@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await LocalAuthentication.authenticateAsync({ promptMessage: 'Confirm to turn on the lock' });
         if (!res.success) return;
       }
-      await SecureStore.setItemAsync(LOCK_KEY, on ? 'on' : 'off');
+      await secure.set(LOCK_KEY, on ? 'on' : 'off');
       setLock(on);
     },
     async refreshMe() {

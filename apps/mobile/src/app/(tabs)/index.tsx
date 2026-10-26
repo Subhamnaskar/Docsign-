@@ -5,12 +5,17 @@ import { Body, Button, Card, Heading, Label, Notice, Screen } from '@/components
 import { api } from '@/lib/api';
 import { activityLabel, timeAgo } from '@/lib/format';
 import { radius, space, useTheme } from '@/lib/theme';
-import type { Home } from '@/lib/types';
+import type { Home, ToSignItem } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { data, error, refreshing, refresh } = useLoad(useCallback(() => api<Home>('/home'), []));
+  // "To sign" counts agreements from any organisation, like the To sign tab
+  const load = useCallback(async () => {
+    const [home, toSign] = await Promise.all([api<Home>('/home'), api<{ data: ToSignItem[] }>('/mobile/to-sign')]);
+    return { ...home, counts: { ...home.counts, toSign: toSign.data.length } };
+  }, []);
+  const { data, error, refreshing, refresh } = useLoad(load);
   const first = data?.name?.split(' ')[0];
 
   return (
@@ -35,7 +40,15 @@ export default function HomeScreen() {
       {data?.activity.map((a) => (
         <Card key={a.id} onPress={() => router.push(`/agreement/${a.envelope.id}`)}>
           <Body>
-            <Text style={{ fontWeight: '700' }}>{a.actor?.name ?? a.actor?.email ?? 'Someone'}</Text> {activityLabel[a.type] ?? a.type} {a.envelope.title}
+            {a.type === 'envelope.completed' ? (
+              <>
+                <Text style={{ fontWeight: '700' }}>{a.envelope.title}</Text> is complete
+              </>
+            ) : (
+              <>
+                <Text style={{ fontWeight: '700' }}>{a.actor?.name ?? a.actor?.email ?? 'A signer'}</Text> {activityLabel[a.type] ?? a.type} {a.envelope.title}
+              </>
+            )}
           </Body>
           <Body muted>{timeAgo(a.createdAt)}</Body>
         </Card>

@@ -4,10 +4,12 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { api } from './api';
 
-// Show alerts while the app is open too
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
-});
+// Show alerts while the app is open too (phones only; browser previews have no push)
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
+  });
+}
 
 let pushToken: string | null = null;
 export const currentPushToken = () => pushToken;
@@ -17,7 +19,7 @@ export const currentPushToken = () => pushToken;
  * device and an EAS project id (set by `eas init`); otherwise it does nothing.
  */
 export async function registerForPush(): Promise<void> {
-  if (!Device.isDevice) return;
+  if (Platform.OS === 'web' || !Device.isDevice) return;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', { name: 'Agreements', importance: Notifications.AndroidImportance.HIGH });
   }

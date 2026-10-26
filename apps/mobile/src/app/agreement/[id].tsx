@@ -45,7 +45,7 @@ export default function Agreement() {
       <View style={{ gap: space.sm }}>
         <Heading>{env.title}</Heading>
         <StatusPill status={env.status} />
-        {env.sentAt ? <Body muted>Sent {formatDate(env.sentAt)}</Body> : null}
+        {env.sentAt && !env.selfSign ? <Body muted>Sent {formatDate(env.sentAt)}</Body> : null}
         {env.completedAt ? <Body muted>Completed {formatDate(env.completedAt)}</Body> : null}
         {env.expiresAt && env.status === 'SENT' ? <Body muted>Expires {formatDate(env.expiresAt)}</Body> : null}
       </View>

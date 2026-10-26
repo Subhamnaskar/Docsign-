@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, type TextInputProps, View, type ViewStyle } from 'react-native';
 import { statusLabel } from '@/lib/format';
 import { gold, radius, space, type Theme, useTheme } from '@/lib/theme';
@@ -135,12 +136,19 @@ export function Loading() {
   );
 }
 
-/** The app mark: gold tile with the signature stroke, as on the website. */
+/** The app mark: gold tile with the signature stroke, as on the website (components/ui.tsx Logo). */
 export function Logo({ size = 40 }: { size?: number }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: size * 0.25, backgroundColor: gold[500], alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#14110b', fontSize: size * 0.5, fontWeight: '900' }}>✍</Text>
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 32 32">
+      <Defs>
+        <LinearGradient id="logo-gold" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor={gold[400]} />
+          <Stop offset="1" stopColor={gold[500]} />
+        </LinearGradient>
+      </Defs>
+      <Rect width="32" height="32" rx="8" fill="url(#logo-gold)" />
+      <Path d="M8 21c3-1 4.5-9 7-9s1 7 3 7 2.5-4 6-4" stroke="#14110b" strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
   );
 }
 

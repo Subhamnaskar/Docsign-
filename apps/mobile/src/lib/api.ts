@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+import { secure } from './secure';
 
 /** The Nuronix eSign server: app.json → extra.apiUrl, or EXPO_PUBLIC_API_URL for local testing. */
 export const API_URL: string = process.env.EXPO_PUBLIC_API_URL ?? (Constants.expoConfig?.extra?.apiUrl as string);
@@ -19,14 +19,14 @@ export class ApiError extends Error {
 }
 
 export async function loadToken() {
-  token = await SecureStore.getItemAsync(TOKEN_KEY);
+  token = await secure.get(TOKEN_KEY);
   return token;
 }
 
 export async function saveToken(t: string | null) {
   token = t;
-  if (t) await SecureStore.setItemAsync(TOKEN_KEY, t);
-  else await SecureStore.deleteItemAsync(TOKEN_KEY);
+  if (t) await secure.set(TOKEN_KEY, t);
+  else await secure.remove(TOKEN_KEY);
 }
 
 export const sessionToken = () => token;
