@@ -13,7 +13,7 @@ declare const Office: any;
  * the normal session cookie works, and hands a session token back to the pane.
  */
 export default function OfficeConnect() {
-  const [message, setMessage] = useState('Connecting to DocSign…');
+  const [message, setMessage] = useState('Connecting to Nuronix eSign…');
 
   async function connect() {
     try {

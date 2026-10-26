@@ -31,7 +31,7 @@ const login = (email: string, password = PASSWORD) => {
 async function enable2fa(c: Client) {
   const setup = await c.json('POST', '/auth/2fa/setup');
   expect(setup.qrSvg).toContain('<svg');
-  expect(setup.otpauthUri).toMatch(/^otpauth:\/\/totp\/DocSign/);
+  expect(setup.otpauthUri).toMatch(/^otpauth:\/\/totp\/Nuronix%20eSign/);
   expect((await c.call('POST', '/auth/2fa/enable', { json: { code: '000000' } })).statusCode).toBe(400);
   const { recoveryCodes } = await c.json('POST', '/auth/2fa/enable', { json: { code: totp(setup.secret) } });
   expect(recoveryCodes).toHaveLength(10);

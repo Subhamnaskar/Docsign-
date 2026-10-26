@@ -78,7 +78,7 @@ export function IntegrationsSettings() {
           ))}
         </ul>
         <p className="mt-3 text-xs text-gray-500">
-          Providers are enabled by your DocSign administrator with each service&apos;s app credentials. Share links from any of them can always be pasted when adding documents.
+          Providers are enabled by your Nuronix eSign administrator with each service&apos;s app credentials. Share links from any of them can always be pasted when adding documents.
         </p>
       </Card>
     </>

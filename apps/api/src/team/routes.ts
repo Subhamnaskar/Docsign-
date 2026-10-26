@@ -86,10 +86,10 @@ export async function teamRoutes(app: FastifyInstance) {
       const inviter = req.auth.actor.kind === 'user' ? req.auth.actor.name : inv.org.name;
       const { html, text } = layout({
         heading: `${inviter} invited you to ${inv.org.name}`,
-        paragraphs: [`You've been invited to join ${inv.org.name} on DocSign as ${body.role.toLowerCase()}.`, 'The invitation expires in 7 days.'],
+        paragraphs: [`You've been invited to join ${inv.org.name} on Nuronix eSign as ${body.role.toLowerCase()}.`, 'The invitation expires in 7 days.'],
         button: { label: 'Accept invitation', url: `${config.appUrl}/invite/${token}` },
       });
-      await sendMail({ to: body.email, subject: `Join ${inv.org.name} on DocSign`, html, text });
+      await sendMail({ to: body.email, subject: `Join ${inv.org.name} on Nuronix eSign`, html, text });
       await logActivity(req, 'user.invited', { email: body.email, role: body.role });
       reply.code(201);
       return { id: inv.id, email: inv.email, role: inv.role, expiresAt: inv.expiresAt };

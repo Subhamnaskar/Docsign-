@@ -30,7 +30,7 @@ export const config = {
     pass: process.env.SMTP_PASS ?? '',
     /** true for port 465 (implicit TLS); port 587 upgrades with STARTTLS automatically */
     secure: (process.env.SMTP_SECURE ?? '') === 'true',
-    from: env('MAIL_FROM', 'DocSign <no-reply@docsign.local>'),
+    from: env('MAIL_FROM', 'Nuronix eSign <no-reply@docsign.local>'),
   },
   gotenbergUrl: env('GOTENBERG_URL', 'http://localhost:3100'),
   tsaUrl: process.env.TSA_URL ?? '',

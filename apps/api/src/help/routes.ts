@@ -46,7 +46,7 @@ export async function helpRoutes(app: FastifyInstance) {
       system: [
         {
           type: 'text',
-          text: `You are the help assistant for DocSign, an e-signature product. Answer only from the help articles below, in plain language, addressed to the user ("you"). If the articles don't cover the question, say so briefly, set answered to false and suggest contacting support. Never invent features, prices or legal advice.\n\n${KNOWLEDGE}`,
+          text: `You are the help assistant for Nuronix eSign, an e-signature product. Answer only from the help articles below, in plain language, addressed to the user ("you"). If the articles don't cover the question, say so briefly, set answered to false and suggest contacting support. Never invent features, prices or legal advice.\n\n${KNOWLEDGE}`,
           cache_control: { type: 'ephemeral' },
         },
       ],

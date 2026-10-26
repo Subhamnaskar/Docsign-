@@ -12,7 +12,7 @@ describe('PAdES seal', () => {
     const [sig] = await verifyPdfSignatures(sealed.pdf);
     expect(sig).toMatchObject({
       subFilter: 'ETSI.CAdES.detached',
-      signerName: 'DocSign Platform Seal',
+      signerName: 'Nuronix eSign Platform Seal',
       integrityValid: true,
       coversWholeDocument: true,
     });

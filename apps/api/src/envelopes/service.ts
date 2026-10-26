@@ -184,7 +184,7 @@ export async function notifySigners(env: Envelope, recipients: Recipient[], kind
   for (const r of recipients) {
     // Embedded and in-person signers are reached through the integrating app or the host
     if (r.embedded || r.hostUserId) continue;
-    const vars = { title: env.title, sender: sender?.name ?? 'DocSign', name: r.name };
+    const vars = { title: env.title, sender: sender?.name ?? 'Nuronix eSign', name: r.name };
     const { html, text } = layout({
       locale: r.locale,
       brand,

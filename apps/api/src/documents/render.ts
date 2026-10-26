@@ -109,7 +109,7 @@ export async function renderCompletedPdf(
     await doc.attach(file.data, file.name, { mimeType: file.mimeType, description: file.description });
   }
 
-  const stamp = `DocSign Envelope ID: ${opts.envelopeId}`;
+  const stamp = `Nuronix eSign Envelope ID: ${opts.envelopeId}`;
   for (const page of pages) {
     // Rotated pages are left unstamped rather than stamped sideways
     if (page.getRotation().angle % 360 !== 0) continue;

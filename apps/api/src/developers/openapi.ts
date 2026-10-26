@@ -15,7 +15,7 @@ export function openApiSpec() {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'DocSign API',
+      title: 'Nuronix eSign API',
       version: '1.0.0',
       description:
         'Create, send and track agreements. Authenticate with `Authorization: Bearer <key>`. Keys starting `dsk_test_` create watermarked test agreements that are not billed; `dsk_` keys are live.',

@@ -148,7 +148,7 @@ export async function securityRoutes(app: FastifyInstance) {
       if (user.totpEnabledAt) throw badRequest('Two-factor authentication is already on. Turn it off first to use a new device.');
       const secret = newTotpSecret();
       await prisma.user.update({ where: { id: user.id }, data: { totpPendingEnc: seal(secret) } });
-      const uri = otpauthUri(secret, user.email, 'DocSign');
+      const uri = otpauthUri(secret, user.email, 'Nuronix eSign');
       return { secret, otpauthUri: uri, qrSvg: await QRCode.toString(uri, { type: 'svg', margin: 1, width: 200 }) };
     });
 

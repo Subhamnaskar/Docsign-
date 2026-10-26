@@ -162,10 +162,10 @@ export async function buildCertificate(input: CertificateInput): Promise<Uint8Ar
   const { envelope, policy } = input;
   const doc = await PDFDocument.create();
   doc.setTitle(`Certificate of Completion - ${envelope.title}`);
-  doc.setProducer('DocSign');
+  doc.setProducer('Nuronix eSign');
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const w = new Writer(doc, font, bold, `DocSign Certificate of Completion  |  Envelope ${envelope.id}`);
+  const w = new Writer(doc, font, bold, `Nuronix eSign Certificate of Completion  |  Envelope ${envelope.id}`);
 
   w.text('Certificate of Completion', { size: 20, bold: true });
   w.gap(4);
@@ -233,7 +233,7 @@ export async function buildCertificate(input: CertificateInput): Promise<Uint8Ar
   w.gap(6);
   w.row('Chain head', input.chainHead);
   w.text(
-    'Each audit event includes the SHA-256 hash of the previous event. Altering, inserting or removing any event breaks the chain. Verify this envelope and its documents at the DocSign verification portal.',
+    'Each audit event includes the SHA-256 hash of the previous event. Altering, inserting or removing any event breaks the chain. Verify this envelope and its documents at the Nuronix eSign verification portal.',
     { size: 8, color: MUTED },
   );
 

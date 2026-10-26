@@ -236,7 +236,7 @@ async function writeDss(pdf: Buffer, data: ValidationData): Promise<Buffer> {
 /** Adds an RFC 3161 document timestamp (PAdES archive timestamp) over the whole file. */
 export async function addDocumentTimestamp(pdf: Buffer): Promise<{ pdf: Buffer; genTime: Date }> {
   const withPlaceholder = await incrementalUpdate(pdf, (doc) =>
-    addSignatureField(doc, { fieldName: `DocSign Archive Timestamp ${Date.now()}`, reason: '', name: '', kind: 'timestamp', signatureLength: 12_000 }),
+    addSignatureField(doc, { fieldName: `Nuronix eSign Archive Timestamp ${Date.now()}`, reason: '', name: '', kind: 'timestamp', signatureLength: 12_000 }),
   );
   const prepared = prepareByteRange(withPlaceholder);
   const digest = createHash('sha256').update(prepared.signedContent).digest();

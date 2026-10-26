@@ -36,7 +36,7 @@ export function layout(opts: {
   button?: { label: string; url: string };
   footer?: string;
   locale?: string;
-  /** Sending organisation's branding; defaults to DocSign's. */
+  /** Sending organisation's branding; defaults to Nuronix eSign's. */
   brand?: { name: string; color: string | null; logoUrl: string | null };
 }): { html: string; text: string } {
   const lang = opts.locale ?? 'en';
@@ -44,7 +44,7 @@ export function layout(opts: {
   const color = opts.brand?.color ?? '#9a6f08';
   const header = opts.brand?.logoUrl
     ? `<img src="${escape(opts.brand.logoUrl)}" alt="${escape(opts.brand.name)}" style="max-height:40px;max-width:200px">`
-    : `<div style="font-weight:700;font-size:18px;color:${color}">${escape(opts.brand?.name ?? 'DocSign')}</div>`;
+    : `<div style="font-weight:700;font-size:18px;color:${color}">${escape(opts.brand?.name ?? 'Nuronix eSign')}</div>`;
   const ps = opts.paragraphs.map((p) => `<p style="margin:0 0 14px;line-height:1.5">${escape(p)}</p>`).join('');
   const button = opts.button
     ? `<p style="margin:24px 0"><a href="${escape(opts.button.url)}" style="background:${color};color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">${escape(opts.button.label)}</a></p>`
@@ -57,7 +57,7 @@ export function layout(opts: {
 </div>
 <p style="font-size:12px;color:#6b7280;margin-top:16px;line-height:1.5">${escape(
     opts.footer ?? t(lang, 'personalLinkFooter'),
-  )}${opts.brand ? '<br>Sent securely via DocSign.' : ''}</p>
+  )}${opts.brand ? '<br>Sent securely via Nuronix eSign.' : ''}</p>
 </div></body></html>`;
   const text = [
     opts.heading,

@@ -11,9 +11,9 @@ export function GET(req: Request) {
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">
   <Id>3f0e8d2a-6c51-4b8e-9a1e-2d7c4b9f6a10</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>DocSign</ProviderName>
+  <ProviderName>Nuronix eSign</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="DocSign"/>
+  <DisplayName DefaultValue="Nuronix eSign"/>
   <Description DefaultValue="Send the open document for electronic signature."/>
   <IconUrl DefaultValue="${origin}/icons/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="${origin}/icons/icon-128.png"/>
@@ -52,10 +52,10 @@ export function GET(req: Request) {
       </bt:Images>
       <bt:Urls><bt:Url id="Taskpane.Url" DefaultValue="${origin}/office/taskpane?host=word"/></bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="Group.Label" DefaultValue="DocSign"/>
+        <bt:String id="Group.Label" DefaultValue="Nuronix eSign"/>
         <bt:String id="Button.Label" DefaultValue="Send for signature"/>
       </bt:ShortStrings>
-      <bt:LongStrings><bt:String id="Button.Tooltip" DefaultValue="Send this document for electronic signature with DocSign."/></bt:LongStrings>
+      <bt:LongStrings><bt:String id="Button.Tooltip" DefaultValue="Send this document for electronic signature with Nuronix eSign."/></bt:LongStrings>
     </Resources>
   </VersionOverrides>
 </OfficeApp>`;

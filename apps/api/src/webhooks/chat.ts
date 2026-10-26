@@ -31,7 +31,7 @@ const VERBS: Record<string, [string, string]> = {
   'envelope.completed': ['✅', 'is complete: everyone has signed'],
   'envelope.voided': ['🗑️', 'was voided'],
   'envelope.expired': ['⌛', 'expired before everyone signed'],
-  ping: ['🔔', 'test notification from DocSign'],
+  ping: ['🔔', 'test notification from Nuronix eSign'],
 };
 
 export interface ChatMessage {
@@ -42,7 +42,7 @@ export interface ChatMessage {
 /** Plain-language message for an event, looking up titles and names it doesn't carry. */
 export async function describeEvent(event: string, data: Record<string, unknown>): Promise<ChatMessage> {
   const [icon, verb] = VERBS[event] ?? ['🔔', event];
-  if (event === 'ping') return { text: `${icon} This channel will receive DocSign notifications.`, url: null };
+  if (event === 'ping') return { text: `${icon} This channel will receive Nuronix eSign notifications.`, url: null };
   const envelopeId = typeof data.envelopeId === 'string' ? data.envelopeId : null;
   const env = envelopeId ? await prisma.envelope.findUnique({ where: { id: envelopeId }, select: { title: true } }) : null;
   const recipient =

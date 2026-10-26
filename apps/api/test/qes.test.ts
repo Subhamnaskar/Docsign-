@@ -79,9 +79,9 @@ describe('qualified signatures (CSC API, sandbox trust service)', () => {
     const doc = await prisma.document.findFirstOrThrow({ where: { envelopeId: env.id } });
     const reports = await verifyPdfSignatures(await getObject(doc.finalKey!));
     const signatures = reports.filter((r) => r.kind === 'signature');
-    expect(signatures.map((r) => r.signerName)).toEqual(['Lena Fischer', 'DocSign Platform Seal']);
+    expect(signatures.map((r) => r.signerName)).toEqual(['Lena Fischer', 'Nuronix eSign Platform Seal']);
     expect(signatures.every((r) => r.integrityValid && r.coversWholeDocument)).toBe(true);
-    expect(signatures[0].issuerName).toBe('DocSign Sandbox QTSP (not qualified)');
+    expect(signatures[0].issuerName).toBe('Nuronix eSign Sandbox QTSP (not qualified)');
 
     const audit = await c.json('GET', `/envelopes/${env.id}/audit`);
     const signed = audit.events.find((e: { type: string }) => e.type === 'recipient.signed');

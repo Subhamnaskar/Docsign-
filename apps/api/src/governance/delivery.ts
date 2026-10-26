@@ -46,7 +46,7 @@ export interface MailIdentity {
 /**
  * Sender identity for an organisation's emails. Without a verified domain the
  * mail comes from the platform address with the organisation's name
- * ("Acme via DocSign"); with one it comes from no-reply@<their domain>, DKIM-signed.
+ * ("Acme via Nuronix eSign"); with one it comes from no-reply@<their domain>, DKIM-signed.
  */
 export function mailIdentityFor(orgId: string): Promise<MailIdentity> {
   return cached(`mail:${orgId}`, async () => {
@@ -61,7 +61,7 @@ export function mailIdentityFor(orgId: string): Promise<MailIdentity> {
         dkim: { domainName: org.emailDomain, keySelector: org.dkimSelector, privateKey: open(org.dkimPrivateKeyEnc) },
       };
     }
-    return { from: `${quote(`${name} via DocSign`)} <${platformAddress()}>`, replyTo };
+    return { from: `${quote(`${name} via Nuronix eSign`)} <${platformAddress()}>`, replyTo };
   });
 }
 

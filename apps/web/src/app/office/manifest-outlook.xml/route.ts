@@ -1,6 +1,6 @@
 /**
  * Outlook add-in manifest: a "Send for signature" button on received
- * messages that sends an attachment to DocSign. Sideload it from Outlook
+ * messages that sends an attachment to Nuronix eSign. Sideload it from Outlook
  * (Get Add-ins → My add-ins → Add a custom add-in) or the admin centre.
  */
 export function GET(req: Request) {
@@ -10,9 +10,9 @@ export function GET(req: Request) {
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
   <Id>8b2d4e61-0f3a-4c7d-b5e9-6a1c3f7d2e40</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>DocSign</ProviderName>
+  <ProviderName>Nuronix eSign</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="DocSign"/>
+  <DisplayName DefaultValue="Nuronix eSign"/>
   <Description DefaultValue="Send email attachments for electronic signature."/>
   <IconUrl DefaultValue="${origin}/icons/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="${origin}/icons/icon-128.png"/>
@@ -54,7 +54,7 @@ export function GET(req: Request) {
       </bt:Images>
       <bt:Urls><bt:Url id="Taskpane.Url" DefaultValue="${origin}/office/taskpane?host=outlook"/></bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="Group.Label" DefaultValue="DocSign"/>
+        <bt:String id="Group.Label" DefaultValue="Nuronix eSign"/>
         <bt:String id="Button.Label" DefaultValue="Send for signature"/>
       </bt:ShortStrings>
       <bt:LongStrings><bt:String id="Button.Tooltip" DefaultValue="Send an attachment from this email for electronic signature."/></bt:LongStrings>

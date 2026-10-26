@@ -12,7 +12,7 @@ const maskEmail = (email: string) => email.replace(/^(.{1,2})[^@]*(@.*)$/, (_, a
 
 /**
  * Public verification portal: anyone holding a document can check that it is
- * an unaltered DocSign original and see who signed it. Nothing is stored.
+ * an unaltered Nuronix eSign original and see who signed it. Nothing is stored.
  */
 export async function verifyRoutes(app: FastifyInstance) {
   /** Revocation list of the development CA (referenced from dev seal certificates). */

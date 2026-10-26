@@ -1,4 +1,4 @@
-// DocSign service worker: makes the app installable and shows an offline page.
+// Nuronix eSign service worker: makes the app installable and shows an offline page.
 // Pages and API calls always go to the network; nothing sensitive is cached.
 const CACHE = 'docsign-shell-v1';
 const SHELL = ['/offline', '/icons/icon-192.png'];

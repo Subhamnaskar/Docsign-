@@ -124,7 +124,7 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
           Copy
         </Button>
         <a
-          href={`data:text/plain;charset=utf-8,${encodeURIComponent(`DocSign recovery codes\n\n${text}\n`)}`}
+          href={`data:text/plain;charset=utf-8,${encodeURIComponent(`Nuronix eSign recovery codes\n\n${text}\n`)}`}
           download="docsign-recovery-codes.txt"
           className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
         >

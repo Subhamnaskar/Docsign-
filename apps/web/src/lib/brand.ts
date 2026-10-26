@@ -1,11 +1,11 @@
 /**
  * Brand and commercial settings for the public website, in one place.
  *
- * "DocSign" is a working name: it is close to an existing trademark, so choose
- * the final name (and run a trademark search) before launching publicly.
+ * The product is Nuronix eSign, by NuronixAI. The name is used everywhere it
+ * is shown (logo, page titles, emails); the API has its own copy in its strings.
  */
 export const brand = {
-  name: 'DocSign',
+  name: 'Nuronix eSign',
   tagline: 'Sign agreements in every market, compliant by design.',
   description:
     'One platform to send, sign and verify agreements across countries, with the right signature level, consent and data residency for each jurisdiction.',

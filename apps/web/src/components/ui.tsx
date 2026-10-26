@@ -181,10 +181,7 @@ export function Logo({ className }: { className?: string }) {
         <rect width="32" height="32" rx="8" fill="url(#logo-gold)" />
         <path d="M8 21c3-1 4.5-9 7-9s1 7 3 7 2.5-4 6-4" stroke="#14110b" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span>
-        {brand.name}
-        <span className="text-brand-500">.</span>
-      </span>
+      <span>{brand.name}</span>
     </span>
   );
 }

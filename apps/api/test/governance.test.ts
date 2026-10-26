@@ -143,7 +143,7 @@ describe('sending from the organisation’s domain and custom signing domain', (
     const { c } = await registerSender(app);
     const orgId = await orgOf(c);
     const signDomain = `sign-${uid().toLowerCase()}.acme.test`;
-    expect((await mailIdentityFor(orgId)).from).toMatch(/^"Acme via DocSign" </);
+    expect((await mailIdentityFor(orgId)).from).toMatch(/^"Acme via Nuronix eSign" </);
 
     await c.json('PUT', '/governance/email', { json: { fromName: 'Acme Legal', replyTo: 'legal@acme.test', domain: 'acme.test' } });
     const gov = await c.json('GET', '/governance');

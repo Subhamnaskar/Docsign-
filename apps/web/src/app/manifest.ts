@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { brand } from '@/lib/brand';
 
-/** Web app manifest: lets people install DocSign on phones and desktops. */
+/** Web app manifest: lets people install Nuronix eSign on phones and desktops. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: brand.name,

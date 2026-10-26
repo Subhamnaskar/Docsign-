@@ -10,7 +10,7 @@ import { hmacSha256Hex, safeEqualHex } from '../lib/crypto.js';
 /**
  * Sandbox trust service implementing the slice of CSC v2 the app uses:
  * OAuth authorize/token, credentials/list, credentials/info and
- * signatures/signHash. Certificates come from a "DocSign Sandbox QTSP" CA and
+ * signatures/signHash. Certificates come from a "Nuronix eSign Sandbox QTSP" CA and
  * are NOT qualified. The PIN 000000 is refused, to test failures.
  */
 
@@ -37,7 +37,7 @@ function sandboxCa() {
     cert.serialNumber = serial();
     cert.validity.notBefore = new Date(Date.now() - 60_000);
     cert.validity.notAfter = new Date(Date.now() + 10 * 365 * 24 * 3600_000);
-    const attrs = [{ name: 'commonName', value: 'DocSign Sandbox QTSP (not qualified)' }, { name: 'countryName', value: 'EU' }];
+    const attrs = [{ name: 'commonName', value: 'Nuronix eSign Sandbox QTSP (not qualified)' }, { name: 'countryName', value: 'EU' }];
     cert.setSubject(attrs);
     cert.setIssuer(attrs);
     cert.setExtensions([{ name: 'basicConstraints', cA: true, critical: true }, { name: 'keyUsage', keyCertSign: true, cRLSign: true, critical: true }]);

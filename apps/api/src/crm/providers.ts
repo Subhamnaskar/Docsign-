@@ -78,7 +78,7 @@ export const hubspot: CrmProvider = {
       for (const f of await ctx.files()) {
         const form = new FormData();
         form.append('file', new Blob([new Uint8Array(f.data)], { type: 'application/pdf' }), f.name);
-        form.append('folderPath', '/DocSign');
+        form.append('folderPath', '/Nuronix eSign');
         form.append('options', JSON.stringify({ access: 'PRIVATE', overwrite: false }));
         const up = (await (await call(`${HUBSPOT}/files/v3/files`, { token, method: 'POST', body: form })).json()) as { id: string };
         attachmentIds.push(up.id);
@@ -98,7 +98,7 @@ export const hubspot: CrmProvider = {
       body: JSON.stringify({
         properties: {
           hs_timestamp: new Date().toISOString(),
-          hs_note_body: `<p>${ctx.text}</p><p><a href="${ctx.url}">Open in DocSign</a></p>`,
+          hs_note_body: `<p>${ctx.text}</p><p><a href="${ctx.url}">Open in Nuronix eSign</a></p>`,
           ...(attachmentIds.length ? { hs_attachment_ids: attachmentIds.join(';') } : {}),
         },
         associations,
@@ -157,7 +157,7 @@ export const salesforce: CrmProvider = {
     await sf('/sobjects/Task', {
       method: 'POST',
       body: JSON.stringify({
-        Subject: `DocSign: ${ctx.text}`.slice(0, 255),
+        Subject: `Nuronix eSign: ${ctx.text}`.slice(0, 255),
         Description: `${ctx.text}\n${ctx.url}`,
         Status: 'Completed',
         ActivityDate: new Date().toISOString().slice(0, 10),

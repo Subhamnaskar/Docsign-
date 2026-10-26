@@ -87,7 +87,7 @@ export default function VerifyPage() {
       <main className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-2xl font-semibold">Verify a signed document</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Check that a PDF or certificate of completion is an unaltered DocSign original. The file is checked in memory and not stored.
+          Check that a PDF or certificate of completion is an unaltered Nuronix eSign original. The file is checked in memory and not stored.
         </p>
 
         <div
@@ -125,14 +125,14 @@ export default function VerifyPage() {
               {authentic
                 ? `This is the original "${result.match!.documentName}" from envelope "${result.match!.title}".`
                 : result.match
-                  ? 'The file matches a DocSign record but its signature did not validate.'
-                  : 'This exact file was not issued by DocSign. It may have been modified, or it may be an original unsigned copy.'}
+                  ? 'The file matches a Nuronix eSign record but its signature did not validate.'
+                  : 'This exact file was not issued by Nuronix eSign. It may have been modified, or it may be an original unsigned copy.'}
             </Alert>
 
             <Card className="p-5">
               <h2 className="font-semibold">Checks</h2>
               <ul className="mt-3 space-y-2 text-sm">
-                <Check ok={!!result.match}>Fingerprint matches a completed DocSign record</Check>
+                <Check ok={!!result.match}>Fingerprint matches a completed Nuronix eSign record</Check>
                 <Check ok={sigOk}>Digital signature is cryptographically valid</Check>
                 <Check ok={untouched}>No changes after signing (validation data may be added later)</Check>
                 {result.signatures.map((s) => s.timestamp && (

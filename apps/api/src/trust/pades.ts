@@ -41,8 +41,8 @@ export async function sealPdf(
     pdfDoc,
     reason: opts.reason,
     contactInfo: config.appUrl,
-    name: 'DocSign Platform Seal',
-    location: opts.location ?? `DocSign cell: ${config.cellRegion}`,
+    name: 'Nuronix eSign Platform Seal',
+    location: opts.location ?? `Nuronix eSign cell: ${config.cellRegion}`,
     // Room for the certificate chain plus a TSA token with its own chain
     signatureLength: 24_000,
     subFilter: SUBFILTER_ETSI_CADES_DETACHED,
@@ -75,7 +75,7 @@ export async function sealPdfIncremental(input: Buffer, opts: { reason: string }
   const signer = new CadesSigner(keys, config.tsaUrl);
   const pdf = await signIncremental(
     input,
-    { fieldName: `DocSign Seal ${Date.now()}`, reason: opts.reason, name: 'DocSign Platform Seal', contactInfo: config.appUrl, location: `DocSign cell: ${config.cellRegion}` },
+    { fieldName: `Nuronix eSign Seal ${Date.now()}`, reason: opts.reason, name: 'Nuronix eSign Platform Seal', contactInfo: config.appUrl, location: `Nuronix eSign cell: ${config.cellRegion}` },
     (content) => signer.sign(content),
   );
   return finish(pdf, signer.lastTimestamp, keys.id);

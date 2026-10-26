@@ -80,7 +80,7 @@ const memo = (name: string, create: () => KeyPairPem) => {
 
 /** Our Application Service Provider key, used to sign eSign requests. */
 export const aspKeys = () =>
-  memo('esign-asp', () => issueCertificate({ subject: [{ name: 'commonName', value: `DocSign ASP (${config.cellRegion})` }], years: 3 }));
+  memo('esign-asp', () => issueCertificate({ subject: [{ name: 'commonName', value: `Nuronix eSign ASP (${config.cellRegion})` }], years: 3 }));
 
 export const sandboxCa = () =>
   memo('esign-sandbox-ca', () =>

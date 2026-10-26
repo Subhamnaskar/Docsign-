@@ -87,7 +87,7 @@ const en = {
   newEmail: 'Their email',
   reassignReason: 'Why are you reassigning?',
   reassignDone: 'Sent to {name}. You can close this page.',
-  via: 'via DocSign',
+  via: 'via Nuronix eSign',
   approve: 'Approve',
   approveIntro: 'Review the document below, then approve it or decline.',
   chooseOne: 'Choose…',

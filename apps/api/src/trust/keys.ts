@@ -24,7 +24,7 @@ export interface KeyProvider {
 }
 
 /**
- * Development key provider: generates a private "DocSign Dev Root CA" and a
+ * Development key provider: generates a private "Nuronix eSign Root CA" and a
  * platform seal certificate on first run and keeps them on disk.
  * Signatures validate structurally everywhere; Adobe shows them as "validity
  * unknown" until the dev root is trusted, as expected for a non-AATL CA.
@@ -95,8 +95,8 @@ function generate(keyPath: string, certPath: string, caPath: string, caKeyPath: 
   caCert.validity.notBefore = new Date(Date.now() - 60_000);
   caCert.validity.notAfter = new Date(Date.now() + 20 * 365 * 24 * 3600 * 1000);
   const caAttrs = [
-    { name: 'commonName', value: 'DocSign Dev Root CA' },
-    { name: 'organizationName', value: 'DocSign (development)' },
+    { name: 'commonName', value: 'Nuronix eSign Root CA' },
+    { name: 'organizationName', value: 'NuronixAI' },
   ];
   caCert.setSubject(caAttrs);
   caCert.setIssuer(caAttrs);
@@ -114,8 +114,8 @@ function generate(keyPath: string, certPath: string, caPath: string, caKeyPath: 
   sealCert.validity.notBefore = new Date(Date.now() - 60_000);
   sealCert.validity.notAfter = new Date(Date.now() + 5 * 365 * 24 * 3600 * 1000);
   sealCert.setSubject([
-    { name: 'commonName', value: 'DocSign Platform Seal' },
-    { name: 'organizationName', value: 'DocSign (development)' },
+    { name: 'commonName', value: 'Nuronix eSign Platform Seal' },
+    { name: 'organizationName', value: 'NuronixAI' },
     { name: 'organizationalUnitName', value: `Cell: ${config.cellRegion}` },
   ]);
   sealCert.setIssuer(caAttrs);

@@ -66,7 +66,7 @@ function attachmentBytes(id: string): Promise<Uint8Array> {
 /**
  * Word and Outlook task pane. Word: send the open document. Outlook: send an
  * attachment of the open message, with its sender as the first signer.
- * Uses the normal DocSign session (the pane runs on this site's own origin).
+ * Uses the normal Nuronix eSign session (the pane runs on this site's own origin).
  */
 export default function OfficeTaskpane() {
   const [ready, setReady] = useState(false);
@@ -170,13 +170,13 @@ export default function OfficeTaskpane() {
         <div className="flex justify-center py-12 text-brand-600"><Spinner /></div>
       ) : me === null ? (
         <div className="mt-6 space-y-3">
-          <p className="text-gray-600">Sign in to DocSign to send documents for signature.</p>
+          <p className="text-gray-600">Sign in to Nuronix eSign to send documents for signature.</p>
           {error && <Alert>{error}</Alert>}
           <Button onClick={signIn}>Sign in</Button>
         </div>
       ) : host === 'browser' ? (
         <div className="mt-6 space-y-2 text-gray-600">
-          <p>This page runs inside Word or Outlook. Add DocSign to Office with one of these manifests:</p>
+          <p>This page runs inside Word or Outlook. Add Nuronix eSign to Office with one of these manifests:</p>
           <ul className="list-disc pl-5">
             <li><a className="text-brand-700 underline" href="/office/manifest-word.xml">Word add-in manifest</a></li>
             <li><a className="text-brand-700 underline" href="/office/manifest-outlook.xml">Outlook add-in manifest</a></li>
@@ -184,7 +184,7 @@ export default function OfficeTaskpane() {
         </div>
       ) : done ? (
         <div className="mt-6 space-y-3">
-          <Alert tone="success" title="Draft created">Finish adding signers and fields in DocSign, then send.</Alert>
+          <Alert tone="success" title="Draft created">Finish adding signers and fields in Nuronix eSign, then send.</Alert>
           <a href={done} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline">Open the agreement</a>
           <Button variant="secondary" size="sm" onClick={() => setDone(null)}>Send another</Button>
         </div>

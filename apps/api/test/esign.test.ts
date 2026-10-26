@@ -150,7 +150,7 @@ describe('Indian loan agreement: e-stamp, Aadhaar eSign and DSC', () => {
     // DUMP_PDF=path.pdf writes the result for manual inspection
     if (process.env.DUMP_PDF) writeFileSync(process.env.DUMP_PDF, pdf.rawPayload);
     const reports = await verifyPdfSignatures(pdf.rawPayload);
-    expect(reports.map((r) => r.signerName)).toEqual(['Ravi Kumar', 'Lender Authorised Signatory', 'DocSign Platform Seal']);
+    expect(reports.map((r) => r.signerName)).toEqual(['Ravi Kumar', 'Lender Authorised Signatory', 'Nuronix eSign Platform Seal']);
     expect(reports.every((r) => r.integrityValid)).toBe(true);
     expect(reports[2].coversWholeDocument).toBe(true);
 
