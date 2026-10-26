@@ -8,6 +8,7 @@ const TTL_MS: Record<AuthTokenKind, number> = {
   VERIFY_EMAIL: 3 * 24 * 3600_000,
   RESET_PASSWORD: 3600_000,
   MFA_LOGIN: 5 * 60_000,
+  WEB_HANDOFF: 2 * 60_000,
 };
 /** Wrong second-factor codes allowed per login attempt */
 export const MFA_MAX_ATTEMPTS = 5;

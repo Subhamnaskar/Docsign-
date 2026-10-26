@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import type { User } from '@prisma/client';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 import { config } from '../config.js';
@@ -22,6 +22,20 @@ const code = z.string().trim().min(6).max(20);
 
 /** Users created through SSO or SCIM have no usable password. */
 export const isSsoOnly = (u: Pick<User, 'passwordHash'>) => u.passwordHash.startsWith('sso:');
+
+/** The second step of a two-factor sign-in (website and mobile app): checks the code and uses up the sign-in token. */
+export async function checkMfaLogin(req: FastifyRequest, input: unknown) {
+  const body = parse(z.object({ token: z.string().min(10), code }), input);
+  const t = await peekToken(body.token, 'MFA_LOGIN');
+  if (!t || t.attempts >= MFA_MAX_ATTEMPTS) throw unauthorized('This sign-in has expired. Enter your password again.');
+  if (!(await checkSecondFactor(t.user, body.code))) {
+    await prisma.authToken.update({ where: { id: t.id }, data: { attempts: { increment: 1 } } });
+    await recordLogin(req, { email: t.user.email, method: 'mfa', success: false, userId: t.user.id, orgId: t.user.orgId, reason: 'bad_code' });
+    throw unauthorized('That code is not correct.');
+  }
+  if (!(await consumeToken(body.token, 'MFA_LOGIN'))) throw unauthorized('This sign-in has expired. Enter your password again.');
+  return t.user;
+}
 
 /** Checks a TOTP code or burns a recovery code. */
 async function checkSecondFactor(user: User, input: string): Promise<boolean> {
@@ -88,17 +102,9 @@ export async function securityRoutes(app: FastifyInstance) {
   // --- Second login step ---------------------------------------------------------
 
   app.post('/auth/login/mfa', strict, async (req, reply) => {
-    const body = parse(z.object({ token: z.string().min(10), code }), req.body);
-    const t = await peekToken(body.token, 'MFA_LOGIN');
-    if (!t || t.attempts >= MFA_MAX_ATTEMPTS) throw unauthorized('This sign-in has expired. Enter your password again.');
-    if (!(await checkSecondFactor(t.user, body.code))) {
-      await prisma.authToken.update({ where: { id: t.id }, data: { attempts: { increment: 1 } } });
-      await recordLogin(req, { email: t.user.email, method: 'mfa', success: false, userId: t.user.id, orgId: t.user.orgId, reason: 'bad_code' });
-      throw unauthorized('That code is not correct.');
-    }
-    if (!(await consumeToken(body.token, 'MFA_LOGIN'))) throw unauthorized('This sign-in has expired. Enter your password again.');
-    await createSession(reply, t.user.id, 'mfa');
-    return { id: t.user.id, name: t.user.name, email: t.user.email };
+    const user = await checkMfaLogin(req, req.body);
+    await createSession(reply, user.id, 'mfa');
+    return { id: user.id, name: user.name, email: user.email };
   });
 
   // --- Signed-in account security ----------------------------------------------

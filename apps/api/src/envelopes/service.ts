@@ -21,6 +21,8 @@ import { mandateLabels } from '../enach/routes.js';
 import { approvalGate } from '../approvals/service.js';
 import { appBaseFor } from '../governance/delivery.js';
 import { rememberRecipients } from '../contacts/service.js';
+import { background } from '../lib/background.js';
+import { pushToEmails } from '../lib/push.js';
 
 export const envelopeInclude = {
   documents: { orderBy: { order: 'asc' } },
@@ -197,6 +199,11 @@ export async function notifySigners(env: Envelope, recipients: Recipient[], kind
       ],
       button: { label: t(r.locale, 'reviewAndSign'), url: signingUrl(r, base) },
     });
+    // Signers who use the mobile app also get an alert; it opens their "to sign" list
+    background(
+      pushToEmails([r.email], { title: kind === 'invite' ? 'Please sign' : 'Reminder to sign', body: `${vars.sender} sent you "${env.title}".`, data: { screen: 'to-sign' } }),
+      (err) => console.error('push failed', err),
+    );
     await sendMail({
       to: r.email,
       subject: `${env.testMode ? '[TEST] ' : ''}${t(r.locale, kind === 'invite' ? 'inviteSubject' : 'reminderSubject', vars)}`,

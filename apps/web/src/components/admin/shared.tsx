@@ -162,6 +162,7 @@ export const LOGIN_METHODS: Record<string, string> = {
   register: 'Sign-up',
   office: 'Office add-in',
   guest: 'Sign it yourself (guest)',
+  mobile: 'Mobile app',
 };
 
 export const FAILURE_REASONS: Record<string, string> = {

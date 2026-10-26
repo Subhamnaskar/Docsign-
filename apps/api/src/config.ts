@@ -170,6 +170,8 @@ export const config = {
   workerMode: env('WORKER_MODE', 'inline') as 'inline' | 'off',
   /** Serverless: secret for the scheduled POST/GET /api/v1/internal/tick (Vercel Cron sends it as a Bearer token) */
   cronSecret: process.env.CRON_SECRET ?? '',
+  /** Optional: Expo access token when "enhanced push security" is on for the mobile app's Expo project */
+  expoAccessToken: process.env.EXPO_ACCESS_TOKEN ?? '',
   clamav: {
     host: process.env.CLAMAV_HOST ?? '',
     port: Number(env('CLAMAV_PORT', '3310')),

@@ -161,6 +161,8 @@ model User {
   // Language of the app for this user (BCP 47, e.g. "hi")
   locale       String       @default("en")
   departments  DepartmentMember[]
+  // Phones signed in to the mobile app, for push notifications
+  pushDevices  PushDevice[]
   createdAt    DateTime     @default(now())
 }
 
@@ -183,6 +185,8 @@ enum AuthTokenKind {
   VERIFY_EMAIL
   RESET_PASSWORD
   MFA_LOGIN
+  // One-time link that opens the website signed in, from the mobile app
+  WEB_HANDOFF
 }
 
 model Invitation {
@@ -1214,4 +1218,18 @@ model StoredObject {
   retainUntil DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// A phone running the mobile app, registered for push notifications (Expo push service)
+model PushDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // ExponentPushToken[...]
+  token      String   @unique
+  platform   String
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
 }

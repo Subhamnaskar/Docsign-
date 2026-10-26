@@ -6,7 +6,7 @@ import { notifyPlatform } from '../platform/access.js';
 export const ATTACK_THRESHOLD = 10;
 const ATTACK_WINDOW_MS = 15 * 60_000;
 
-export type LoginMethod = 'password' | 'mfa' | 'sso' | 'invite' | 'register' | 'office' | 'guest';
+export type LoginMethod = 'password' | 'mfa' | 'sso' | 'invite' | 'register' | 'office' | 'guest' | 'mobile';
 export type LoginFailure = 'bad_password' | 'unknown_user' | 'deactivated' | 'sso_required' | 'bad_code' | 'suspended';
 
 /**

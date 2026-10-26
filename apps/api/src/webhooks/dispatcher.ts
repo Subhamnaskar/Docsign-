@@ -4,6 +4,8 @@ import { hmacSha256Hex } from '../lib/crypto.js';
 import { chatBody, describeEvent } from './chat.js';
 import { enqueueCrmEvents } from '../crm/routes.js';
 import { enqueueWorkflowRuns } from '../workflows/engine.js';
+import { background } from '../lib/background.js';
+import { pushForEvent } from '../lib/push.js';
 
 export const WEBHOOK_EVENTS = [
   'envelope.sent',
@@ -27,6 +29,8 @@ export async function enqueueWebhook(
 ): Promise<void> {
   await enqueueCrmEvents(tx, orgId, event, data);
   await enqueueWorkflowRuns(tx, orgId, event, data);
+  // Mobile app alerts for the sender; sent after the response, never failing the caller
+  background(pushForEvent(event, data), (err) => console.error('push failed', err));
   const endpoints = await tx.webhookEndpoint.findMany({ where: { orgId, active: true } });
   const payload = { event, createdAt: new Date().toISOString(), data } as Prisma.JsonObject;
   const targets = endpoints.filter((e) => e.events.length === 0 || e.events.includes(event));

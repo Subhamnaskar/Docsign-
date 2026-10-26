@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
@@ -22,6 +22,29 @@ const password = passwordSchema;
 const APP_LOCALES = ['en', 'hi'] as const;
 // Compared against when the user doesn't exist, so response timing doesn't reveal registered emails
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 12);
+
+/** Email and password sign-in checks, shared by the website and the mobile app. Returns the user; the caller handles two-factor. */
+export async function checkPassword(req: FastifyRequest, input: unknown) {
+  const body = parse(z.object({ email: z.string().trim().toLowerCase(), password: z.string() }), input);
+  const user = await prisma.user.findUnique({ where: { email: body.email } });
+  const ok = await bcrypt.compare(body.password, user?.passwordHash ?? DUMMY_HASH);
+  const failed = (reason: LoginFailure) => recordLogin(req, { email: body.email, method: 'password', success: false, userId: user?.id, orgId: user?.orgId, reason });
+  if (!user || !ok) {
+    await failed(user ? 'bad_password' : 'unknown_user');
+    throw unauthorized('Incorrect email or password.');
+  }
+  const sso = await ssoOrgForEmail(body.email);
+  // Owners keep password access so a broken identity provider can't lock everyone out
+  if (sso?.ssoEnforced && sso.id === user.orgId && user.role !== 'OWNER') {
+    await failed('sso_required');
+    throw forbidden('Your organisation requires single sign-on. Use "Sign in with SSO".');
+  }
+  if (user.disabledAt) {
+    await failed('deactivated');
+    throw unauthorized('This account has been deactivated.');
+  }
+  return user;
+}
 
 export async function authRoutes(app: FastifyInstance) {
   const strict = { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } };
@@ -63,24 +86,7 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.post('/auth/login', strict, async (req, reply) => {
-    const body = parse(z.object({ email: z.string().trim().toLowerCase(), password: z.string() }), req.body);
-    const user = await prisma.user.findUnique({ where: { email: body.email } });
-    const ok = await bcrypt.compare(body.password, user?.passwordHash ?? DUMMY_HASH);
-    const failed = (reason: LoginFailure) => recordLogin(req, { email: body.email, method: 'password', success: false, userId: user?.id, orgId: user?.orgId, reason });
-    if (!user || !ok) {
-      await failed(user ? 'bad_password' : 'unknown_user');
-      throw unauthorized('Incorrect email or password.');
-    }
-    const sso = await ssoOrgForEmail(body.email);
-    // Owners keep password access so a broken identity provider can't lock everyone out
-    if (sso?.ssoEnforced && sso.id === user.orgId && user.role !== 'OWNER') {
-      await failed('sso_required');
-      throw forbidden('Your organisation requires single sign-on. Use "Sign in with SSO".');
-    }
-    if (user.disabledAt) {
-      await failed('deactivated');
-      throw unauthorized('This account has been deactivated.');
-    }
+    const user = await checkPassword(req, req.body);
     if (user.totpEnabledAt) {
       // Password was right; the session is only created after the second factor
       return { mfaRequired: true, mfaToken: await issueToken(user.id, 'MFA_LOGIN') };
