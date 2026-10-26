@@ -9,9 +9,11 @@ export const brand = {
   tagline: 'Sign agreements in every market, compliant by design.',
   description:
     'One platform to send, sign and verify agreements across countries, with the right signature level, consent and data residency for each jurisdiction.',
-  domain: 'docsign.example',
-  salesEmail: 'sales@docsign.example',
-  supportEmail: 'support@docsign.example',
+  /** Where the app is hosted: a subdomain of NuronixAI's domain (the main site stays on nuronixai.in) */
+  domain: 'sign.nuronixai.in',
+  /** Mailboxes on NuronixAI's Hostinger email; create them in hPanel → Emails */
+  salesEmail: 'sales@nuronixai.in',
+  supportEmail: 'support@nuronixai.in',
   /** Registered company details for the footer and legal pages. */
   legalEntity: 'NuronixAI',
   /** Social profiles shown in the footer; leave empty until the accounts exist. */

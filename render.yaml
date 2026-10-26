@@ -6,6 +6,7 @@ services:
     name: docsign
     runtime: docker
     plan: free
+    region: singapore
     dockerfilePath: ./deploy/render/Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/billing/plans
@@ -16,12 +17,12 @@ services:
         value: in
       - key: APP_SECRET
         generateValue: true
-      # https://<your-service>.onrender.com (or your own domain)
+      # The app's address (Hostinger DNS: CNAME sign → this Render service)
       - key: APP_URL
-        sync: false
+        value: https://sign.nuronixai.in
       - key: CORS_ORIGINS
-        sync: false
-      # Supabase → Connect → Session pooler connection string
+        value: https://sign.nuronixai.in
+      # Neon → Connection string (or Supabase → Connect → Session pooler)
       - key: DATABASE_URL
         sync: false
       # Supabase → Storage → S3 connection
@@ -37,17 +38,21 @@ services:
         value: docsign-documents
       - key: S3_OBJECT_LOCK
         value: "false"
-      # Brevo SMTP
+      # Hostinger email (the no-reply@nuronixai.in mailbox)
       - key: SMTP_HOST
-        value: smtp-relay.brevo.com
+        value: smtp.hostinger.com
       - key: SMTP_PORT
-        value: "587"
+        value: "465"
+      - key: SMTP_SECURE
+        value: "true"
       - key: SMTP_USER
-        sync: false
+        value: no-reply@nuronixai.in
       - key: SMTP_PASS
         sync: false
       - key: MAIL_FROM
-        sync: false
+        value: DocSign <no-reply@nuronixai.in>
+      - key: SUPPORT_EMAIL
+        value: support@nuronixai.in
       # Output of: npm run keys:export -w @docsign/api
       - key: SEAL_KEYS
         sync: false

@@ -1,40 +1,51 @@
-# Host DocSign free, without a credit card
+# Host DocSign free at sign.nuronixai.in
 
-Four free services, about 30 minutes:
+No credit card needed. About 30–40 minutes.
 
 | Piece | Service | Free limit |
 |---|---|---|
-| App (website + API) | **Render** free web service | 512 MB RAM; sleeps after 15 min idle (kept awake by step 5) |
-| Database + file storage | **Supabase** free project | 500 MB database, 1 GB files |
-| Email | **Brevo** | 300 emails/day |
+| App (website + API) | **Render** free web service | 512 MB RAM; sleeps after 15 min idle (kept awake in step 7) |
+| Database | **Neon** | 0.5 GB |
+| File storage | **Supabase Storage** | 1 GB |
+| Email | **Hostinger email** you already have | your Hostinger plan's sending limit |
+| Address + HTTPS | **sign.nuronixai.in** on your Hostinger DNS | free certificate from Render |
 | Keep-awake ping | **cron-job.org** | free |
 
-**Good for:** demos, testing, first pilot customers.
-**Not on the free plan:** Word/Excel upload conversion (upload PDFs) and virus
-scanning, which need more memory. Sealed files are not write-once (Supabase has
-no Object Lock). Pages are slower than on a real server.
+Your main site (nuronixai.in, app.nuronixai.in on Vercel) is not touched.
+
+**Not on the free plan:** Word/Excel conversion (upload PDFs) and virus scanning,
+which need more memory. Sealed files are not write-once (Supabase has no Object
+Lock). Pages are slower than on a paid server. Fine for demos and first pilots.
 
 ---
 
-## 1. Supabase: database and file storage
+## 1. Neon: database
 
-1. Sign up at **supabase.com** (GitHub login works) → **New project**. Region:
-   **Mumbai (ap-south-1)**. Choose a database password and save it.
-2. **Database:** click **Connect** (top) → **Session pooler** → copy the URI.
-   Replace `[YOUR-PASSWORD]` with your password. This is `DATABASE_URL`.
-3. **Files:** **Storage** → **New bucket** → name `docsign-documents`, keep it **private**.
-4. **Storage → S3 Connection**: copy the **Endpoint** (`S3_ENDPOINT`) and
-   **Region** (`S3_REGION`). Under **Access keys** → *New access key*: copy the
-   **Access key ID** (`S3_ACCESS_KEY`) and **Secret** (`S3_SECRET_KEY`).
+1. Sign up at **neon.tech** (GitHub login works) → create a project, region
+   **AWS Asia Pacific (Singapore)** (closest to India).
+2. **Connect** → copy the connection string (starts with `postgresql://`, ends
+   with `?sslmode=require`). This is `DATABASE_URL`.
 
-## 2. Brevo: email
+## 2. Supabase: file storage
 
-1. Sign up at **brevo.com** → **Senders, Domains & Dedicated IPs** → add and
-   verify your sender email.
-2. **SMTP & API → SMTP**: copy the **Login** (`SMTP_USER`) and generate an
-   **SMTP key** (`SMTP_PASS`).
+1. Sign up at **supabase.com** → **New project**, region **Mumbai (ap-south-1)**.
+2. **Storage** → **New bucket** → name `docsign-documents`, keep it **private**.
+3. **Storage → S3 Connection** (Settings): copy the **Endpoint** (`S3_ENDPOINT`)
+   and **Region** (`S3_REGION`). Under **Access keys** → *New access key*: copy
+   the **Access key ID** (`S3_ACCESS_KEY`) and **Secret** (`S3_SECRET_KEY`).
 
-## 3. Seal key (on your PC)
+## 3. Hostinger: email mailboxes
+
+In **hPanel → Emails → nuronixai.in → Create email account**:
+
+- `no-reply@nuronixai.in`: the app sends from this. Save its password (`SMTP_PASS`).
+- `support@nuronixai.in` and `sales@nuronixai.in`: shown on the website and in emails.
+
+Your existing SPF record already allows Hostinger to send for nuronixai.in, so
+nothing else is needed. (Optional, better delivery: in hPanel turn on **DKIM**
+for the domain, and later change DMARC from `p=none` to `p=quarantine`.)
+
+## 4. Seal key (on your PC)
 
 Signed PDFs are sealed with a key. Free hosts wipe their disk on restart, so the
 key is stored as a setting. In the project folder (PowerShell):
@@ -44,42 +55,50 @@ $env:KEYS_DIR = '.keys-prod'; npm run keys:export -w @docsign/api
 ```
 
 Copy the long line it prints: that's `SEAL_KEYS`. Keep it secret, and keep the
-`.keys-prod` folder as a backup (it's ignored by git).
+`.keys-prod` folder as a backup (git ignores it).
 
-## 4. Render: the app
+## 5. Render: the app
 
 1. Sign up at **render.com** with GitHub and allow access to the `Docsign-` repository.
-2. **New → Blueprint** → pick the repository. Render reads `render.yaml`.
+2. **New → Blueprint** → pick the repository. Render reads `render.yaml`
+   (address, Hostinger email server and most settings are already filled in).
 3. Fill in the values it asks for:
-   - `APP_URL` and `CORS_ORIGINS`: `https://docsign.onrender.com` (use the service
-     name Render shows; fix it after the first deploy if different)
-   - `DATABASE_URL`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` from step 1
-   - `SMTP_USER`, `SMTP_PASS` from step 2; `MAIL_FROM` like `DocSign <you@your-email.com>` (your verified sender)
-   - `SEAL_KEYS` from step 3
+   - `DATABASE_URL` from step 1
+   - `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` from step 2
+   - `SMTP_PASS`: the `no-reply@nuronixai.in` mailbox password from step 3
+   - `SEAL_KEYS` from step 4
    - `PLATFORM_ADMINS`: your email
-4. **Apply**. The first build takes ~10 minutes. Then open the URL and register
-   with your `PLATFORM_ADMINS` email.
+4. **Apply**. The first build takes ~10 minutes. Note the service address,
+   e.g. `docsign-xxxx.onrender.com`.
 
-## 5. Keep it awake
+## 6. Hostinger DNS: point sign.nuronixai.in at Render
 
-Free Render services sleep after 15 minutes, and then reminders and workflows
-pause and the next visitor waits about a minute.
+1. Render → your service → **Settings → Custom Domains → Add** → `sign.nuronixai.in`.
+2. **hPanel → Domains → nuronixai.in → DNS / Nameservers → Add record**:
+   - Type **CNAME**, Name **sign**, Target **docsign-xxxx.onrender.com** (your Render address), TTL default.
+3. Back in Render, click **Verify**. The HTTPS certificate is issued
+   automatically (a few minutes up to an hour).
+
+Open **https://sign.nuronixai.in** and register with your `PLATFORM_ADMINS` email.
+
+## 7. Keep it awake
+
+Free Render services sleep after 15 minutes: then reminders and workflows pause
+and the next visitor waits about a minute.
 
 **cron-job.org** → sign up → **Create cronjob**: URL
-`https://YOUR-SERVICE.onrender.com/api/v1/billing/plans`, every **10 minutes**.
-
-This also keeps the Supabase project active (free projects pause after a week idle).
+`https://sign.nuronixai.in/api/v1/billing/plans`, every **10 minutes**.
 
 ---
 
 ## Updating
 
-Push to GitHub and Render redeploys automatically.
+Push to GitHub; Render redeploys automatically.
 
 ## When you outgrow it
 
-- Render **Starter** ($7/month) removes sleeping and gives more memory, and then
-  Word conversion and virus scanning can run (see `deploy/docker-compose.yml`).
-- Or move everything to one small VPS with `deploy/README.md`.
-- Payments, SMS/WhatsApp, Aadhaar eSign and KYC stay in sandbox mode until you
-  add live provider keys (names in `apps/api/.env.example`).
+- Render **Starter** (~$7/month) removes sleeping and adds memory; then Word
+  conversion and virus scanning can be turned on.
+- Or move to one small VPS with `deploy/README.md` (same address, change the DNS record).
+- Payments, SMS/WhatsApp, Aadhaar eSign and KYC stay in test mode until you add
+  live provider keys (names in `apps/api/.env.example`).
