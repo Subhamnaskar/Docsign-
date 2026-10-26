@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL } from '@/lib/seo';
-import { API_URL } from '@/lib/serverApi';
+import { serverApiFetch } from '@/lib/serverApi';
 import { SOLUTIONS } from '@/lib/solutions';
 
 export const revalidate = 3600;
@@ -24,8 +24,8 @@ const PAGES: [path: string, priority: number][] = [
 
 async function helpArticles(): Promise<string[]> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/help/articles`, { next: { revalidate } });
-    if (!res.ok) return [];
+    const res = await serverApiFetch('/help/articles', revalidate);
+    if (!res?.ok) return [];
     const body = (await res.json()) as { slug: string }[] | { articles?: { slug: string }[] };
     return (Array.isArray(body) ? body : (body.articles ?? [])).map((a) => `/help/${a.slug}`);
   } catch {

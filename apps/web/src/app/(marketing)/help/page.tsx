@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { HelpIndex } from '@/components/marketing/HelpIndex';
 import { PageHero, Section } from '@/components/marketing/Site';
 import type { ArticleSummary } from '@/components/HelpWidgets';
-import { API_URL } from '@/lib/serverApi';
+import { serverApiFetch } from '@/lib/serverApi';
 import { pageMeta } from '@/lib/seo';
 
 export const metadata: Metadata = pageMeta({
@@ -16,8 +16,8 @@ export const revalidate = 300;
 
 async function loadArticles(): Promise<ArticleSummary[]> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/help/articles`, { next: { revalidate } });
-    return res.ok ? ((await res.json()) as ArticleSummary[]) : [];
+    const res = await serverApiFetch('/help/articles', revalidate);
+    return res?.ok ? ((await res.json()) as ArticleSummary[]) : [];
   } catch {
     return [];
   }

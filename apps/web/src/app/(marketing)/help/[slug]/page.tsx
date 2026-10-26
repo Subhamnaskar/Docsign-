@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Section } from '@/components/marketing/Site';
 import { Markdown } from '@/lib/markdown';
-import { API_URL } from '@/lib/serverApi';
+import { serverApiFetch } from '@/lib/serverApi';
 import { pageMeta } from '@/lib/seo';
 
 interface Article {
@@ -18,8 +18,8 @@ export const revalidate = 300;
 
 async function load(slug: string): Promise<Article | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/help/articles/${encodeURIComponent(slug)}`, { next: { revalidate } });
-    return res.ok ? ((await res.json()) as Article) : null;
+    const res = await serverApiFetch(`/help/articles/${encodeURIComponent(slug)}`, revalidate);
+    return res?.ok ? ((await res.json()) as Article) : null;
   } catch {
     return null;
   }

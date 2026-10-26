@@ -16,3 +16,4 @@ apps/web/src/pages/
 .env.local
 .env.*.local
 .neon
+.vercel

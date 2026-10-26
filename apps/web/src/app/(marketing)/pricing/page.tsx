@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { CtaBand, PageHero, Section } from '@/components/marketing/Site';
 import { type PricingData, PricingPlans } from '@/components/marketing/PricingPlans';
 import { apiPricing } from '@/lib/brand';
-import { API_URL } from '@/lib/serverApi';
+import { serverApiFetch } from '@/lib/serverApi';
 import { faqLd, pageMeta, softwareLd } from '@/lib/seo';
 import { JsonLd } from '@/components/JsonLd';
 
@@ -12,8 +12,8 @@ export const revalidate = 300;
 
 async function loadPricing(): Promise<PricingData | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/billing/plans`, { next: { revalidate } });
-    return res.ok ? ((await res.json()) as PricingData) : null;
+    const res = await serverApiFetch('/billing/plans', revalidate);
+    return res?.ok ? ((await res.json()) as PricingData) : null;
   } catch {
     return null;
   }
