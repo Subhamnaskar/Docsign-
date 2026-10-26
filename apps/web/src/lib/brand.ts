@@ -12,8 +12,8 @@ export const brand = {
   /** Where the app is hosted: a subdomain of NuronixAI's domain (the main site stays on nuronixai.in) */
   domain: 'sign.nuronixai.in',
   /** Mailboxes on NuronixAI's Hostinger email; create them in hPanel → Emails */
-  salesEmail: 'sales@nuronixai.in',
-  supportEmail: 'support@nuronixai.in',
+  salesEmail: 'info@nuronixai.in',
+  supportEmail: 'info@nuronixai.in',
   /** Registered company details for the footer and legal pages. */
   legalEntity: 'NuronixAI',
   /** Social profiles shown in the footer; leave empty until the accounts exist. */

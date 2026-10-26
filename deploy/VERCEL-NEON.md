@@ -10,7 +10,7 @@ PDFs. Email goes through your **Hostinger** mailbox.
 | Database | Neon Postgres (free: 0.5 GB) |
 | Files | Neon object storage, bucket `documents` (free: 5 GB) |
 | Background jobs (reminders, workflows, webhooks) | A scheduler calls the app every 5 minutes (step 6) |
-| Email | Hostinger (`no-reply@nuronixai.in`) |
+| Email | Hostinger (`info@nuronixai.in`) |
 | Address | `sign.nuronixai.in` (one DNS record at Hostinger) |
 
 **Limits of this setup**
@@ -41,7 +41,7 @@ PDFs. Email goes through your **Hostinger** mailbox.
 ## 2. Hostinger: email mailboxes
 
 **hPanel → Emails → nuronixai.in → Create email account**:
-`no-reply@nuronixai.in` (save its password), plus `support@` and `sales@`.
+`info@nuronixai.in` (save its password). The app sends from it, and support and sales mail goes to it.
 
 ## 3. Seal key (on your PC)
 
@@ -88,10 +88,11 @@ Also make a random secret for the scheduler (`CRON_SECRET`):
 | `SMTP_HOST` | `smtp.hostinger.com` |
 | `SMTP_PORT` | `465` |
 | `SMTP_SECURE` | `true` |
-| `SMTP_USER` | `no-reply@nuronixai.in` |
+| `SMTP_USER` | `info@nuronixai.in` |
 | `SMTP_PASS` | the mailbox password |
-| `MAIL_FROM` | `DocSign <no-reply@nuronixai.in>` |
-| `SUPPORT_EMAIL` | `support@nuronixai.in` |
+| `MAIL_FROM` | `DocSign <info@nuronixai.in>` |
+| `SALES_EMAIL` | `info@nuronixai.in` |
+| `SUPPORT_EMAIL` | `info@nuronixai.in` |
 | `PLATFORM_ADMINS` | your email |
 | `TSA_URL` | `http://timestamp.digicert.com` |
 
