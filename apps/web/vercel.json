@@ -3,5 +3,6 @@
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "bash vercel/build.sh",
   "ignoreCommand": "bash vercel/ignore-build.sh",
+  "regions": ["sin1"],
   "crons": [{ "path": "/api/v1/internal/tick", "schedule": "0 3 * * *" }]
 }
