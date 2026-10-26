@@ -2,5 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "bash vercel/build.sh",
+  "ignoreCommand": "bash vercel/ignore-build.sh",
   "crons": [{ "path": "/api/v1/internal/tick", "schedule": "0 3 * * *" }]
 }
