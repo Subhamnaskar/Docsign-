@@ -208,7 +208,7 @@ export function AuditMock() {
         <div key={e} className="flex items-center gap-2 py-1">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
           <span className="flex-1 text-ink">{e}</span>
-          <span className="tabular-nums text-gray-400">{t}</span>
+          <span className="tabular-nums text-gray-500">{t}</span>
         </div>
       ))}
     </Window>

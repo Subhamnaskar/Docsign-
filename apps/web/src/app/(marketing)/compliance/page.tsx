@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import { Check, CtaBand, PageHero, Section, SectionHeading } from '@/components/marketing/Site';
+import { pageMeta } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Compliance & security',
-  description: 'Jurisdiction-aware signing, tamper-evident evidence, data residency and security controls.',
-};
+export const metadata: Metadata = pageMeta({
+  title: 'Legally Valid E-Signatures: IT Act, eIDAS, ESIGN',
+  description: "E-signatures valid under India's IT Act 2000, the EU's eIDAS and the US ESIGN Act, with tamper-evident audit trails, sealed PDFs, data residency and security controls.",
+  path: '/compliance',
+  keywords: ['legally valid e-signature', 'IT Act 2000 e-signature', 'eIDAS', 'ESIGN Act', 'e-signature security'],
+});
 
 const JURISDICTIONS = [
   {

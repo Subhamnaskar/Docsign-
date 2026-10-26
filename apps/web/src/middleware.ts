@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { brand } from '@/lib/brand';
 
 const API_URL = process.env.API_URL;
 const OFFICE_ORIGINS = ['https://*.officeapps.live.com', 'https://*.office.com', 'https://*.office365.com', 'https://outlook.live.com', 'https://*.sharepoint.com', 'https://*.microsoft365.com'];
@@ -25,6 +26,8 @@ export async function middleware(req: NextRequest) {
   // The Office task pane is framed by Office on the web
   if (req.nextUrl.pathname.startsWith('/office/taskpane')) origins = OFFICE_ORIGINS;
   res.headers.set('Content-Security-Policy', ["frame-ancestors 'self'", ...origins].join(' '));
+  // Search engines index the site only at its own domain, not at vercel.app or preview addresses
+  if (req.nextUrl.hostname !== brand.domain) res.headers.set('X-Robots-Tag', 'noindex, nofollow');
   return res;
 }
 

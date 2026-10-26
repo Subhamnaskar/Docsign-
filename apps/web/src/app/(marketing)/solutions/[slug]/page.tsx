@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { AuditMock, SigningMock } from '@/components/marketing/Mocks';
 import { Check, CtaBand, GoldLink, OutlineLink } from '@/components/marketing/Site';
 import { SOLUTIONS, solutionBySlug } from '@/lib/solutions';
+import { pageMeta } from '@/lib/seo';
 
 export function generateStaticParams() {
   return SOLUTIONS.map((s) => ({ slug: s.slug }));
@@ -11,7 +12,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const s = solutionBySlug((await params).slug);
-  return s ? { title: `${s.name} solutions`, description: s.intro } : {};
+  return s ? pageMeta({ title: `E-Signatures for ${s.name}`, description: s.intro, path: `/solutions/${s.slug}` }) : {};
 }
 
 export default async function SolutionPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -52,7 +53,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           <div className="mt-10 grid gap-6 lg:grid-cols-3">
             {s.useCases.map((u, i) => (
               <article key={u.title} className="rounded-2xl bg-brand-50 p-8 ring-1 ring-brand-100">
-                <span className="font-mono text-sm text-brand-600">0{i + 1}</span>
+                <span className="font-mono text-sm text-brand-700">0{i + 1}</span>
                 <h3 className="mt-3 text-xl font-bold text-ink">{u.title}</h3>
                 <p className="mt-3 leading-relaxed text-gray-600">{u.body}</p>
               </article>

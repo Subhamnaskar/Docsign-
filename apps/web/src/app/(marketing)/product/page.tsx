@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import { Check, CtaBand, PageHero, Section, SectionHeading } from '@/components/marketing/Site';
+import { pageMeta } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Product',
-  description: 'Prepare, send, sign and verify agreements, with templates, web forms, payments, Aadhaar eSign, signer languages and a full audit trail.',
-};
+export const metadata: Metadata = pageMeta({
+  title: 'E-Signature Features: Templates, Forms, Aadhaar eSign',
+  description: 'Prepare, send, sign and verify agreements online: templates, bulk send, web forms, payments, Aadhaar eSign, signing in 10 languages and a full audit trail.',
+  path: '/product',
+  keywords: ['e-signature features', 'document signing software', 'bulk send for signature', 'online forms with signature'],
+});
 
 const GROUPS = [
   {

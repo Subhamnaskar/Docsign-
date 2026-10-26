@@ -17,8 +17,8 @@ import type { Envelope, Field } from '@/lib/types';
 export default function SignYourselfPage() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const check = useCallback(() => {
-    api('/auth/me')
-      .then(() => setSignedIn(true))
+    api<{ signedIn: boolean }>('/auth/state')
+      .then((s) => setSignedIn(s.signedIn))
       .catch(() => setSignedIn(false));
   }, []);
   useEffect(check, [check]);

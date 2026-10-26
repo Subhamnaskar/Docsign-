@@ -3,11 +3,14 @@ import { HelpIndex } from '@/components/marketing/HelpIndex';
 import { PageHero, Section } from '@/components/marketing/Site';
 import type { ArticleSummary } from '@/components/HelpWidgets';
 import { API_URL } from '@/lib/serverApi';
+import { pageMeta } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Help centre',
-  description: 'Guides for sending and signing agreements, India features, teams, security, billing and the API.',
-};
+export const metadata: Metadata = pageMeta({
+  title: 'Help Centre: How to Send and Sign Documents Online',
+  description: 'Step-by-step guides to sending and e-signing documents, Aadhaar eSign and other India features, teams, security, billing and the API.',
+  path: '/help',
+  keywords: ['how to sign a PDF online', 'how to send a document for signature', 'Aadhaar eSign help'],
+});
 
 export const revalidate = 300;
 

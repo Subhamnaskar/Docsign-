@@ -83,7 +83,7 @@ export function SiteFooter() {
         </div>
         {FOOTER.map((col) => (
           <div key={col.title}>
-            <h3 className="text-sm font-bold text-ink">{col.title}</h3>
+            <h2 className="text-sm font-bold text-ink">{col.title}</h2>
             <ul className="mt-4 space-y-2.5">
               {col.links.map((l) => (
                 <li key={l.label}>

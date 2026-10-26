@@ -5,16 +5,19 @@ import { CodeTabs, EmailStart, FeatureTabs } from '@/components/marketing/Landin
 import { CtaBand } from '@/components/marketing/Site';
 import { brand } from '@/lib/brand';
 import { SOLUTIONS } from '@/lib/solutions';
+import type { Metadata } from 'next';
+import { JsonLd } from '@/components/JsonLd';
+import { pageMeta, softwareLd } from '@/lib/seo';
 
 /** Integrations the product has today, shown as wordmarks in their own colours (no customer claim). */
 const WORKS_WITH: { name: string; className: string }[] = [
   { name: 'slack', className: 'font-black lowercase tracking-tight text-[#4A154B]' },
-  { name: 'Google Drive', className: 'font-semibold text-[#4285F4]' },
+  { name: 'Google Drive', className: 'font-semibold text-[#1A73E8]' },
   { name: 'Microsoft 365', className: 'font-semibold text-gray-700' },
   { name: 'Dropbox', className: 'font-bold text-[#0061FE]' },
-  { name: 'HubSpot', className: 'font-bold text-[#FF7A59]' },
+  { name: 'HubSpot', className: 'font-bold text-[#C2410C]' },
   { name: 'zapier', className: 'font-black lowercase text-[#FF4F00]' },
-  { name: 'Salesforce', className: 'font-bold text-[#00A1E0]' },
+  { name: 'Salesforce', className: 'font-bold text-[#0176D3]' },
   { name: 'OneDrive', className: 'font-semibold text-[#0364B8]' },
 ];
 
@@ -38,27 +41,38 @@ const INDUSTRY_ICONS: Record<string, IconName> = {
 };
 
 const HUB: { label: string; className: string; text: string }[] = [
-  { label: 'Salesforce', className: 'bg-[#00A1E0] text-white', text: 'sf' },
+  { label: 'Salesforce', className: 'bg-[#0176D3] text-white', text: 'sf' },
   { label: 'Google Drive', className: 'bg-white text-[#1FA463]', text: '▲' },
   { label: 'Slack', className: 'bg-white text-[#4A154B]', text: '#' },
-  { label: 'HubSpot', className: 'bg-white text-[#FF7A59]', text: 'H' },
+  { label: 'HubSpot', className: 'bg-white text-[#C2410C]', text: 'H' },
 ];
+
+export const metadata: Metadata = {
+  ...pageMeta({
+    title: 'E-Signature Software for India and the World',
+    description: 'Sign PDFs and contracts online with legally valid e-signatures, Aadhaar eSign and sealed PDFs. Send for signature, track and store agreements. Free trial.',
+    path: '/',
+    keywords: ['e-signature', 'electronic signature', 'digital signature online', 'Aadhaar eSign', 'sign PDF online', 'e-signature software India', 'online document signing'],
+  }),
+  title: { absolute: `${brand.name}: E-Signature Software for India and the World` },
+};
 
 export default function Home() {
   return (
     <>
+      <JsonLd data={softwareLd()} />
       {/* Hero */}
       <section className="relative overflow-hidden bg-night text-white">
         <HeroWaves />
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-14 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-20 lg:pt-20">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">Agreements for a faster tomorrow</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">E-signature software for India and the world</p>
             <h1 className="mt-5 text-[2.7rem] font-black leading-[1.03] tracking-tight sm:text-6xl lg:text-[3.5rem] xl:text-[3.9rem]">
               <span className="lg:whitespace-nowrap">Send. Sign. Manage.</span>
               <span className="block text-gold">All in one place.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-300">
-              {brand.name} helps modern teams create, send, sign and manage agreements with the right workflows, integrations and security to keep business moving.
+              {brand.name} helps teams create, send, e-sign and manage agreements online, with Aadhaar eSign, sealed PDFs, workflows and integrations to keep business moving.
             </p>
             <div className="mt-8 max-w-xl">
               <EmailStart id="hero-email" />

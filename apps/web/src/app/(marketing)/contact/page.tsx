@@ -124,7 +124,7 @@ export default function ContactPage() {
     <section className="bg-cream">
       <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1fr_1.2fr]">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-brand-600">Contact</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-brand-700">Contact</p>
           <h1 className="mt-2 text-4xl font-bold tracking-tight text-gray-900">Book a demo</h1>
           <p className="mt-5 text-lg text-gray-600">See how {brand.name} handles your documents and jurisdictions. We usually reply within one business day.</p>
           <ul className="mt-8 space-y-3 text-gray-700">
@@ -134,7 +134,7 @@ export default function ContactPage() {
           </ul>
           <p className="mt-10 text-sm text-gray-500">
             Prefer email?{' '}
-            <a href={`mailto:${brand.salesEmail}`} className="font-medium text-brand-600 hover:underline">
+            <a href={`mailto:${brand.salesEmail}`} className="font-medium text-brand-700 hover:underline">
               {brand.salesEmail}
             </a>
           </p>

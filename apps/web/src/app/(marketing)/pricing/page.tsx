@@ -4,6 +4,8 @@ import { CtaBand, PageHero, Section } from '@/components/marketing/Site';
 import { type PricingData, PricingPlans } from '@/components/marketing/PricingPlans';
 import { apiPricing } from '@/lib/brand';
 import { API_URL } from '@/lib/serverApi';
+import { faqLd, pageMeta, softwareLd } from '@/lib/seo';
+import { JsonLd } from '@/components/JsonLd';
 
 // Prices come from the API; refresh every 5 minutes
 export const revalidate = 300;
@@ -17,10 +19,12 @@ async function loadPricing(): Promise<PricingData | null> {
   }
 }
 
-export const metadata: Metadata = {
-  title: 'Pricing',
-  description: 'Plans for teams, growing companies and regulated enterprises, plus usage-based API pricing.',
-};
+export const metadata: Metadata = pageMeta({
+  title: 'E-Signature Pricing: Plans, Free Trial and API',
+  description: 'Simple e-signature pricing in rupees and dollars, with GST invoices. Plans for small teams, growing companies and enterprises, a free trial and usage-based API pricing.',
+  path: '/pricing',
+  keywords: ['e-signature pricing', 'e-signature price India', 'docusign alternative India', 'cheap e-signature'],
+});
 
 const FAQ = [
   ['Do signers need an account?', 'No. Signers open a personal link from their email, confirm a one-time code and sign. Only senders need an account.'],
@@ -32,11 +36,15 @@ const FAQ = [
 ];
 
 export default async function PricingPage() {
+  const data = await loadPricing();
+  const prices = (data?.plans ?? []).filter((p) => p.price?.INR).map((p) => ({ name: p.name, inr: p.price!.INR / 100 }));
   return (
     <>
+      <JsonLd data={softwareLd(prices)} />
+      <JsonLd data={faqLd(FAQ as [string, string][])} />
       <PageHero eyebrow="Pricing" title="Plans that grow with you" intro="Start free, then choose the plan that matches your volume and compliance needs." />
       <Section>
-        <PricingPlans data={await loadPricing()} />
+        <PricingPlans data={data} />
 
         <div className="mt-10 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-7 sm:flex-row sm:items-center sm:justify-between">
           <div>

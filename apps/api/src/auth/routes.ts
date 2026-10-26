@@ -104,6 +104,16 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /** Whether this browser is signed in; public pages use it to choose what to show (no 401 to log). */
+  app.get('/auth/state', async (req) => {
+    try {
+      await requireAuth(req);
+      return { signedIn: true };
+    } catch {
+      return { signedIn: false };
+    }
+  });
+
   app.get('/auth/me', { preHandler: requireAuth }, async (req) => {
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: req.auth.orgId } });
     const user = req.auth.userId ? await prisma.user.findUnique({ where: { id: req.auth.userId } }) : null;

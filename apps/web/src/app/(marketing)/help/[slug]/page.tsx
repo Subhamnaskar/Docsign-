@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Section } from '@/components/marketing/Site';
 import { Markdown } from '@/lib/markdown';
 import { API_URL } from '@/lib/serverApi';
+import { pageMeta } from '@/lib/seo';
 
 interface Article {
   slug: string;
@@ -26,7 +27,7 @@ async function load(slug: string): Promise<Article | null> {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const a = await load((await params).slug);
-  return a ? { title: a.title, description: a.summary } : { title: 'Help centre' };
+  return a ? pageMeta({ title: a.title, description: a.summary, path: `/help/${a.slug}` }) : { title: 'Help centre' };
 }
 
 export default async function HelpArticlePage({ params }: { params: Promise<{ slug: string }> }) {

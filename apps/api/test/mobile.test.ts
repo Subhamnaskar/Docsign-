@@ -110,6 +110,15 @@ describe('mobile app', () => {
     expect(await prisma.pushDevice.count({ where: { token: pushToken } })).toBe(0);
   });
 
+  it('tells public pages whether this browser is signed in, without a 401', async () => {
+    const anon = await app.inject({ method: 'GET', url: '/api/v1/auth/state' });
+    expect(anon.statusCode).toBe(200);
+    expect(anon.json()).toEqual({ signedIn: false });
+    const { email } = await registerSender(app);
+    const phone = await mobileLogin(email);
+    expect((await phone.call('GET', '/auth/state')).json()).toEqual({ signedIn: true });
+  });
+
   it('asks for the second factor when two-factor is on', async () => {
     const { email } = await registerSender(app);
     await prisma.user.update({ where: { email }, data: { totpEnabledAt: new Date() } });

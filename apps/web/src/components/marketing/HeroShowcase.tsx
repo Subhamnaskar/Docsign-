@@ -111,7 +111,7 @@ export function HeroShowcase() {
               </div>
               <div className="mt-3 flex gap-6 border-b border-gray-200 text-[12px] text-gray-500">
                 {['All', 'Drafts', 'Waiting for others', 'Completed'].map((t, i) => (
-                  <span key={t} className={cx('pb-2', i === 0 && 'border-b-2 border-brand-500 font-semibold text-brand-600')}>
+                  <span key={t} className={cx('pb-2', i === 0 && 'border-b-2 border-brand-500 font-semibold text-brand-700')}>
                     {t}
                   </span>
                 ))}
@@ -283,7 +283,7 @@ function SignatureCard({ onInsert }: { onInsert: (s: NonNullable<Signature>) => 
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={cx('-mb-px border-b-2 pb-2 pt-1 font-medium capitalize', tab === t ? 'border-brand-500 text-ink' : 'border-transparent text-gray-400 hover:text-gray-600')}
+            className={cx('-mb-px border-b-2 pb-2 pt-1 font-medium capitalize', tab === t ? 'border-brand-500 text-ink' : 'border-transparent text-gray-500 hover:text-gray-600')}
           >
             {t}
           </button>
@@ -343,7 +343,7 @@ function SignatureCard({ onInsert }: { onInsert: (s: NonNullable<Signature>) => 
       <button type="button" disabled={!ready} onClick={insert} className="mt-3 w-full rounded-xl bg-gold py-2.5 text-[12.5px] font-bold text-ink shadow-md shadow-brand-500/30 hover:brightness-105 disabled:opacity-50">
         Insert signature
       </button>
-      <p className="mt-2 text-center text-[10px] text-gray-400">Try it: draw, type or upload, then insert.</p>
+      <p className="mt-2 text-center text-[10px] text-gray-500">Try it: draw, type or upload, then insert.</p>
     </div>
   );
 }

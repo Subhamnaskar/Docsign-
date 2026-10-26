@@ -150,6 +150,22 @@ The upload boxes on the website and in the app offer Word, Excel and PowerPoint 
 soon as this is set up. To use your own converter instead, set `CONVERTER=gotenberg`
 and `GOTENBERG_URL`.
 
+## 8. Google Search and analytics (optional, free)
+
+The site already has page titles, share cards, structured data, a sitemap and
+robots rules. Only `sign.nuronixai.in` is indexed; the vercel.app address is
+marked noindex. Add any of these in Vercel, then **Redeploy** (they are read at build time):
+
+| Setting | Where to get it |
+|---|---|
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | search.google.com/search-console → add `https://sign.nuronixai.in` as a URL-prefix property → **HTML tag** → the `content="…"` value |
+| `NEXT_PUBLIC_GA_ID` | analytics.google.com → Admin → Data streams → Web → Measurement ID (`G-…`) |
+| `NEXT_PUBLIC_META_PIXEL_ID` | Meta Events Manager → your pixel's ID (only if you run Facebook/Instagram ads) |
+
+With an analytics ID set, visitors see a cookie banner and nothing is tracked until
+they accept; signing pages and the signed-in app are never tracked. After verifying
+in Search Console, submit `https://sign.nuronixai.in/sitemap.xml` under **Sitemaps**.
+
 ## Updating
 
 Push to GitHub; Vercel redeploys and applies database changes automatically.

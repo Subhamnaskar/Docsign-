@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CtaBand, PageHero, Section, SectionHeading } from '@/components/marketing/Site';
+import { pageMeta } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Partners',
-  description: 'Referral, reseller, system integrator, OEM and trust-service partnerships.',
-};
+export const metadata: Metadata = pageMeta({
+  title: 'E-Signature Partner Programme',
+  description: 'Refer, resell or embed Nuronix eSign: referral, reseller, system integrator, OEM and trust-service partnerships for India and global markets.',
+  path: '/partners',
+  keywords: ['e-signature reseller', 'e-signature partner programme', 'white label e-signature'],
+});
 
 const TYPES = [
   { name: 'Referral partners', role: 'Introduce qualified customers', get: 'Referral commission and co-branded marketing material' },

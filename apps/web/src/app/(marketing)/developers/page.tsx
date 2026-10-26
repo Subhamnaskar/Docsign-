@@ -3,11 +3,14 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { CtaBand, PageHero, Section, SectionHeading } from '@/components/marketing/Site';
 import { brand } from '@/lib/brand';
+import { pageMeta } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Developers',
-  description: 'REST API, API keys and signed webhooks for sending, tracking and verifying agreements.',
-};
+export const metadata: Metadata = pageMeta({
+  title: 'E-Signature API and Webhooks for Developers',
+  description: 'Add e-signatures to your app with a REST API, SDKs for Node.js and Python, signed webhooks and embedded signing. Send, track and verify agreements in code.',
+  path: '/developers',
+  keywords: ['e-signature API', 'esign API India', 'embedded signing', 'signature webhooks', 'REST API e-signature'],
+});
 
 const BASE = `https://${brand.domain}/api/v1`;
 
