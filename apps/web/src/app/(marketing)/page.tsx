@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { HeroShowcase } from '@/components/marketing/HeroShowcase';
 import { Icon, type IconName } from '@/components/marketing/Icons';
 import { CodeTabs, EmailStart, FeatureTabs } from '@/components/marketing/Landing';
+import { Globe } from '@/components/marketing/Globe';
+import { LiveToasts, Marquee, Reveal, Starfield } from '@/components/marketing/Motion';
 import { CtaBand } from '@/components/marketing/Site';
 import { brand } from '@/lib/brand';
 import { SOLUTIONS } from '@/lib/solutions';
@@ -57,6 +59,13 @@ export const metadata: Metadata = {
   title: { absolute: `${brand.name}: E-Signature Software for India and the World` },
 };
 
+const MARKETS: [flag: string, name: string, law: string][] = [
+  ['🇮🇳', 'India', 'IT Act · Aadhaar eSign'],
+  ['🇺🇸', 'USA', 'ESIGN · UETA'],
+  ['🇬🇧', 'UK', 'Electronic Communications Act'],
+  ['🇪🇺', 'EU', 'eIDAS'],
+];
+
 export default function Home() {
   return (
     <>
@@ -64,12 +73,13 @@ export default function Home() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-night text-white">
         <HeroWaves />
+        <Starfield />
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-14 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-20 lg:pt-20">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">E-signature software for India and the world</p>
-            <h1 className="mt-5 text-[2.7rem] font-black leading-[1.03] tracking-tight sm:text-6xl lg:text-[3.5rem] xl:text-[3.9rem]">
+            <h1 className="mt-5 text-[2.9rem] font-light leading-[1.02] tracking-tight sm:text-6xl lg:text-[3.8rem] xl:text-[4.3rem]">
               <span className="lg:whitespace-nowrap">Send. Sign. Manage.</span>
-              <span className="block text-gold">All in one place.</span>
+              <span className="text-gold-shimmer block font-normal">All in one place.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-300">
               {brand.name} helps teams create, send, e-sign and manage agreements online, with Aadhaar eSign, sealed PDFs, workflows and integrations to keep business moving.
@@ -84,7 +94,10 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <HeroShowcase />
+          <div className="relative">
+            <HeroShowcase />
+            <LiveToasts className="mt-6 max-w-xs lg:absolute lg:-bottom-6 lg:right-0 lg:z-20 lg:mt-0" />
+          </div>
         </div>
       </section>
 
@@ -92,27 +105,67 @@ export default function Home() {
       <section className="border-b border-gray-100 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
           <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Works with the tools your team already uses</p>
-          <ul className="mt-6 grid grid-cols-2 items-center justify-items-center gap-6 sm:grid-cols-4 lg:grid-cols-8">
-            {WORKS_WITH.map((w) => (
-              <li key={w.name} className={`text-xl ${w.className}`}>
-                {w.name}
-              </li>
-            ))}
-          </ul>
+          <div className="mt-6">
+            <Marquee>
+              {WORKS_WITH.map((w) => (
+                <span key={w.name} className={`whitespace-nowrap text-xl ${w.className}`}>
+                  {w.name}
+                </span>
+              ))}
+            </Marquee>
+          </div>
         </div>
       </section>
 
       {/* Features */}
       <section id="features" className="scroll-mt-20 bg-cream">
         <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:py-24">
-          <div className="mx-auto max-w-3xl text-center">
+          <Reveal className="mx-auto max-w-3xl text-center">
             <span className="inline-block rounded-full bg-brand-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-brand-700">Powerful features</span>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-ink sm:text-5xl">Everything you need to manage agreements</h2>
             <p className="mt-4 text-lg text-gray-600">From e-signatures to automated workflows, {brand.name} gives you the tools to handle your contracts from start to finish.</p>
-          </div>
+          </Reveal>
           <div className="mt-10">
             <FeatureTabs />
           </div>
+        </div>
+      </section>
+
+      {/* Every market */}
+      <section className="relative overflow-hidden bg-[#0b0820] text-white">
+        <Starfield count={50} />
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:py-24">
+          <Reveal className="mx-auto w-full max-w-[34rem]">
+            <Globe />
+          </Reveal>
+          <Reveal delay={150}>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-300">Built for agreements everywhere</p>
+            <h2 className="mt-4 text-4xl font-light leading-tight tracking-tight sm:text-5xl">
+              One eSign.
+              <span className="text-gold-shimmer block font-normal">Every market you sign in.</span>
+            </h2>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-gray-300">
+              The right signature, consent and evidence for each country, from Aadhaar eSign in India to eIDAS in Europe, sealed into one tamper-evident PDF.
+            </p>
+            <ul className="mt-6 flex flex-wrap gap-2">
+              {MARKETS.map(([flag, name, law]) => (
+                <li key={name} className="rounded-full bg-white/5 px-3 py-1.5 text-sm ring-1 ring-white/15">
+                  {flag} <span className="font-semibold">{name}</span> <span className="text-gray-400">{law}</span>
+                </li>
+              ))}
+            </ul>
+            <dl className="mt-8 grid max-w-md grid-cols-3 gap-6">
+              {[['4', 'Jurisdictions'], ['10', 'Signer languages'], ['100%', 'Sealed PDFs']].map(([n, l]) => (
+                <div key={l}>
+                  <dt className="text-3xl font-light">{n}</dt>
+                  <dd className="mt-1 text-sm text-gray-400">{l}</dd>
+                </div>
+              ))}
+            </dl>
+            <Link href="/register" className="sheen bg-gold mt-8 inline-flex rounded-full px-6 py-3 font-semibold text-ink">
+              Start free in your country →
+            </Link>
+          </Reveal>
         </div>
       </section>
 
