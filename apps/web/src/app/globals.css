@@ -76,7 +76,23 @@ body {
 .sheen { position: relative; overflow: hidden; }
 .sheen::after { content: ''; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent); transform: translateX(-120%) skewX(-20deg); animation: sheen 4.5s ease-in-out 1.5s infinite; }
 
+/* Hero scene */
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes draw { 0% { stroke-dashoffset: 1; } 45%, 85% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes row-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes flow { to { stroke-dashoffset: -1; } }
+@keyframes glow-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.6; } }
+@keyframes ping-dot { 75%, 100% { transform: scale(2.4); opacity: 0; } }
+.float { animation: float 6s ease-in-out infinite; }
+.sig-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 4.5s ease-in-out infinite; }
+.row-in { opacity: 0; animation: row-in 0.7s cubic-bezier(.2,.7,.2,1) forwards; }
+.flow { stroke-dasharray: 0.08 0.92; animation: flow 5s linear infinite; }
+.glow-pulse { animation: glow-pulse 4s ease-in-out infinite; }
+.ping-dot { animation: ping-dot 1.6s cubic-bezier(0,0,.2,1) infinite; }
+
 @media (prefers-reduced-motion: reduce) {
-  .text-gold-shimmer, .twinkle, .drift, .marquee, .toast-in, .sheen::after { animation: none !important; }
+  .text-gold-shimmer, .twinkle, .drift, .marquee, .toast-in, .sheen::after, .float, .flow, .glow-pulse, .ping-dot { animation: none !important; }
+  .sig-draw { animation: none; stroke-dashoffset: 0; }
+  .row-in { animation: none; opacity: 1; }
   .reveal { opacity: 1; transform: none; transition: none; }
 }

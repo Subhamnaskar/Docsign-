@@ -30,14 +30,19 @@ const NAV: [IconName, string][] = [
 ];
 
 /** A written-looking default signature, so the scene never starts empty. */
-const SAMPLE_SIGNATURE =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 70"><path d="M10 50 C 22 10, 34 10, 30 42 S 46 58, 58 30 C 64 18, 70 46, 80 40 S 96 26, 104 40 S 120 48, 132 36 L 210 34" fill="none" stroke="#1d1a4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+const SAMPLE_PATH = 'M10 50 C 22 10, 34 10, 30 42 S 46 58, 58 30 C 64 18, 70 46, 80 40 S 96 26, 104 40 S 120 48, 132 36 L 210 34';
+
+/** The sample signature writing itself, over and over. */
+function DrawnSignature({ className, faint }: { className?: string; faint?: boolean }) {
+  return (
+    <svg viewBox="0 0 220 70" className={className} aria-hidden>
+      <path d={SAMPLE_PATH} pathLength={1} className="sig-draw" fill="none" stroke="#1d1a4d" strokeOpacity={faint ? 0.25 : 1} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
+}
 
 export function HeroShowcase() {
-  const [signature, setSignature] = useState<Signature>({ kind: 'image', src: SAMPLE_SIGNATURE });
+  const [signature, setSignature] = useState<Signature>(null);
   const [signed, setSigned] = useState(false);
 
   return (
@@ -46,7 +51,7 @@ export function HeroShowcase() {
       <div className="bg-dots pointer-events-none absolute -right-6 top-24 hidden h-40 w-24 opacity-60 sm:block" aria-hidden />
       <div className="bg-dots pointer-events-none absolute -left-10 top-6 hidden h-24 w-24 opacity-50 sm:block" aria-hidden />
 
-      <div className="absolute right-4 top-0 z-30 hidden items-center gap-3 rounded-2xl border border-white/15 bg-[#161827]/90 py-2 pl-2 pr-5 text-sm text-gray-200 shadow-xl shadow-black/40 backdrop-blur sm:flex">
+      <div className="float absolute right-4 top-0 z-30 hidden items-center gap-3 rounded-2xl border border-white/15 bg-[#161827]/90 py-2 pl-2 pr-5 text-sm text-gray-200 shadow-xl shadow-black/40 backdrop-blur sm:flex">
         <span className="flex -space-x-2">
           {[
             ['IN', 'from-amber-300 to-orange-500'],
@@ -63,7 +68,7 @@ export function HeroShowcase() {
       </div>
 
       {/* App window, tilted in 3D */}
-      <div className="relative z-10 [perspective:2200px]">
+      <div className="float relative z-10 [perspective:2200px]" style={{ animationDuration: '8s' }}>
         <div
           className="relative overflow-hidden rounded-[22px] border-[7px] border-[#1a1d2e] bg-white ring-1 ring-white/15 sm:[transform:rotateY(-16deg)_rotateX(6deg)_rotateZ(1.5deg)] sm:[transform-origin:30%_50%]"
           style={{ boxShadow: '10px 10px 0 -1px #11131f, 18px 20px 0 -2px #0c0d17, 40px 60px 90px rgba(0,0,0,0.6), 0 0 80px rgba(201,147,46,0.12)' }}
@@ -107,7 +112,7 @@ export function HeroShowcase() {
               </div>
               <div className="mt-5 flex items-center justify-between">
                 <p className="text-[22px] font-bold tracking-tight text-ink">Agreements</p>
-                <span className="rounded-lg bg-gold px-4 py-2 text-[12px] font-bold text-ink shadow-md shadow-brand-500/30">New agreement</span>
+                <span className="sheen rounded-lg bg-gold px-4 py-2 text-[12px] font-bold text-ink shadow-md shadow-brand-500/30">New agreement</span>
               </div>
               <div className="mt-3 flex gap-6 border-b border-gray-200 text-[12px] text-gray-500">
                 {['All', 'Drafts', 'Waiting for others', 'Completed'].map((t, i) => (
@@ -117,8 +122,8 @@ export function HeroShowcase() {
                 ))}
               </div>
               <ul className="mt-4 space-y-2.5">
-                {ROWS.map((r) => (
-                  <li key={r.title} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3.5 py-3 shadow-[0_2px_8px_rgba(15,20,40,0.05)]">
+                {ROWS.map((r, i) => (
+                  <li key={r.title} style={{ animationDelay: `${300 + i * 180}ms` }} className="row-in flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3.5 py-3 shadow-[0_2px_8px_rgba(15,20,40,0.05)]">
                     <span className={cx('flex h-10 w-10 items-center justify-center rounded-lg', r.icon)}>
                       <Icon name="document" className="h-5 w-5" />
                     </span>
@@ -126,7 +131,15 @@ export function HeroShowcase() {
                       <p className="truncate text-[13.5px] font-semibold text-ink">{r.title}</p>
                       <p className="truncate text-[11.5px] text-gray-500">{r.party}</p>
                     </div>
-                    <span className={cx('whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium', r.tone)}>{r.status}</span>
+                    <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium', r.tone)}>
+                      {r.status.startsWith('Waiting') && (
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="ping-dot absolute h-full w-full rounded-full bg-amber-500" />
+                          <span className="relative h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        </span>
+                      )}
+                      {r.status}
+                    </span>
                     <span className="text-gray-400">•••</span>
                   </li>
                 ))}
@@ -138,16 +151,18 @@ export function HeroShowcase() {
 
       {/* Working signature card */}
       <div className="relative z-20 mx-auto -mt-8 w-[270px] sm:absolute sm:-left-8 sm:bottom-2 sm:mt-0 lg:-left-4">
+        <div className="float" style={{ animationDelay: '-2s', animationDuration: '7s' }}>
         <SignatureCard
           onInsert={(s) => {
             setSignature(s);
             setSigned(false);
           }}
         />
+        </div>
       </div>
 
       {/* Phone, tilted in 3D */}
-      <div className="absolute -right-4 bottom-0 z-20 hidden [perspective:1200px] sm:block lg:-right-10">
+      <div className="float absolute -right-4 bottom-0 z-20 hidden [perspective:1200px] sm:block lg:-right-10" style={{ animationDelay: '-4s' }}>
         <div
           className="relative w-[200px] rounded-[2.6rem] border-[8px] border-[#0f1120] bg-[#0f1120] [transform:rotateY(-18deg)_rotateZ(5deg)]"
           style={{ boxShadow: '6px 8px 0 -1px #1d2033, 30px 40px 70px rgba(0,0,0,0.65)' }}
@@ -162,12 +177,11 @@ export function HeroShowcase() {
                 ))}
               </div>
               <div className="mt-5 flex h-16 items-end justify-center border-b border-gray-200 pb-1">
-                {signature ? <SignaturePreview signature={signature} className="max-h-14" /> : <span className="text-[11px] text-gray-400">Sign here</span>}
+                {signature ? <SignaturePreview signature={signature} className="max-h-14" /> : <DrawnSignature className="h-14 w-full" />}
               </div>
             </div>
             <button
               type="button"
-              disabled={!signature}
               onClick={() => setSigned(true)}
               className="mt-3 w-full rounded-xl bg-gold py-2.5 text-[13px] font-bold text-ink shadow-md shadow-brand-500/30 disabled:opacity-50"
             >
@@ -195,8 +209,9 @@ function Ribbon() {
           <feGaussianBlur stdDeviation="10" />
         </filter>
       </defs>
-      <path d="M0 470 C 120 520, 230 300, 330 170 S 620 -10, 900 110" fill="none" stroke="url(#ribbon)" strokeWidth="70" strokeLinecap="round" opacity="0.45" filter="url(#ribbon-glow)" />
+      <path d="M0 470 C 120 520, 230 300, 330 170 S 620 -10, 900 110" fill="none" stroke="url(#ribbon)" strokeWidth="70" strokeLinecap="round" opacity="0.45" filter="url(#ribbon-glow)" className="glow-pulse" />
       <path d="M0 470 C 120 520, 230 300, 330 170 S 620 -10, 900 110" fill="none" stroke="url(#ribbon)" strokeWidth="4" strokeLinecap="round" />
+      <path d="M0 470 C 120 520, 230 300, 330 170 S 620 -10, 900 110" pathLength={1} fill="none" stroke="#fff6dc" strokeWidth="5" strokeLinecap="round" className="flow" />
       <path d="M10 500 C 140 545, 250 330, 350 200 S 640 25, 900 140" fill="none" stroke="url(#ribbon)" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
       <circle cx="60" cy="300" r="4" fill="#fff" opacity="0.8" />
     </svg>
@@ -289,7 +304,8 @@ function SignatureCard({ onInsert }: { onInsert: (s: NonNullable<Signature>) => 
           </button>
         ))}
       </div>
-      <div className="mt-3 h-24 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="relative mt-3 h-24 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        {tab === 'draw' && !drawn && <DrawnSignature faint className="pointer-events-none absolute inset-0 m-auto h-16 w-4/5" />}
         {tab === 'draw' && (
           <canvas
             ref={canvas}
