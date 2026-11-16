@@ -3,6 +3,8 @@
 # Skips only when nothing the website is built from changed (e.g. a push that
 # touches just the mobile app or docs). If the comparison fails, it builds.
 cd ../..
-base="${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}"
+base="${VERCEL_GIT_PREVIOUS_SHA:-}"
+# A redeploy of the same commit (e.g. after changing settings) always builds
+[ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD)" ] && exit 1
 git diff --quiet "$base" HEAD -- apps/web apps/api package.json package-lock.json && exit 0
 exit 1
